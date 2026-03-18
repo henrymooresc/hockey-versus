@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { NavLinks } from "@/components/NavLinks";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,8 +18,8 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
         <header className="sticky top-0 z-50 border-b border-[#1b2a4a]/60 bg-gray-950/80 backdrop-blur-lg">
-          <div className="mx-auto max-w-7xl px-6 py-3 flex items-center justify-between">
-            <a href="/" className="group transition-opacity duration-200 hover:opacity-85">
+          <div className="px-6 flex items-stretch gap-0">
+            <a href="/" className="shrink-0 py-2 pr-4 transition-opacity duration-200 hover:opacity-85">
               <Image
                 src="/logo.png"
                 alt="Bar Down Data"
@@ -27,14 +28,7 @@ export default function RootLayout({
                 className="rounded"
               />
             </a>
-            <nav className="flex items-center gap-6">
-              <a
-                href="/"
-                className="text-sm font-semibold uppercase tracking-widest text-[#5a7baa] transition-colors duration-200 hover:text-[#a62639]"
-              >
-                Hockey Versus
-              </a>
-            </nav>
+            <NavLinks />
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
