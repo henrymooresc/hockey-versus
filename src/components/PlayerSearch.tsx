@@ -13,6 +13,118 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+function TeamGroup({
+  abbrev,
+  logoUrl,
+  players,
+  selected,
+  onSelect,
+  defaultOpen,
+}: {
+  abbrev: string;
+  logoUrl: string | null;
+  players: PlayerSearchResult[];
+  selected: PlayerSearchResult | null;
+  onSelect: (p: PlayerSearchResult) => void;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen]);
+
+  return (
+    <li>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 bg-gray-900 px-4 py-2 hover:bg-gray-800"
+      >
+        {logoUrl ? (
+          <img src={logoUrl} alt={abbrev} className="h-5 w-5 object-contain" />
+        ) : (
+          <div className="h-5 w-5" />
+        )}
+        <span className="flex-1 text-left text-xs font-bold uppercase tracking-wider text-gray-400">
+          {abbrev}
+        </span>
+        <span className="text-xs text-gray-500">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <ul>
+          {players.map((player) => (
+            <li
+              key={player.id}
+              onClick={() => onSelect(player)}
+              className={`flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-gray-700 ${
+                selected?.id === player.id ? "bg-gray-700" : ""
+              }`}
+            >
+              {player.headshotUrl ? (
+                <img src={player.headshotUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <div className="h-9 w-9 rounded-full bg-gray-600" />
+              )}
+              <div>
+                <div className="font-medium">
+                  {player.firstName} {player.lastName}
+                </div>
+                <div className="text-xs text-gray-400">{player.position ?? "—"}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function TeamList({
+  results,
+  exclude,
+  selected,
+  onSelect,
+  isFiltering,
+  loading,
+}: {
+  results: PlayerSearchResult[];
+  exclude: PlayerSearchResult | null;
+  selected: PlayerSearchResult | null;
+  onSelect: (p: PlayerSearchResult) => void;
+  isFiltering: boolean;
+  loading: boolean;
+}) {
+  const filtered = results.filter((p) => p.id !== exclude?.id);
+  const groups = new Map<string, { logoUrl: string | null; players: PlayerSearchResult[] }>();
+  for (const player of filtered) {
+    const key = player.teamAbbrev ?? "—";
+    if (!groups.has(key)) groups.set(key, { logoUrl: player.teamLogoUrl, players: [] });
+    groups.get(key)!.players.push(player);
+  }
+
+  return (
+    <ul className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-700 bg-gray-800">
+      {loading ? (
+        <li className="px-4 py-3 text-sm text-gray-500">Loading...</li>
+      ) : filtered.length === 0 ? (
+        <li className="px-4 py-3 text-sm text-gray-500">No players found</li>
+      ) : (
+        Array.from(groups.entries()).map(([abbrev, group]) => (
+          <TeamGroup
+            key={abbrev}
+            abbrev={abbrev}
+            logoUrl={group.logoUrl}
+            players={group.players}
+            selected={selected}
+            onSelect={onSelect}
+            defaultOpen={isFiltering}
+          />
+        ))
+      )}
+    </ul>
+  );
+}
+
 function PlayerCombobox({
   label,
   selected,
@@ -83,37 +195,14 @@ function PlayerCombobox({
           className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       )}
-      <ul className="mt-2 max-h-72 overflow-auto rounded-lg border border-gray-700 bg-gray-800">
-        {loading ? (
-          <li className="px-4 py-3 text-sm text-gray-500">Loading...</li>
-        ) : results.length === 0 ? (
-          <li className="px-4 py-3 text-sm text-gray-500">No players found</li>
-        ) : (
-          results.filter((p) => p.id !== exclude?.id).map((player) => (
-            <li
-              key={player.id}
-              onClick={() => handleSelect(player)}
-              className={`flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-gray-700 ${
-                selected?.id === player.id ? "bg-gray-700" : ""
-              }`}
-            >
-              {player.headshotUrl ? (
-                <img src={player.headshotUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
-              ) : (
-                <div className="h-10 w-10 rounded-full bg-gray-600" />
-              )}
-              <div>
-                <div className="font-medium">
-                  {player.firstName} {player.lastName}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {player.teamAbbrev ?? "—"} &middot; {player.position ?? "—"}
-                </div>
-              </div>
-            </li>
-          ))
-        )}
-      </ul>
+      <TeamList
+        results={results}
+        exclude={exclude}
+        selected={selected}
+        onSelect={handleSelect}
+        isFiltering={debouncedQuery.length >= 2}
+        loading={loading}
+      />
     </div>
   );
 }

@@ -14,13 +14,14 @@ export async function GET(request: NextRequest) {
       position: players.position,
       headshotUrl: players.headshotUrl,
       teamAbbrev: teams.abbrev,
+      teamLogoUrl: teams.logoUrl,
     })
     .from(players)
     .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`);
 
   const results = await (q && q.length >= 2
     ? baseQuery.where(ilike(players.searchText, `%${q.toLowerCase()}%`)).limit(50)
-    : baseQuery.orderBy(asc(players.lastName)).limit(50));
+    : baseQuery.orderBy(asc(players.lastName)).limit(1000));
 
   return NextResponse.json({ players: results });
 }
