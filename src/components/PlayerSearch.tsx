@@ -234,12 +234,13 @@ function PlayerCombobox({
     setLoading(true);
     const params = new URLSearchParams({ onRoster: "true", minGames: "10" });
     if (debouncedQuery.length >= 2) params.set("q", debouncedQuery);
+    if (exclude?.id) params.set("versusWith", String(exclude.id));
     fetch(`/api/players/search?${params}`)
       .then((r) => r.json())
       .then((data) => setResults(data.players ?? []))
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
-  }, [debouncedQuery]);
+  }, [debouncedQuery, exclude?.id]);
 
   const handleSelect = useCallback(
     (player: PlayerSearchResult) => {
