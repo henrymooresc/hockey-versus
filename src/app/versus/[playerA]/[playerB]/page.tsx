@@ -176,6 +176,11 @@ export default async function VersusPage({
 
   return (
     <div className="flex flex-col items-center gap-8 pt-4">
+      <div className="w-full">
+        <a href="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+          ← Back
+        </a>
+      </div>
       {/* Player cards with VS */}
       <div className="flex items-center gap-8">
         <PlayerCard player={playerAInfo} />
