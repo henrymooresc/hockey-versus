@@ -213,6 +213,7 @@ function PlayerList({
   );
 }
 
+
 function PlayerCombobox({
   label,
   selected,
@@ -231,11 +232,9 @@ function PlayerCombobox({
 
   useEffect(() => {
     setLoading(true);
-    const url =
-      debouncedQuery.length >= 2
-        ? `/api/players/search?q=${encodeURIComponent(debouncedQuery)}`
-        : `/api/players/search`;
-    fetch(url)
+    const params = new URLSearchParams({ onRoster: "true", minGames: "10" });
+    if (debouncedQuery.length >= 2) params.set("q", debouncedQuery);
+    fetch(`/api/players/search?${params}`)
       .then((r) => r.json())
       .then((data) => setResults(data.players ?? []))
       .catch(() => setResults([]))
