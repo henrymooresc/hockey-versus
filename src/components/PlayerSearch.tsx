@@ -17,10 +17,12 @@ function PlayerCombobox({
   label,
   selected,
   onSelect,
+  exclude,
 }: {
   label: string;
   selected: PlayerSearchResult | null;
   onSelect: (player: PlayerSearchResult | null) => void;
+  exclude: PlayerSearchResult | null;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlayerSearchResult[]>([]);
@@ -87,7 +89,7 @@ function PlayerCombobox({
         ) : results.length === 0 ? (
           <li className="px-4 py-3 text-sm text-gray-500">No players found</li>
         ) : (
-          results.map((player) => (
+          results.filter((p) => p.id !== exclude?.id).map((player) => (
             <li
               key={player.id}
               onClick={() => handleSelect(player)}
@@ -134,11 +136,13 @@ export function PlayerSearch() {
           label="Player 1"
           selected={playerA}
           onSelect={setPlayerA}
+          exclude={playerB}
         />
         <PlayerCombobox
           label="Player 2"
           selected={playerB}
           onSelect={setPlayerB}
+          exclude={playerA}
         />
       </div>
       <button
