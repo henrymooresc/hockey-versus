@@ -1,0 +1,241 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { versusStats, players, teams } from "@/db/schema";
+import { sql, eq, or, and, gt } from "drizzle-orm";
+
+/**
+ * For each stat, returns the top 3 opponents where the selected player
+ * performed best, and the bottom 3 where they performed worst.
+ *
+ * "Rivalry" weight = stat difference * log(1 + toiSharedSeconds)
+ * so high-interaction matchups rank higher than flukey low-sample ones.
+ */
+
+interface RivalEntry {
+  playerId: number;
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  headshotUrl: string | null;
+  teamAbbrev: string | null;
+  teamLogoUrl: string | null;
+  value: number;
+  opponentValue: number;
+  toiSharedSeconds: number;
+  gamesShared: number;
+}
+
+interface StatRivals {
+  label: string;
+  top: RivalEntry[];
+  bottom: RivalEntry[];
+}
+
+// Stats to rank, from the selected player's perspective.
+// "field" = the column for the selected player, "oppField" = the opponent's column.
+// "higherIsBetter" controls which direction is "top" vs "bottom".
+const SKATER_STATS: {
+  label: string;
+  fieldA: string;
+  fieldB: string;
+  higherIsBetter: boolean;
+}[] = [
+  { label: "Goals", fieldA: "player_a_goals", fieldB: "player_b_goals", higherIsBetter: true },
+  { label: "Assists", fieldA: "player_a_assists", fieldB: "player_b_assists", higherIsBetter: true },
+  { label: "Points", fieldA: "(player_a_goals + player_a_assists)", fieldB: "(player_b_goals + player_b_assists)", higherIsBetter: true },
+  { label: "Goals For", fieldA: "goals_for_a", fieldB: "goals_for_b", higherIsBetter: true },
+  { label: "Goals Against", fieldA: "goals_against_a", fieldB: "goals_against_b", higherIsBetter: false },
+  { label: "Shots For", fieldA: "shots_for_a", fieldB: "shots_for_b", higherIsBetter: true },
+  { label: "Shots Against", fieldA: "shots_against_a", fieldB: "shots_against_b", higherIsBetter: false },
+  { label: "Hits", fieldA: "hits_by_a", fieldB: "hits_by_b", higherIsBetter: true },
+  { label: "Penalties", fieldA: "penalties_by_a", fieldB: "penalties_by_b", higherIsBetter: false },
+];
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+  const resolvedParams = await Promise.resolve(context.params);
+  const playerId = parseInt(resolvedParams.id, 10);
+  if (isNaN(playerId)) {
+    return NextResponse.json({ error: "Invalid player ID" }, { status: 400 });
+  }
+
+  // Aggregate all seasons into totals per opponent, only opponents (sameTeam = false)
+  const rows = await db.execute(sql`
+    WITH aggregated AS (
+      SELECT
+        CASE WHEN player_a_id = ${playerId} THEN player_b_id ELSE player_a_id END AS opponent_id,
+        CASE WHEN player_a_id = ${playerId} THEN 'A' ELSE 'B' END AS player_side,
+        SUM(toi_shared_seconds)::int AS toi_shared_seconds,
+        SUM(games_shared)::int AS games_shared,
+        SUM(player_a_goals)::int AS player_a_goals,
+        SUM(player_a_assists)::int AS player_a_assists,
+        SUM(player_b_goals)::int AS player_b_goals,
+        SUM(player_b_assists)::int AS player_b_assists,
+        SUM(goals_for_a)::int AS goals_for_a,
+        SUM(goals_against_a)::int AS goals_against_a,
+        SUM(goals_for_b)::int AS goals_for_b,
+        SUM(goals_against_b)::int AS goals_against_b,
+        SUM(shots_for_a)::int AS shots_for_a,
+        SUM(shots_against_a)::int AS shots_against_a,
+        SUM(shots_for_b)::int AS shots_for_b,
+        SUM(shots_against_b)::int AS shots_against_b,
+        SUM(hits_by_a)::int AS hits_by_a,
+        SUM(hits_by_b)::int AS hits_by_b,
+        SUM(penalties_by_a)::int AS penalties_by_a,
+        SUM(penalties_by_b)::int AS penalties_by_b,
+        SUM(faceoff_wins_a)::int AS faceoff_wins_a,
+        SUM(faceoff_wins_b)::int AS faceoff_wins_b,
+        SUM(wins_a)::int AS wins_a,
+        SUM(wins_b)::int AS wins_b
+      FROM versus_stats
+      WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
+        AND same_team = false
+        AND toi_shared_seconds > 0
+      GROUP BY opponent_id, player_side
+    )
+    SELECT
+      a.*,
+      p.first_name,
+      p.last_name,
+      p.position,
+      p.headshot_url,
+      t.abbrev AS team_abbrev,
+      t.logo_url AS team_logo_url
+    FROM aggregated a
+    JOIN players p ON p.id = a.opponent_id
+    LEFT JOIN teams t ON t.id = p.current_team_id
+  `);
+
+  // Build a normalized array where stats are from the selected player's perspective
+  interface AggRow {
+    opponent_id: number;
+    player_side: string;
+    toi_shared_seconds: number;
+    games_shared: number;
+    first_name: string;
+    last_name: string;
+    position: string | null;
+    headshot_url: string | null;
+    team_abbrev: string | null;
+    team_logo_url: string | null;
+    [key: string]: unknown;
+  }
+
+  const rowsArray = Array.isArray(rows) ? rows : (rows as any).rows ?? [];
+  const opponents = (rowsArray as AggRow[]).map((row) => {
+    const isA = row.player_side === "A";
+    return {
+      opponentId: row.opponent_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      position: row.position,
+      headshotUrl: row.headshot_url,
+      teamAbbrev: row.team_abbrev,
+      teamLogoUrl: row.team_logo_url,
+      toiSharedSeconds: row.toi_shared_seconds,
+      gamesShared: row.games_shared,
+      // Stat values from selected player's perspective
+      stats: {
+        goals: isA ? row.player_a_goals as number : row.player_b_goals as number,
+        assists: isA ? row.player_a_assists as number : row.player_b_assists as number,
+        points: isA
+          ? (row.player_a_goals as number) + (row.player_a_assists as number)
+          : (row.player_b_goals as number) + (row.player_b_assists as number),
+        goalsFor: isA ? row.goals_for_a as number : row.goals_for_b as number,
+        goalsAgainst: isA ? row.goals_against_a as number : row.goals_against_b as number,
+        shotsFor: isA ? row.shots_for_a as number : row.shots_for_b as number,
+        shotsAgainst: isA ? row.shots_against_a as number : row.shots_against_b as number,
+        hits: isA ? row.hits_by_a as number : row.hits_by_b as number,
+        penalties: isA ? row.penalties_by_a as number : row.penalties_by_b as number,
+      },
+      // Opponent's stats for the same categories
+      oppStats: {
+        goals: isA ? row.player_b_goals as number : row.player_a_goals as number,
+        assists: isA ? row.player_b_assists as number : row.player_a_assists as number,
+        points: isA
+          ? (row.player_b_goals as number) + (row.player_b_assists as number)
+          : (row.player_a_goals as number) + (row.player_a_assists as number),
+        goalsFor: isA ? row.goals_for_b as number : row.goals_for_a as number,
+        goalsAgainst: isA ? row.goals_against_b as number : row.goals_against_a as number,
+        shotsFor: isA ? row.shots_for_b as number : row.shots_for_a as number,
+        shotsAgainst: isA ? row.shots_against_b as number : row.shots_against_a as number,
+        hits: isA ? row.hits_by_b as number : row.hits_by_a as number,
+        penalties: isA ? row.penalties_by_b as number : row.penalties_by_a as number,
+      },
+    };
+  });
+
+  // For each stat, rank opponents by weighted difference
+  const statKeys: {
+    key: string;
+    label: string;
+    higherIsBetter: boolean;
+  }[] = [
+    { key: "goals", label: "Goals", higherIsBetter: true },
+    { key: "assists", label: "Assists", higherIsBetter: true },
+    { key: "points", label: "Points", higherIsBetter: true },
+    { key: "goalsFor", label: "Goals For", higherIsBetter: true },
+    { key: "goalsAgainst", label: "Goals Against", higherIsBetter: false },
+    { key: "shotsFor", label: "Shots For", higherIsBetter: true },
+    { key: "shotsAgainst", label: "Shots Against", higherIsBetter: false },
+    { key: "hits", label: "Hits", higherIsBetter: true },
+    { key: "penalties", label: "Penalties", higherIsBetter: false },
+  ];
+
+  const results: StatRivals[] = statKeys.map(({ key, label, higherIsBetter }) => {
+    // Weighted score: stat difference * log(1 + toi)
+    // For "higherIsBetter" stats: positive = player outperformed opponent
+    // For "lowerIsBetter" stats: positive = player had fewer (better)
+    const scored = opponents.map((opp) => {
+      const playerVal = opp.stats[key as keyof typeof opp.stats] as number;
+      const oppVal = opp.oppStats[key as keyof typeof opp.oppStats] as number;
+      const diff = higherIsBetter ? playerVal - oppVal : oppVal - playerVal;
+      const weight = Math.log(1 + opp.toiSharedSeconds);
+      return { ...opp, playerVal, oppVal, weightedScore: diff * weight };
+    });
+
+    // Top 3: highest weighted score (player dominated)
+    const sortedBest = [...scored].sort((a, b) => b.weightedScore - a.weightedScore);
+    const top = sortedBest.slice(0, 3).map((o) => ({
+      playerId: o.opponentId,
+      firstName: o.firstName,
+      lastName: o.lastName,
+      position: o.position,
+      headshotUrl: o.headshotUrl,
+      teamAbbrev: o.teamAbbrev,
+      teamLogoUrl: o.teamLogoUrl,
+      value: o.playerVal,
+      opponentValue: o.oppVal,
+      toiSharedSeconds: o.toiSharedSeconds,
+      gamesShared: o.gamesShared,
+    }));
+
+    // Bottom 3: lowest weighted score (player was dominated)
+    const sortedWorst = [...scored].sort((a, b) => a.weightedScore - b.weightedScore);
+    const bottom = sortedWorst.slice(0, 3).map((o) => ({
+      playerId: o.opponentId,
+      firstName: o.firstName,
+      lastName: o.lastName,
+      position: o.position,
+      headshotUrl: o.headshotUrl,
+      teamAbbrev: o.teamAbbrev,
+      teamLogoUrl: o.teamLogoUrl,
+      value: o.playerVal,
+      opponentValue: o.oppVal,
+      toiSharedSeconds: o.toiSharedSeconds,
+      gamesShared: o.gamesShared,
+    }));
+
+    return { label, top, bottom };
+  });
+
+  return NextResponse.json({ rivals: results });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Rivals API error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

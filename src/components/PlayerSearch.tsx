@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { PlayerSearchResult } from "@/types/versus";
+import { SoloAnalysis } from "./SoloAnalysis";
 
 const DIVISIONS: Record<string, string[]> = {
   Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
@@ -288,14 +289,16 @@ function PlayerCombobox({
         />
       )}
 
-      <PlayerList
-        results={results}
-        exclude={exclude}
-        selected={selected}
-        onSelect={handleSelect}
-        isFiltering={debouncedQuery.length >= 2}
-        loading={loading}
-      />
+      {!selected && (
+        <PlayerList
+          results={results}
+          exclude={exclude}
+          selected={selected}
+          onSelect={handleSelect}
+          isFiltering={debouncedQuery.length >= 2}
+          loading={loading}
+        />
+      )}
     </div>
   );
 }
@@ -304,6 +307,7 @@ export function PlayerSearch() {
   const router = useRouter();
   const [playerA, setPlayerA] = useState<PlayerSearchResult | null>(null);
   const [playerB, setPlayerB] = useState<PlayerSearchResult | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
 
   const handleCompare = () => {
     if (playerA && playerB) {
@@ -311,19 +315,81 @@ export function PlayerSearch() {
     }
   };
 
+  const handleToggleCompare = () => {
+    if (compareMode) {
+      // Exiting compare mode — clear player B
+      setPlayerB(null);
+      setCompareMode(false);
+    } else {
+      setCompareMode(true);
+    }
+  };
+
   return (
     <div className="w-full">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <PlayerCombobox label="Player 1" selected={playerA} onSelect={setPlayerA} exclude={playerB} />
-        <PlayerCombobox label="Player 2" selected={playerB} onSelect={setPlayerB} exclude={playerA} />
+      {/* Compare toggle */}
+      <div className="mb-6 flex items-center justify-end gap-3">
+        <span className="text-sm text-gray-400">Head-to-Head</span>
+        <button
+          onClick={handleToggleCompare}
+          className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
+            compareMode
+              ? "border-blue-500 bg-blue-600"
+              : "border-gray-600 bg-gray-700"
+          }`}
+          role="switch"
+          aria-checked={compareMode}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
+              compareMode ? "translate-x-[22px]" : "translate-x-[2px]"
+            }`}
+          />
+        </button>
       </div>
-      <button
-        onClick={handleCompare}
-        disabled={!playerA || !playerB}
-        className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 hover:scale-[1.01] active:scale-[0.98] active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
-      >
-        Compare Players
-      </button>
+
+      {/* Player selection area */}
+      {!compareMode ? (
+        // Solo mode: single player picker
+        <div>
+          <PlayerCombobox
+            label="Select a Player"
+            selected={playerA}
+            onSelect={setPlayerA}
+            exclude={null}
+          />
+
+          {playerA && (
+            <SoloAnalysis player={playerA} />
+          )}
+        </div>
+      ) : (
+        // Compare mode: two player pickers side by side
+        <div>
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+            <PlayerCombobox
+              label="Player 1"
+              selected={playerA}
+              onSelect={setPlayerA}
+              exclude={playerB}
+            />
+            <PlayerCombobox
+              label="Player 2"
+              selected={playerB}
+              onSelect={setPlayerB}
+              exclude={playerA}
+            />
+          </div>
+
+          <button
+            onClick={handleCompare}
+            disabled={!playerA || !playerB}
+            className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 hover:scale-[1.01] active:scale-[0.98] active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
+          >
+            Compare Players
+          </button>
+        </div>
+      )}
     </div>
   );
 }
