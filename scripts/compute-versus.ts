@@ -26,7 +26,14 @@ async function main() {
 
   // Get games that have both shifts and events ingested
   const eligibleGames = await db
-    .select({ id: games.id, seasonId: games.seasonId })
+    .select({
+      id: games.id,
+      seasonId: games.seasonId,
+      homeTeamId: games.homeTeamId,
+      awayTeamId: games.awayTeamId,
+      homeScore: games.homeScore,
+      awayScore: games.awayScore,
+    })
     .from(games)
     .where(
       and(eq(games.shiftsIngested, true), eq(games.eventsIngested, true))
@@ -51,7 +58,7 @@ async function main() {
   // Accumulate stats per pair per season
   const accumulator = new Map<
     string,
-    PairStats & { seasonId: string; gamesShared: number }
+    PairStats & { seasonId: string; gamesShared: number; winsA: number; winsB: number }
   >();
 
   for (const game of filtered) {
@@ -92,19 +99,35 @@ async function main() {
         gameEvts as EventRecord[]
       );
 
+      // Determine game winner team ID
+      const winnerTeamId =
+        game.homeScore !== null && game.awayScore !== null && game.homeScore !== game.awayScore
+          ? game.homeScore > game.awayScore
+            ? game.homeTeamId
+            : game.awayTeamId
+          : null;
+
       // Accumulate into season-level stats
       for (const [pairKey, stats] of pairStats) {
         const accKey = `${pairKey}-${game.seasonId}`;
+
+        const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
+        const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
 
         if (!accumulator.has(accKey)) {
           accumulator.set(accKey, {
             ...stats,
             seasonId: game.seasonId,
             gamesShared: 1,
+            winsA: pairWinsA,
+            winsB: pairWinsB,
           });
         } else {
           const existing = accumulator.get(accKey)!;
           existing.gamesShared++;
+          existing.winsA += pairWinsA;
+          existing.winsB += pairWinsB;
+
           existing.toiSharedSeconds += stats.toiSharedSeconds;
           existing.goalsForA += stats.goalsForA;
           existing.goalsAgainstA += stats.goalsAgainstA;
@@ -155,6 +178,8 @@ async function main() {
           sameTeam: row.sameTeam,
           gamesShared: row.gamesShared,
           toiSharedSeconds: row.toiSharedSeconds,
+          winsA: row.winsA,
+          winsB: row.winsB,
           playerATeamId: row.playerATeamId,
           playerBTeamId: row.playerBTeamId,
           goalsForA: row.goalsForA,
@@ -188,6 +213,8 @@ async function main() {
             sameTeam: row.sameTeam,
             gamesShared: row.gamesShared,
             toiSharedSeconds: row.toiSharedSeconds,
+            winsA: row.winsA,
+            winsB: row.winsB,
             playerATeamId: row.playerATeamId,
             playerBTeamId: row.playerBTeamId,
             goalsForA: row.goalsForA,

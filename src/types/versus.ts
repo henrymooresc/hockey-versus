@@ -15,6 +15,8 @@ export interface VersusSeasonStats {
   sameTeam: boolean;
   gamesShared: number;
   toiSharedSeconds: number;
+  winsA: number;
+  winsB: number;
   playerA: VersusPlayerSeasonStats;
   playerB: VersusPlayerSeasonStats;
 }

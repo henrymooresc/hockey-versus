@@ -21,6 +21,50 @@ function saves(shotsAgainst: number, goalsAgainst: number): number {
   return shotsAgainst - goalsAgainst;
 }
 
+// ── Win/loss banner ─────────────────────────────────────────────────────────
+
+function WinLossBanner({
+  stats,
+  playerA,
+  playerB,
+}: {
+  stats: VersusSeasonStats;
+  playerA: PlayerInfo;
+  playerB: PlayerInfo;
+}) {
+  if (stats.sameTeam) return null;
+  const losses = stats.gamesShared - stats.winsA - stats.winsB;
+  const aWins = stats.winsA > stats.winsB;
+  const bWins = stats.winsB > stats.winsA;
+  return (
+    <div className="mb-5 rounded-lg border border-gray-600 bg-gray-800 px-4 py-3">
+      <div className="mb-2 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
+        Head-to-Head Record
+      </div>
+      <div className="grid grid-cols-3 items-center gap-2">
+        <div className="text-right">
+          <span className={`text-3xl font-black ${aWins ? "text-green-400" : bWins ? "text-red-400" : "text-gray-300"}`}>
+            {stats.winsA}
+          </span>
+          <div className="text-xs text-gray-500">{playerA.lastName}</div>
+        </div>
+        <div className="text-center">
+          {losses > 0 && (
+            <div className="text-sm font-semibold text-gray-500">{losses} tie{losses !== 1 ? "s" : ""}</div>
+          )}
+          <div className="text-xs text-gray-600">W</div>
+        </div>
+        <div className="text-left">
+          <span className={`text-3xl font-black ${bWins ? "text-green-400" : aWins ? "text-red-400" : "text-gray-300"}`}>
+            {stats.winsB}
+          </span>
+          <div className="text-xs text-gray-500">{playerB.lastName}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared header ──────────────────────────────────────────────────────────
 
 function TableHeader({
@@ -104,6 +148,7 @@ function SkaterTable({
 }) {
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+      <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       <TableHeader stats={stats} playerA={playerA} playerB={playerB} />
 
       <SectionLabel label="Individual" />
@@ -164,6 +209,7 @@ function GoalieVsGoalieTable({
 
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+      <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       <TableHeader stats={stats} playerA={playerA} playerB={playerB} />
 
       <SectionLabel label="Save Performance" />
@@ -203,6 +249,7 @@ function GoalieVsSkaterTable({
 
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+      <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       {/* Header */}
       <div className="mb-4 text-center text-sm text-gray-400">
         {stats.gamesShared} games &middot;{" "}

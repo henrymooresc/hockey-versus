@@ -83,6 +83,8 @@ export default async function VersusPage({
     sameTeam: row.sameTeam,
     gamesShared: row.gamesShared,
     toiSharedSeconds: row.toiSharedSeconds,
+    winsA: swapped ? row.winsB : row.winsA,
+    winsB: swapped ? row.winsA : row.winsB,
     playerA: {
       teamId: swapped ? row.playerBTeamId : row.playerATeamId,
       goalsFor: swapped ? row.goalsForB : row.goalsForA,
@@ -117,6 +119,8 @@ export default async function VersusPage({
       ...acc,
       gamesShared: acc.gamesShared + s.gamesShared,
       toiSharedSeconds: acc.toiSharedSeconds + s.toiSharedSeconds,
+      winsA: acc.winsA + s.winsA,
+      winsB: acc.winsB + s.winsB,
       playerA: {
         ...acc.playerA,
         goalsFor: acc.playerA.goalsFor + s.playerA.goalsFor,
@@ -155,6 +159,8 @@ export default async function VersusPage({
       sameTeam: false,
       gamesShared: 0,
       toiSharedSeconds: 0,
+      winsA: 0,
+      winsB: 0,
       playerA: {
         teamId: null,
         goalsFor: 0,

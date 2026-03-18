@@ -160,6 +160,9 @@ export const versusStats = pgTable(
     // Faceoffs
     faceoffWinsA: smallint("faceoff_wins_a").notNull().default(0),
     faceoffWinsB: smallint("faceoff_wins_b").notNull().default(0),
+    // Game record
+    winsA: smallint("wins_a").notNull().default(0),
+    winsB: smallint("wins_b").notNull().default(0),
     // Individual stats
     playerAGoals: smallint("player_a_goals").notNull().default(0),
     playerAAssists: smallint("player_a_assists").notNull().default(0),
