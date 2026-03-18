@@ -14,10 +14,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-gray-950 text-gray-100 antialiased">
-        <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm">
+        <header className="sticky top-0 z-50 border-b border-gray-800/50 bg-gray-950/70 backdrop-blur-lg">
           <div className="mx-auto max-w-7xl px-6 py-5">
-            <a href="/" className="text-3xl font-bold tracking-tight">
-              Hockey <span className="text-blue-400">Versus</span>
+            <a href="/" className="group text-3xl font-bold tracking-tight transition-opacity duration-200 hover:opacity-80">
+              Hockey <span className="text-blue-400 transition-colors duration-200 group-hover:text-blue-300">Versus</span>
             </a>
           </div>
         </header>

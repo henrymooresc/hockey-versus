@@ -64,8 +64,8 @@ export default async function VersusPage({
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-10 pt-4">
-        <a href="/" className="self-start text-sm text-gray-400 hover:text-white transition-colors">
-          ← Back
+        <a href="/" className="group self-start inline-flex items-center gap-2 text-sm text-gray-400 transition-all duration-200 hover:text-white hover:gap-3">
+          <span className="transition-transform duration-200 group-hover:-translate-x-0.5">←</span> Back
         </a>
         <div className="flex items-center justify-center gap-6 md:gap-16">
           <PlayerCard player={playerAInfo} />
@@ -193,15 +193,15 @@ export default async function VersusPage({
   return (
     <div className="flex flex-col gap-10 pt-4">
       {/* Back */}
-      <a href="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-        ← Back
+      <a href="/" className="group inline-flex items-center gap-2 text-sm text-gray-400 transition-all duration-200 hover:text-white hover:gap-3">
+        <span className="transition-transform duration-200 group-hover:-translate-x-0.5">←</span> Back
       </a>
 
       {/* Hero */}
       <div className="flex items-center justify-center gap-6 md:gap-16">
         <PlayerCard player={playerAInfo} />
         <div className="flex flex-col items-center gap-1">
-          <span className="text-5xl font-black text-blue-400 md:text-6xl">VS</span>
+          <span className="text-5xl font-black text-blue-400 md:text-6xl drop-shadow-[0_0_12px_rgba(96,165,250,0.3)]">VS</span>
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
             {totals.gamesShared} game{totals.gamesShared !== 1 ? "s" : ""} together
           </span>

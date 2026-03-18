@@ -37,7 +37,7 @@ function WinLossBanner({
   const aWins = stats.winsA > stats.winsB;
   const bWins = stats.winsB > stats.winsA;
   return (
-    <div className="mb-5 rounded-lg border border-gray-600 bg-gray-800 px-4 py-3">
+    <div className="mb-5 rounded-lg border border-gray-700/70 bg-gradient-to-r from-gray-800/80 via-gray-800 to-gray-800/80 px-4 py-3">
       <div className="mb-2 text-center text-xs font-bold uppercase tracking-widest text-gray-400">
         Head-to-Head Record
       </div>
@@ -117,10 +117,10 @@ function StatRow({
   const colorB = bWins ? "text-green-400" : aWins ? "text-red-400" : "text-gray-300";
 
   return (
-    <div className="grid grid-cols-3 items-center border-b border-gray-800 py-3">
-      <div className={`text-right font-mono text-xl font-semibold ${colorA}`}>{valueA}</div>
-      <div className="text-center text-xs text-gray-500">{label}</div>
-      <div className={`text-left font-mono text-xl font-semibold ${colorB}`}>{valueB}</div>
+    <div className="group grid grid-cols-3 items-center border-b border-gray-800/70 py-3 rounded-lg transition-colors duration-150 hover:bg-gray-800/50">
+      <div className={`text-right font-mono text-xl font-semibold transition-all duration-150 ${colorA}`}>{valueA}</div>
+      <div className="text-center text-xs text-gray-500 transition-colors duration-150 group-hover:text-gray-400">{label}</div>
+      <div className={`text-left font-mono text-xl font-semibold transition-all duration-150 ${colorB}`}>{valueB}</div>
     </div>
   );
 }
@@ -147,7 +147,7 @@ function SkaterTable({
   showFaceoffs: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+    <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 px-6 py-5 shadow-xl shadow-black/20 backdrop-blur-sm">
       <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       <TableHeader stats={stats} playerA={playerA} playerB={playerB} />
 
@@ -208,7 +208,7 @@ function GoalieVsGoalieTable({
   const svB = saves(stats.playerB.shotsAgainst, stats.playerB.goalsAgainst);
 
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+    <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 px-6 py-5 shadow-xl shadow-black/20 backdrop-blur-sm">
       <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       <TableHeader stats={stats} playerA={playerA} playerB={playerB} />
 
@@ -248,7 +248,7 @@ function GoalieVsSkaterTable({
   const goaliesSaves = skaterShots - skaterGoals;
 
   return (
-    <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
+    <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 px-6 py-5 shadow-xl shadow-black/20 backdrop-blur-sm">
       <WinLossBanner stats={stats} playerA={playerA} playerB={playerB} />
       {/* Header */}
       <div className="mb-4 text-center text-sm text-gray-400">

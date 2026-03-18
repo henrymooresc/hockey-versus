@@ -40,12 +40,12 @@ function PlayerRow({
   return (
     <li
       onClick={() => onSelect(player)}
-      className={`flex cursor-pointer items-center gap-4 px-5 py-3 transition-colors hover:bg-gray-700 ${
-        isSelected ? "bg-gray-700" : ""
+      className={`flex cursor-pointer items-center gap-4 px-5 py-3 transition-all duration-150 hover:bg-gray-700/80 hover:pl-6 active:scale-[0.99] active:bg-gray-600/60 ${
+        isSelected ? "bg-gray-700/80 pl-6" : ""
       }`}
     >
       {player.headshotUrl ? (
-        <img src={player.headshotUrl} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600" />
+        <img src={player.headshotUrl} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600 transition-all duration-150 group-hover:ring-gray-400" />
       ) : (
         <div className="h-12 w-12 rounded-full bg-gray-600 ring-2 ring-gray-500" />
       )}
@@ -86,7 +86,7 @@ function TeamGroup({
     <li className="border-b border-gray-700 last:border-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-5 py-3 hover:bg-gray-750 transition-colors"
+        className="flex w-full items-center gap-3 px-5 py-3 hover:bg-gray-800/80 active:bg-gray-700/60 transition-all duration-150 active:scale-[0.995]"
       >
         {logoUrl ? (
           <img src={logoUrl} alt={teamAbbrev} className="h-8 w-8 object-contain" />
@@ -95,7 +95,7 @@ function TeamGroup({
         )}
         <span className="flex-1 text-left font-semibold text-gray-200">{teamName}</span>
         <span className="text-xs text-gray-500 mr-2">{players.length}</span>
-        <span className="text-gray-500 text-sm">{open ? "▲" : "▼"}</span>
+        <span className={`text-gray-500 text-sm transition-transform duration-200 inline-block ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
       {open && (
         <ul className="border-t border-gray-700 bg-gray-850">
@@ -190,7 +190,7 @@ function PlayerList({
   }
 
   return (
-    <ul className="overflow-auto rounded-xl border border-gray-700 bg-gray-800" style={{ maxHeight: "28rem" }}>
+    <ul className="overflow-auto scroll-smooth rounded-xl border border-gray-700/70 bg-gray-800/90 backdrop-blur-sm" style={{ maxHeight: "28rem" }}>
       {loading ? (
         <li className="px-5 py-4 text-sm text-gray-500">Loading...</li>
       ) : filtered.length === 0 ? (
@@ -257,9 +257,9 @@ function PlayerCombobox({
       </label>
 
       {selected ? (
-        <div className="flex items-center gap-4 rounded-xl border-2 border-blue-500 bg-gray-800 px-5 py-4">
+        <div className="flex items-center gap-4 rounded-xl border-2 border-blue-500/70 bg-gradient-to-r from-blue-950/40 to-gray-800 px-5 py-4 shadow-lg shadow-blue-500/5 transition-all duration-300">
           {selected.headshotUrl ? (
-            <img src={selected.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400" />
+            <img src={selected.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400/70" />
           ) : (
             <div className="h-14 w-14 rounded-full bg-gray-600" />
           )}
@@ -273,7 +273,7 @@ function PlayerCombobox({
           </div>
           <button
             onClick={() => onSelect(null)}
-            className="rounded-full p-1 text-gray-400 hover:text-white transition-colors"
+            className="rounded-full p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 active:scale-90 transition-all duration-150"
           >
             ✕
           </button>
@@ -284,7 +284,7 @@ function PlayerCombobox({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name..."
-          className="w-full rounded-xl border border-gray-600 bg-gray-800 px-5 py-4 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-xl border border-gray-700 bg-gray-800/80 px-5 py-4 text-white placeholder-gray-500 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:bg-gray-800"
         />
       )}
 
@@ -320,7 +320,7 @@ export function PlayerSearch() {
       <button
         onClick={handleCompare}
         disabled={!playerA || !playerB}
-        className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 hover:scale-[1.01] active:scale-[0.98] active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
       >
         Compare Players
       </button>
