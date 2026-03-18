@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
       position: players.position,
       headshotUrl: players.headshotUrl,
       teamAbbrev: teams.abbrev,
+      teamName: teams.name,
       teamLogoUrl: teams.logoUrl,
     })
     .from(players)

@@ -4,6 +4,20 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { PlayerSearchResult } from "@/types/versus";
 
+const DIVISIONS: Record<string, string[]> = {
+  Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
+  Metropolitan: ["CAR", "CBJ", "NJD", "NYI", "NYR", "PHI", "PIT", "WSH"],
+  Central:      ["CHI", "COL", "DAL", "MIN", "NSH", "STL", "UTA", "WPG"],
+  Pacific:      ["ANA", "CGY", "EDM", "LAK", "SJS", "SEA", "VAN", "VGK"],
+};
+
+function abbrevToDivision(abbrev: string): string {
+  for (const [division, abbrevs] of Object.entries(DIVISIONS)) {
+    if (abbrevs.includes(abbrev)) return division;
+  }
+  return "Other";
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -13,15 +27,49 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
+function PlayerRow({
+  player,
+  selected,
+  onSelect,
+}: {
+  player: PlayerSearchResult;
+  selected: PlayerSearchResult | null;
+  onSelect: (p: PlayerSearchResult) => void;
+}) {
+  const isSelected = selected?.id === player.id;
+  return (
+    <li
+      onClick={() => onSelect(player)}
+      className={`flex cursor-pointer items-center gap-4 px-5 py-3 transition-colors hover:bg-gray-700 ${
+        isSelected ? "bg-gray-700" : ""
+      }`}
+    >
+      {player.headshotUrl ? (
+        <img src={player.headshotUrl} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600" />
+      ) : (
+        <div className="h-12 w-12 rounded-full bg-gray-600 ring-2 ring-gray-500" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-white">
+          {player.firstName} {player.lastName}
+        </div>
+        <div className="text-sm text-gray-400">{player.position ?? "—"}</div>
+      </div>
+    </li>
+  );
+}
+
 function TeamGroup({
-  abbrev,
+  teamAbbrev,
+  teamName,
   logoUrl,
   players,
   selected,
   onSelect,
   defaultOpen,
 }: {
-  abbrev: string;
+  teamAbbrev: string;
+  teamName: string;
   logoUrl: string | null;
   players: PlayerSearchResult[];
   selected: PlayerSearchResult | null;
@@ -35,43 +83,24 @@ function TeamGroup({
   }, [defaultOpen]);
 
   return (
-    <li>
+    <li className="border-b border-gray-700 last:border-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 bg-gray-900 px-4 py-2 hover:bg-gray-800"
+        className="flex w-full items-center gap-3 px-5 py-3 hover:bg-gray-750 transition-colors"
       >
         {logoUrl ? (
-          <img src={logoUrl} alt={abbrev} className="h-5 w-5 object-contain" />
+          <img src={logoUrl} alt={teamAbbrev} className="h-8 w-8 object-contain" />
         ) : (
-          <div className="h-5 w-5" />
+          <div className="h-8 w-8" />
         )}
-        <span className="flex-1 text-left text-xs font-bold uppercase tracking-wider text-gray-400">
-          {abbrev}
-        </span>
-        <span className="text-xs text-gray-500">{open ? "▲" : "▼"}</span>
+        <span className="flex-1 text-left font-semibold text-gray-200">{teamName}</span>
+        <span className="text-xs text-gray-500 mr-2">{players.length}</span>
+        <span className="text-gray-500 text-sm">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
-        <ul>
+        <ul className="border-t border-gray-700 bg-gray-850">
           {players.map((player) => (
-            <li
-              key={player.id}
-              onClick={() => onSelect(player)}
-              className={`flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-gray-700 ${
-                selected?.id === player.id ? "bg-gray-700" : ""
-              }`}
-            >
-              {player.headshotUrl ? (
-                <img src={player.headshotUrl} alt="" className="h-9 w-9 rounded-full object-cover" />
-              ) : (
-                <div className="h-9 w-9 rounded-full bg-gray-600" />
-              )}
-              <div>
-                <div className="font-medium">
-                  {player.firstName} {player.lastName}
-                </div>
-                <div className="text-xs text-gray-400">{player.position ?? "—"}</div>
-              </div>
-            </li>
+            <PlayerRow key={player.id} player={player} selected={selected} onSelect={onSelect} />
           ))}
         </ul>
       )}
@@ -79,7 +108,47 @@ function TeamGroup({
   );
 }
 
-function TeamList({
+function DivisionSection({
+  division,
+  teams,
+  selected,
+  onSelect,
+  isFiltering,
+}: {
+  division: string;
+  teams: Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>;
+  selected: PlayerSearchResult | null;
+  onSelect: (p: PlayerSearchResult) => void;
+  isFiltering: boolean;
+}) {
+  const sorted = Array.from(teams.entries()).sort(([, a], [, b]) =>
+    a.teamName.localeCompare(b.teamName)
+  );
+
+  return (
+    <li>
+      <div className="bg-gray-950 px-5 py-2 sticky top-0 z-10">
+        <span className="text-xs font-bold uppercase tracking-widest text-blue-400">{division}</span>
+      </div>
+      <ul>
+        {sorted.map(([abbrev, group]) => (
+          <TeamGroup
+            key={abbrev}
+            teamAbbrev={abbrev}
+            teamName={group.teamName}
+            logoUrl={group.logoUrl}
+            players={group.players}
+            selected={selected}
+            onSelect={onSelect}
+            defaultOpen={isFiltering}
+          />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function PlayerList({
   results,
   exclude,
   selected,
@@ -95,31 +164,50 @@ function TeamList({
   loading: boolean;
 }) {
   const filtered = results.filter((p) => p.id !== exclude?.id);
-  const groups = new Map<string, { logoUrl: string | null; players: PlayerSearchResult[] }>();
+
+  // Group by team
+  const teamMap = new Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>();
   for (const player of filtered) {
     const key = player.teamAbbrev ?? "—";
-    if (!groups.has(key)) groups.set(key, { logoUrl: player.teamLogoUrl, players: [] });
-    groups.get(key)!.players.push(player);
+    if (!teamMap.has(key)) {
+      teamMap.set(key, {
+        teamName: player.teamName ?? key,
+        logoUrl: player.teamLogoUrl,
+        players: [],
+      });
+    }
+    teamMap.get(key)!.players.push(player);
+  }
+
+  // Group teams by division
+  const divisionMap = new Map<string, Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>>();
+  const divisionOrder = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
+  for (const div of divisionOrder) divisionMap.set(div, new Map());
+
+  for (const [abbrev, group] of teamMap.entries()) {
+    const div = abbrevToDivision(abbrev);
+    divisionMap.get(div)!.set(abbrev, group);
   }
 
   return (
-    <ul className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-700 bg-gray-800">
+    <ul className="overflow-auto rounded-xl border border-gray-700 bg-gray-800" style={{ maxHeight: "28rem" }}>
       {loading ? (
-        <li className="px-4 py-3 text-sm text-gray-500">Loading...</li>
+        <li className="px-5 py-4 text-sm text-gray-500">Loading...</li>
       ) : filtered.length === 0 ? (
-        <li className="px-4 py-3 text-sm text-gray-500">No players found</li>
+        <li className="px-5 py-4 text-sm text-gray-500">No players found</li>
       ) : (
-        Array.from(groups.entries()).map(([abbrev, group]) => (
-          <TeamGroup
-            key={abbrev}
-            abbrev={abbrev}
-            logoUrl={group.logoUrl}
-            players={group.players}
-            selected={selected}
-            onSelect={onSelect}
-            defaultOpen={isFiltering}
-          />
-        ))
+        divisionOrder
+          .filter((div) => divisionMap.get(div)!.size > 0)
+          .map((div) => (
+            <DivisionSection
+              key={div}
+              division={div}
+              teams={divisionMap.get(div)!}
+              selected={selected}
+              onSelect={onSelect}
+              isFiltering={isFiltering}
+            />
+          ))
       )}
     </ul>
   );
@@ -143,9 +231,10 @@ function PlayerCombobox({
 
   useEffect(() => {
     setLoading(true);
-    const url = debouncedQuery.length >= 2
-      ? `/api/players/search?q=${encodeURIComponent(debouncedQuery)}`
-      : `/api/players/search`;
+    const url =
+      debouncedQuery.length >= 2
+        ? `/api/players/search?q=${encodeURIComponent(debouncedQuery)}`
+        : `/api/players/search`;
     fetch(url)
       .then((r) => r.json())
       .then((data) => setResults(data.players ?? []))
@@ -162,28 +251,31 @@ function PlayerCombobox({
   );
 
   return (
-    <div className="flex flex-col">
-      <label className="mb-1 block text-sm font-medium text-gray-400">
+    <div className="flex flex-col gap-3">
+      <label className="text-sm font-semibold uppercase tracking-wider text-gray-400">
         {label}
       </label>
+
       {selected ? (
-        <div className="flex items-center gap-3 rounded-lg border border-blue-500 bg-gray-800 px-4 py-3">
-          {selected.headshotUrl && (
-            <img src={selected.headshotUrl} alt="" className="h-10 w-10 rounded-full" />
+        <div className="flex items-center gap-4 rounded-xl border-2 border-blue-500 bg-gray-800 px-5 py-4">
+          {selected.headshotUrl ? (
+            <img src={selected.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400" />
+          ) : (
+            <div className="h-14 w-14 rounded-full bg-gray-600" />
           )}
           <div className="flex-1">
-            <div className="font-semibold">
+            <div className="text-lg font-bold text-white">
               {selected.firstName} {selected.lastName}
             </div>
             <div className="text-sm text-gray-400">
-              {selected.teamAbbrev} &middot; {selected.position}
+              {selected.teamName ?? selected.teamAbbrev ?? "—"} &middot; {selected.position ?? "—"}
             </div>
           </div>
           <button
             onClick={() => onSelect(null)}
-            className="text-gray-400 hover:text-white"
+            className="rounded-full p-1 text-gray-400 hover:text-white transition-colors"
           >
-            &times;
+            ✕
           </button>
         </div>
       ) : (
@@ -191,11 +283,12 @@ function PlayerCombobox({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search player name..."
-          className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Search by name..."
+          className="w-full rounded-xl border border-gray-600 bg-gray-800 px-5 py-4 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       )}
-      <TeamList
+
+      <PlayerList
         results={results}
         exclude={exclude}
         selected={selected}
@@ -219,27 +312,17 @@ export function PlayerSearch() {
   };
 
   return (
-    <div className="w-full max-w-2xl">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <PlayerCombobox
-          label="Player 1"
-          selected={playerA}
-          onSelect={setPlayerA}
-          exclude={playerB}
-        />
-        <PlayerCombobox
-          label="Player 2"
-          selected={playerB}
-          onSelect={setPlayerB}
-          exclude={playerA}
-        />
+    <div className="w-full">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <PlayerCombobox label="Player 1" selected={playerA} onSelect={setPlayerA} exclude={playerB} />
+        <PlayerCombobox label="Player 2" selected={playerB} onSelect={setPlayerB} exclude={playerA} />
       </div>
       <button
         onClick={handleCompare}
         disabled={!playerA || !playerB}
-        className="mt-6 w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Compare
+        Compare Players
       </button>
     </div>
   );

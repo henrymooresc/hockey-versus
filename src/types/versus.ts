@@ -45,5 +45,6 @@ export interface PlayerSearchResult {
   position: string | null;
   headshotUrl: string | null;
   teamAbbrev: string | null;
+  teamName: string | null;
   teamLogoUrl: string | null;
 }
