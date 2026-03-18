@@ -215,10 +215,13 @@ function GoalieVsSkaterTable({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {/* Goalie panel */}
+        {/* Goalie panel — framed from the goalie's perspective */}
         <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">
-          <div className="mb-3 text-center text-sm font-bold uppercase tracking-wider text-blue-400">
+          <div className="mb-1 text-center text-sm font-bold uppercase tracking-wider text-blue-400">
             {goalieName}
+          </div>
+          <div className="mb-3 text-center text-xs text-gray-500">
+            facing {skaterName}
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -229,50 +232,69 @@ function GoalieVsSkaterTable({
               <span className="text-gray-400">Saves</span>
               <span className="font-mono text-white">{goaliesSaves}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Goals Allowed</span>
-              <span className="font-mono text-white">{skaterGoals}</span>
+            <div className="border-t border-gray-700 pt-2 mt-2 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Goals Scored On</span>
+                <span className="font-mono text-red-400">{skaterGoals}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Goals Set Up Against</span>
+                <span className="font-mono text-red-400">{sStats.individualAssists}</span>
+              </div>
             </div>
-            <div className="flex justify-between border-t border-gray-700 pt-2">
-              <span className="text-gray-400">Save %</span>
-              <span className="font-mono font-bold text-white">
-                {skaterShots > 0 ? (goaliesSaves / skaterShots).toFixed(3) : "—"}
-              </span>
+            <div className="border-t border-gray-700 pt-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Save % vs {skaterName}</span>
+                <span className="font-mono font-bold text-white">
+                  {skaterShots > 0 ? (goaliesSaves / skaterShots).toFixed(3) : "—"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Skater panel */}
+        {/* Skater panel — framed from the skater's perspective */}
         <div className="rounded-lg border border-gray-700 bg-gray-800 p-4">
-          <div className="mb-3 text-center text-sm font-bold uppercase tracking-wider text-blue-400">
+          <div className="mb-1 text-center text-sm font-bold uppercase tracking-wider text-blue-400">
             {skaterName}
+          </div>
+          <div className="mb-3 text-center text-xs text-gray-500">
+            against {goalieName}
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-400">Shots</span>
+              <span className="text-gray-400">Shots on Goal</span>
               <span className="font-mono text-white">{skaterShots}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Goals</span>
-              <span className="font-mono text-white">{skaterGoals}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Assists</span>
-              <span className="font-mono text-white">{sStats.individualAssists}</span>
-            </div>
-            <div className="flex justify-between border-t border-gray-700 pt-2">
               <span className="text-gray-400">Shooting %</span>
-              <span className="font-mono font-bold text-white">
+              <span className="font-mono text-white">
                 {skaterShots > 0 ? ((skaterGoals / skaterShots) * 100).toFixed(1) + "%" : "—"}
               </span>
             </div>
-            <div className="flex justify-between border-t border-gray-700 pt-2">
-              <span className="text-gray-400">Hits</span>
-              <span className="font-mono text-white">{sStats.hits}</span>
+            <div className="border-t border-gray-700 pt-2 mt-2 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Goals Scored</span>
+                <span className="font-mono text-green-400">{skaterGoals}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Goals Assisted</span>
+                <span className="font-mono text-green-400">{sStats.individualAssists}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Total Points</span>
+                <span className="font-mono font-bold text-white">{skaterGoals + sStats.individualAssists}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Penalties</span>
-              <span className="font-mono text-white">{sStats.penalties}</span>
+            <div className="border-t border-gray-700 pt-2 mt-2 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Hits</span>
+                <span className="font-mono text-white">{sStats.hits}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Penalties</span>
+                <span className="font-mono text-white">{sStats.penalties}</span>
+              </div>
             </div>
           </div>
         </div>
