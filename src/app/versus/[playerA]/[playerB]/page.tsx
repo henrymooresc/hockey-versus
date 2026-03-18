@@ -14,6 +14,7 @@ async function getPlayerInfo(playerId: number): Promise<PlayerInfo | null> {
       position: players.position,
       headshotUrl: players.headshotUrl,
       teamAbbrev: teams.abbrev,
+      teamLogoUrl: teams.logoUrl,
       teamId: players.currentTeamId,
       sweaterNumber: players.sweaterNumber,
     })
@@ -62,15 +63,16 @@ export default async function VersusPage({
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-8 pt-8">
-        <div className="flex items-center gap-8">
+      <div className="flex flex-col items-center gap-10 pt-4">
+        <a href="/" className="self-start text-sm text-gray-400 hover:text-white transition-colors">
+          ← Back
+        </a>
+        <div className="flex items-center justify-center gap-6 md:gap-16">
           <PlayerCard player={playerAInfo} />
-          <span className="text-3xl font-bold text-gray-600">VS</span>
+          <span className="text-5xl font-black text-gray-700">VS</span>
           <PlayerCard player={playerBInfo} />
         </div>
-        <p className="text-gray-400">
-          No shared ice time data found for these players.
-        </p>
+        <p className="text-gray-500">No shared ice time data found for these players.</p>
       </div>
     );
   }
@@ -92,6 +94,7 @@ export default async function VersusPage({
       faceoffWins: swapped ? row.faceoffWinsB : row.faceoffWinsA,
       individualGoals: swapped ? row.playerBGoals : row.playerAGoals,
       individualAssists: swapped ? row.playerBAssists : row.playerAAssists,
+      individualShots: swapped ? row.playerBShots : row.playerAShots,
     },
     playerB: {
       teamId: swapped ? row.playerATeamId : row.playerBTeamId,
@@ -104,6 +107,7 @@ export default async function VersusPage({
       faceoffWins: swapped ? row.faceoffWinsA : row.faceoffWinsB,
       individualGoals: swapped ? row.playerAGoals : row.playerBGoals,
       individualAssists: swapped ? row.playerAAssists : row.playerBAssists,
+      individualShots: swapped ? row.playerAShots : row.playerBShots,
     },
   }));
 
@@ -126,6 +130,8 @@ export default async function VersusPage({
           acc.playerA.individualGoals + s.playerA.individualGoals,
         individualAssists:
           acc.playerA.individualAssists + s.playerA.individualAssists,
+        individualShots:
+          acc.playerA.individualShots + s.playerA.individualShots,
       },
       playerB: {
         ...acc.playerB,
@@ -140,6 +146,8 @@ export default async function VersusPage({
           acc.playerB.individualGoals + s.playerB.individualGoals,
         individualAssists:
           acc.playerB.individualAssists + s.playerB.individualAssists,
+        individualShots:
+          acc.playerB.individualShots + s.playerB.individualShots,
       },
     }),
     {
@@ -158,6 +166,7 @@ export default async function VersusPage({
         faceoffWins: 0,
         individualGoals: 0,
         individualAssists: 0,
+        individualShots: 0,
       },
       playerB: {
         teamId: null,
@@ -170,27 +179,33 @@ export default async function VersusPage({
         faceoffWins: 0,
         individualGoals: 0,
         individualAssists: 0,
+        individualShots: 0,
       },
     } as VersusSeasonStats
   );
 
   return (
-    <div className="flex flex-col items-center gap-8 pt-4">
-      <div className="w-full">
-        <a href="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
-          ← Back
-        </a>
-      </div>
-      {/* Player cards with VS */}
-      <div className="flex items-center gap-8">
+    <div className="flex flex-col gap-10 pt-4">
+      {/* Back */}
+      <a href="/" className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors">
+        ← Back
+      </a>
+
+      {/* Hero */}
+      <div className="flex items-center justify-center gap-6 md:gap-16">
         <PlayerCard player={playerAInfo} />
-        <span className="text-4xl font-black text-blue-400">VS</span>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-5xl font-black text-blue-400 md:text-6xl">VS</span>
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
+            {totals.gamesShared} game{totals.gamesShared !== 1 ? "s" : ""} together
+          </span>
+        </div>
         <PlayerCard player={playerBInfo} />
       </div>
 
       {/* Totals */}
       <div>
-        <h2 className="mb-3 text-center text-lg font-semibold text-gray-300">
+        <h2 className="mb-4 text-center text-xl font-bold tracking-tight text-gray-200">
           All Seasons Combined
         </h2>
         <VersusTable
@@ -202,15 +217,15 @@ export default async function VersusPage({
 
       {/* Per-season breakdown */}
       {seasonStats.length > 1 && (
-        <div className="w-full max-w-xl">
-          <h2 className="mb-3 text-center text-lg font-semibold text-gray-300">
+        <div className="w-full">
+          <h2 className="mb-6 text-center text-xl font-bold tracking-tight text-gray-200">
             By Season
           </h2>
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-8">
             {seasonStats.map((s) => (
               <div key={s.seasonId}>
-                <h3 className="mb-2 text-center text-sm font-medium text-gray-400">
-                  {s.seasonId.slice(0, 4)}-{s.seasonId.slice(4)}
+                <h3 className="mb-3 text-center text-base font-semibold text-gray-400">
+                  {s.seasonId.slice(0, 4)}–{s.seasonId.slice(4)}
                 </h3>
                 <VersusTable
                   stats={s}

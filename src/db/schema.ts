@@ -163,8 +163,10 @@ export const versusStats = pgTable(
     // Individual stats
     playerAGoals: smallint("player_a_goals").notNull().default(0),
     playerAAssists: smallint("player_a_assists").notNull().default(0),
+    playerAShots: smallint("player_a_shots").notNull().default(0),
     playerBGoals: smallint("player_b_goals").notNull().default(0),
     playerBAssists: smallint("player_b_assists").notNull().default(0),
+    playerBShots: smallint("player_b_shots").notNull().default(0),
     computedAt: timestamp("computed_at").defaultNow(),
   },
   (table) => [

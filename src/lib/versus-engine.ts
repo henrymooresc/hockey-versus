@@ -45,8 +45,10 @@ export interface PairStats {
   faceoffWinsB: number;
   playerAGoals: number;
   playerAAssists: number;
+  playerAShots: number;
   playerBGoals: number;
   playerBAssists: number;
+  playerBShots: number;
 }
 
 /**
@@ -145,8 +147,10 @@ export function computeGameVersus(
         faceoffWinsB: 0,
         playerAGoals: 0,
         playerAAssists: 0,
+        playerAShots: 0,
         playerBGoals: 0,
         playerBAssists: 0,
+        playerBShots: 0,
       };
 
       // Attribute events during overlap intervals
@@ -207,6 +211,9 @@ export function computeGameVersus(
                 stats.shotsAgainstA++;
               }
             }
+            // Individual shots (shooter is player1)
+            if (event.player1Id === playerA) stats.playerAShots++;
+            if (event.player1Id === playerB) stats.playerBShots++;
             break;
           }
           case "hit": {

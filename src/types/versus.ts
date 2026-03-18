@@ -5,6 +5,7 @@ export interface PlayerInfo {
   position: string | null;
   headshotUrl: string | null;
   teamAbbrev: string | null;
+  teamLogoUrl: string | null;
   teamId: number | null;
   sweaterNumber: number | null;
 }
@@ -29,6 +30,7 @@ export interface VersusPlayerSeasonStats {
   faceoffWins: number;
   individualGoals: number;
   individualAssists: number;
+  individualShots: number;
 }
 
 export interface VersusResult {

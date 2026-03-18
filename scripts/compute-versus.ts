@@ -122,8 +122,10 @@ async function main() {
           existing.faceoffWinsB += stats.faceoffWinsB;
           existing.playerAGoals += stats.playerAGoals;
           existing.playerAAssists += stats.playerAAssists;
+          existing.playerAShots += stats.playerAShots;
           existing.playerBGoals += stats.playerBGoals;
           existing.playerBAssists += stats.playerBAssists;
+          existing.playerBShots += stats.playerBShots;
         }
       }
     } catch (err) {
@@ -171,8 +173,10 @@ async function main() {
           faceoffWinsB: row.faceoffWinsB,
           playerAGoals: row.playerAGoals,
           playerAAssists: row.playerAAssists,
+          playerAShots: row.playerAShots,
           playerBGoals: row.playerBGoals,
           playerBAssists: row.playerBAssists,
+          playerBShots: row.playerBShots,
         })
         .onConflictDoUpdate({
           target: [
@@ -202,8 +206,10 @@ async function main() {
             faceoffWinsB: row.faceoffWinsB,
             playerAGoals: row.playerAGoals,
             playerAAssists: row.playerAAssists,
+            playerAShots: row.playerAShots,
             playerBGoals: row.playerBGoals,
             playerBAssists: row.playerBAssists,
+            playerBShots: row.playerBShots,
             computedAt: new Date(),
           },
         });
