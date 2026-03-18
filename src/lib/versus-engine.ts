@@ -222,8 +222,8 @@ export function computeGameVersus(
             break;
           }
           case "penalty": {
-            if (event.player1Id === playerA) stats.penaltiesByA++;
-            if (event.player1Id === playerB) stats.penaltiesByB++;
+            if (event.player1Id === playerA && event.player2Id === playerB) stats.penaltiesByA++;
+            if (event.player1Id === playerB && event.player2Id === playerA) stats.penaltiesByB++;
             break;
           }
           case "faceoff": {
