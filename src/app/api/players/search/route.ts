@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { players, teams } from "@/db/schema";
-import { ilike, sql } from "drizzle-orm";
+import { ilike, asc, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim();
 
-  if (!q || q.length < 2) {
-    return NextResponse.json({ players: [] });
-  }
-
-  const searchTerm = `%${q.toLowerCase()}%`;
-
-  const results = await db
+  const baseQuery = db
     .select({
       id: players.id,
       firstName: players.firstName,
@@ -22,9 +16,11 @@ export async function GET(request: NextRequest) {
       teamAbbrev: teams.abbrev,
     })
     .from(players)
-    .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
-    .where(ilike(players.searchText, searchTerm))
-    .limit(10);
+    .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`);
+
+  const results = await (q && q.length >= 2
+    ? baseQuery.where(ilike(players.searchText, `%${q.toLowerCase()}%`)).limit(50)
+    : baseQuery.orderBy(asc(players.lastName)).limit(50));
 
   return NextResponse.json({ players: results });
 }
