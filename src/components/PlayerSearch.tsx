@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import type { PlayerSearchResult } from "@/types/versus";
 import { SoloAnalysis } from "./SoloAnalysis";
+import { HeadToHeadComparison } from "./HeadToHeadComparison";
 
 const DIVISIONS: Record<string, string[]> = {
   Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
@@ -304,20 +304,12 @@ function PlayerCombobox({
 }
 
 export function PlayerSearch() {
-  const router = useRouter();
   const [playerA, setPlayerA] = useState<PlayerSearchResult | null>(null);
   const [playerB, setPlayerB] = useState<PlayerSearchResult | null>(null);
   const [compareMode, setCompareMode] = useState(false);
 
-  const handleCompare = () => {
-    if (playerA && playerB) {
-      router.push(`/versus/${playerA.id}/${playerB.id}`);
-    }
-  };
-
   const handleToggleCompare = () => {
     if (compareMode) {
-      // Exiting compare mode — clear player B
       setPlayerB(null);
       setCompareMode(false);
     } else {
@@ -381,13 +373,9 @@ export function PlayerSearch() {
             />
           </div>
 
-          <button
-            onClick={handleCompare}
-            disabled={!playerA || !playerB}
-            className="mt-8 w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:bg-blue-500 hover:shadow-blue-500/30 hover:scale-[1.01] active:scale-[0.98] active:shadow-sm disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100"
-          >
-            Compare Players
-          </button>
+          {playerA && playerB && (
+            <HeadToHeadComparison playerA={playerA} playerB={playerB} />
+          )}
         </div>
       )}
     </div>
