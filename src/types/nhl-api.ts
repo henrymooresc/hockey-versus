@@ -75,7 +75,6 @@ export interface PlayByPlayResponse {
 
 export interface Play {
   eventId: number;
-  period: number;
   periodDescriptor: {
     number: number;
     periodType: string;

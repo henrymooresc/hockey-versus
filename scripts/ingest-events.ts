@@ -7,7 +7,7 @@ import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
-import { games, gameEvents } from "../src/db/schema";
+import { games, gameEvents, players, teams } from "../src/db/schema";
 import { getPlayByPlay } from "../src/lib/nhl-api";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
@@ -74,7 +74,7 @@ function normalizeEvent(play: Play) {
 
   return {
     eventId: play.eventId,
-    period: play.period,
+    period: play.periodDescriptor.number,
     timeSeconds: parseTimeToSeconds(play.timeInPeriod),
     eventType,
     teamId,
@@ -108,6 +108,18 @@ async function main() {
     return;
   }
 
+  const knownPlayers = await db.select({ id: players.id }).from(players);
+  const knownPlayerIds = new Set(knownPlayers.map((p) => p.id));
+  console.log(`${knownPlayerIds.size} known players`);
+
+  const knownTeams = await db.select({ id: teams.id }).from(teams);
+  const knownTeamIds = new Set(knownTeams.map((t) => t.id));
+
+  const sanitizePlayer = (id: number | null) =>
+    id !== null && knownPlayerIds.has(id) ? id : null;
+  const sanitizeTeam = (id: number | null) =>
+    id !== null && knownTeamIds.has(id) ? id : null;
+
   const progress = new Progress(filtered.length, "Ingesting events");
   let totalEvents = 0;
 
@@ -118,7 +130,14 @@ async function main() {
       const eventRows = pbp.plays
         .map(normalizeEvent)
         .filter((e): e is NonNullable<typeof e> => e !== null)
-        .map((e) => ({ ...e, gameId: game.id }));
+        .map((e) => ({
+          ...e,
+          gameId: game.id,
+          teamId: sanitizeTeam(e.teamId),
+          player1Id: sanitizePlayer(e.player1Id),
+          player2Id: sanitizePlayer(e.player2Id),
+          player3Id: sanitizePlayer(e.player3Id),
+        }));
 
       // Batch insert
       const BATCH_SIZE = 500;
