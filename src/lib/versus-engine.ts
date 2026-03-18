@@ -217,8 +217,8 @@ export function computeGameVersus(
             break;
           }
           case "hit": {
-            if (event.player1Id === playerA) stats.hitsByA++;
-            if (event.player1Id === playerB) stats.hitsByB++;
+            if (event.player1Id === playerA && event.player2Id === playerB) stats.hitsByA++;
+            if (event.player1Id === playerB && event.player2Id === playerA) stats.hitsByB++;
             break;
           }
           case "penalty": {

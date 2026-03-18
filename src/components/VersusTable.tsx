@@ -229,7 +229,7 @@ function GoalieVsSkaterTable({
               <span className="font-mono text-white">{skaterShots}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Saves</span>
+              <span className="text-gray-400">Shots Saved</span>
               <span className="font-mono text-white">{goaliesSaves}</span>
             </div>
             <div className="border-t border-gray-700 pt-2 mt-2 space-y-2">
@@ -286,11 +286,7 @@ function GoalieVsSkaterTable({
                 <span className="font-mono font-bold text-white">{skaterGoals + sStats.individualAssists}</span>
               </div>
             </div>
-            <div className="border-t border-gray-700 pt-2 mt-2 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Hits</span>
-                <span className="font-mono text-white">{sStats.hits}</span>
-              </div>
+            <div className="border-t border-gray-700 pt-2 mt-2">
               <div className="flex justify-between">
                 <span className="text-gray-400">Penalties</span>
                 <span className="font-mono text-white">{sStats.penalties}</span>
@@ -300,18 +296,6 @@ function GoalieVsSkaterTable({
         </div>
       </div>
 
-      {/* Shared team context */}
-      <div className="mt-4">
-        <div className="grid grid-cols-3 items-center border-b border-gray-700 pb-2 text-sm font-semibold text-gray-300">
-          <div className="text-right">{goalieIsA ? playerA.lastName : playerB.lastName}</div>
-          <div className="text-center text-xs text-gray-500">On-Ice Team</div>
-          <div className="text-left">{goalieIsA ? playerB.lastName : playerA.lastName}</div>
-        </div>
-        <StatRow label="Goals For" valueA={gStats.goalsFor} valueB={sStats.goalsFor} />
-        <StatRow label="Goals Against" valueA={gStats.goalsAgainst} valueB={sStats.goalsAgainst} higherIsBetter={false} />
-        <StatRow label="Shots For" valueA={gStats.shotsFor} valueB={sStats.shotsFor} />
-        <StatRow label="Shots Against" valueA={gStats.shotsAgainst} valueB={sStats.shotsAgainst} higherIsBetter={false} />
-      </div>
     </div>
   );
 }
