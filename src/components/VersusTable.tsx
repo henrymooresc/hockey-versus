@@ -43,9 +43,9 @@ function TableHeader({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-3 items-center border-b border-gray-700 pb-2 text-sm font-semibold text-gray-300">
+      <div className="grid grid-cols-3 items-center border-b border-gray-700 pb-3 text-base font-bold text-gray-200">
         <div className="text-right">{playerA.lastName}</div>
-        <div className="text-center text-xs text-gray-500">Stat</div>
+        <div className="text-center text-xs font-normal text-gray-500">Stat</div>
         <div className="text-left">{playerB.lastName}</div>
       </div>
     </>
@@ -59,13 +59,11 @@ function StatRow({
   valueA,
   valueB,
   higherIsBetter = true,
-  section,
 }: {
   label: string;
   valueA: number | string;
   valueB: number | string;
   higherIsBetter?: boolean;
-  section?: string;
 }) {
   const numA = typeof valueA === "number" ? valueA : parseFloat(valueA as string);
   const numB = typeof valueB === "number" ? valueB : parseFloat(valueB as string);
@@ -75,10 +73,10 @@ function StatRow({
   const colorB = bWins ? "text-green-400" : aWins ? "text-red-400" : "text-gray-300";
 
   return (
-    <div className="grid grid-cols-3 items-center border-b border-gray-800 py-2.5">
-      <div className={`text-right font-mono text-base ${colorA}`}>{valueA}</div>
+    <div className="grid grid-cols-3 items-center border-b border-gray-800 py-3">
+      <div className={`text-right font-mono text-xl font-semibold ${colorA}`}>{valueA}</div>
       <div className="text-center text-xs text-gray-500">{label}</div>
-      <div className={`text-left font-mono text-base ${colorB}`}>{valueB}</div>
+      <div className={`text-left font-mono text-xl font-semibold ${colorB}`}>{valueB}</div>
     </div>
   );
 }
@@ -199,8 +197,9 @@ function GoalieVsSkaterTable({
   const gStats = goalieIsA ? stats.playerA : stats.playerB;
   const sStats = goalieIsA ? stats.playerB : stats.playerA;
 
-  const sv = saves(gStats.shotsAgainst, gStats.goalsAgainst);
-  const svp = savePct(gStats.shotsAgainst, gStats.goalsAgainst);
+  const skaterShots = sStats.individualShots;
+  const skaterGoals = sStats.individualGoals;
+  const goaliesSaves = skaterShots - skaterGoals;
 
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-900 px-6 py-5">
@@ -224,23 +223,21 @@ function GoalieVsSkaterTable({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">Shots Faced</span>
-              <span className="font-mono text-white">{gStats.shotsAgainst}</span>
+              <span className="font-mono text-white">{skaterShots}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Saves</span>
-              <span className="font-mono text-white">{sv}</span>
+              <span className="font-mono text-white">{goaliesSaves}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Goals Against</span>
-              <span className="font-mono text-white">{gStats.goalsAgainst}</span>
+              <span className="text-gray-400">Goals Allowed</span>
+              <span className="font-mono text-white">{skaterGoals}</span>
             </div>
             <div className="flex justify-between border-t border-gray-700 pt-2">
               <span className="text-gray-400">Save %</span>
-              <span className="font-mono font-bold text-white">{svp}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Goals For</span>
-              <span className="font-mono text-white">{gStats.goalsFor}</span>
+              <span className="font-mono font-bold text-white">
+                {skaterShots > 0 ? (goaliesSaves / skaterShots).toFixed(3) : "—"}
+              </span>
             </div>
           </div>
         </div>
@@ -252,17 +249,21 @@ function GoalieVsSkaterTable({
           </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
+              <span className="text-gray-400">Shots</span>
+              <span className="font-mono text-white">{skaterShots}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-gray-400">Goals</span>
-              <span className="font-mono text-white">{sStats.individualGoals}</span>
+              <span className="font-mono text-white">{skaterGoals}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Assists</span>
               <span className="font-mono text-white">{sStats.individualAssists}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Points</span>
+            <div className="flex justify-between border-t border-gray-700 pt-2">
+              <span className="text-gray-400">Shooting %</span>
               <span className="font-mono font-bold text-white">
-                {sStats.individualGoals + sStats.individualAssists}
+                {skaterShots > 0 ? ((skaterGoals / skaterShots) * 100).toFixed(1) + "%" : "—"}
               </span>
             </div>
             <div className="flex justify-between border-t border-gray-700 pt-2">
