@@ -48,14 +48,7 @@ async function main() {
   const newPlayerIds = new Set<number>();
   const progress1 = new Progress(allGames.length, "Scanning boxscores");
 
-  // Sample a subset of games if there are many (every team plays ~82 games,
-  // so checking every 5th game should catch all players)
-  const sampled =
-    allGames.length > 2000
-      ? allGames.filter((_, i) => i % 5 === 0)
-      : allGames;
-
-  for (const game of sampled) {
+  for (const game of allGames) {
     try {
       const boxscore = await getBoxscore(game.id);
       const ids = extractPlayersFromBoxscore(boxscore);
