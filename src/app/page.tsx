@@ -4,8 +4,8 @@ export default function HomePage() {
   return (
     <div className="flex flex-col gap-10 pt-10">
       <div className="text-center">
-        <h1 className="text-6xl font-extrabold tracking-tight">
-          Hockey <span className="text-blue-400">Versus</span>
+        <h1 className="text-5xl font-extrabold tracking-tight md:text-6xl">
+          Hockey <span className="text-[#a62639]">Versus</span>
         </h1>
         <p className="mt-4 text-xl text-gray-400">
           Compare how NHL players perform when sharing the ice

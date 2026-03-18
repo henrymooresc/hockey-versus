@@ -201,7 +201,7 @@ export default async function VersusPage({
       <div className="flex items-center justify-center gap-6 md:gap-16">
         <PlayerCard player={playerAInfo} />
         <div className="flex flex-col items-center gap-1">
-          <span className="text-5xl font-black text-blue-400 md:text-6xl drop-shadow-[0_0_12px_rgba(96,165,250,0.3)]">VS</span>
+          <span className="text-5xl font-black text-[#a62639] md:text-6xl drop-shadow-[0_0_12px_rgba(166,38,57,0.3)]">VS</span>
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
             {totals.gamesShared} game{totals.gamesShared !== 1 ? "s" : ""} together
           </span>
