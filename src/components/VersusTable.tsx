@@ -174,9 +174,9 @@ function GoalieVsGoalieTable({
       <StatRow label="Goals Against" valueA={stats.playerA.goalsAgainst} valueB={stats.playerB.goalsAgainst} higherIsBetter={false} />
       <StatRow label="Save %" valueA={savePct(stats.playerA.shotsAgainst, stats.playerA.goalsAgainst)} valueB={savePct(stats.playerB.shotsAgainst, stats.playerB.goalsAgainst)} />
 
-      <SectionLabel label="Team Offense" />
-      <StatRow label="Team Goals For" valueA={stats.playerA.goalsFor} valueB={stats.playerB.goalsFor} />
-      <StatRow label="Team Shots For" valueA={stats.playerA.shotsFor} valueB={stats.playerB.shotsFor} />
+      <SectionLabel label="On-Ice Team" />
+      <StatRow label="Goals For" valueA={stats.playerA.goalsFor} valueB={stats.playerB.goalsFor} />
+      <StatRow label="Shots For" valueA={stats.playerA.shotsFor} valueB={stats.playerB.shotsFor} />
     </div>
   );
 }
@@ -239,7 +239,7 @@ function GoalieVsSkaterTable({
               <span className="font-mono font-bold text-white">{svp}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Team Goals For</span>
+              <span className="text-gray-400">Goals For</span>
               <span className="font-mono text-white">{gStats.goalsFor}</span>
             </div>
           </div>
@@ -281,7 +281,7 @@ function GoalieVsSkaterTable({
       <div className="mt-4">
         <div className="grid grid-cols-3 items-center border-b border-gray-700 pb-2 text-sm font-semibold text-gray-300">
           <div className="text-right">{goalieIsA ? playerA.lastName : playerB.lastName}</div>
-          <div className="text-center text-xs text-gray-500">Team</div>
+          <div className="text-center text-xs text-gray-500">On-Ice Team</div>
           <div className="text-left">{goalieIsA ? playerB.lastName : playerA.lastName}</div>
         </div>
         <StatRow label="Goals For" valueA={gStats.goalsFor} valueB={sStats.goalsFor} />
