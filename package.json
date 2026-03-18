@@ -1,0 +1,34 @@
+{
+  "name": "hockey-versus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "ingest:seasons": "tsx scripts/ingest-seasons.ts",
+    "ingest:players": "tsx scripts/ingest-players.ts",
+    "ingest:shifts": "tsx scripts/ingest-shifts.ts",
+    "ingest:events": "tsx scripts/ingest-events.ts",
+    "compute:versus": "tsx scripts/compute-versus.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "next": "^16.1.7",
+    "postgres": "^3.4.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
