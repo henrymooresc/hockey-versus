@@ -84,14 +84,14 @@ export function HeadToHeadComparison({
             VS
           </span>
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
-            {data.totals.gamesShared} game{data.totals.gamesShared !== 1 ? "s" : ""}
+            {data.totals.gamesShared} game{data.totals.gamesShared !== 1 ? "s" : ""} together
           </span>
           {!data.totals.sameTeam && (
             <div className="mt-2 flex items-center gap-3">
               <span className={`text-2xl font-black ${data.totals.winsA > data.totals.winsB ? "text-green-400" : data.totals.winsA < data.totals.winsB ? "text-red-400" : "text-gray-300"}`}>
                 {data.totals.winsA}
               </span>
-              <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">W</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">-</span>
               <span className={`text-2xl font-black ${data.totals.winsB > data.totals.winsA ? "text-green-400" : data.totals.winsB < data.totals.winsA ? "text-red-400" : "text-gray-300"}`}>
                 {data.totals.winsB}
               </span>
