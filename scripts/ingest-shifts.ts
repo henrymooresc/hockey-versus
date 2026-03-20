@@ -1,14 +1,18 @@
 /**
  * Fetches shift chart data for all games and populates the `shifts` table.
  *
+ * Uses the NHL Stats API as the primary source, falling back to HTML shift
+ * reports when the Stats API returns empty data.
+ *
  * Usage: npx tsx scripts/ingest-shifts.ts [--season 20242025]
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
-import { games, shifts, players } from "../src/db/schema";
-import { getShiftChart } from "../src/lib/nhl-api";
+import { games, shifts, players, teams } from "../src/db/schema";
+import { getShiftChart, getPlayByPlay } from "../src/lib/nhl-api";
+import { getShiftChartFromHtml } from "../src/lib/html-shifts";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
 
@@ -22,7 +26,12 @@ async function main() {
 
   // Get games that haven't had shifts ingested yet
   let query = db
-    .select({ id: games.id, seasonId: games.seasonId })
+    .select({
+      id: games.id,
+      seasonId: games.seasonId,
+      homeTeamId: games.homeTeamId,
+      awayTeamId: games.awayTeamId,
+    })
     .from(games)
     .where(eq(games.shiftsIngested, false));
 
@@ -45,19 +54,45 @@ async function main() {
   const knownPlayerIds = new Set(knownPlayers.map((p) => p.id));
   console.log(`${knownPlayerIds.size} known players`);
 
+  // Load team info for HTML fallback
+  const allTeams = await db
+    .select({ id: teams.id, abbrev: teams.abbrev, name: teams.name })
+    .from(teams);
+  const teamMap = new Map(allTeams.map((t) => [t.id, t]));
+
   const progress = new Progress(filtered.length, "Ingesting shifts");
   let totalShifts = 0;
+  let htmlFallbackCount = 0;
 
   for (const game of filtered) {
     try {
-      const shiftData = await getShiftChart(game.id);
+      let shiftData = await getShiftChart(game.id);
+
+      // Fallback to HTML shift reports if Stats API returns empty
+      if (!shiftData.data || shiftData.data.length === 0) {
+        const homeTeam = teamMap.get(game.homeTeamId!);
+        const awayTeam = teamMap.get(game.awayTeamId!);
+
+        if (homeTeam && awayTeam) {
+          try {
+            const pbp = await getPlayByPlay(game.id);
+            shiftData = await getShiftChartFromHtml(
+              game.id,
+              game.seasonId,
+              homeTeam,
+              awayTeam,
+              pbp.rosterSpots
+            );
+            if (shiftData.data.length > 0) htmlFallbackCount++;
+          } catch (htmlErr) {
+            console.warn(
+              `\n  HTML fallback failed for game ${game.id}: ${htmlErr instanceof Error ? htmlErr.message : htmlErr}`
+            );
+          }
+        }
+      }
 
       if (!shiftData.data || shiftData.data.length === 0) {
-        // Mark as ingested even if no data (e.g., cancelled games)
-        await db
-          .update(games)
-          .set({ shiftsIngested: true })
-          .where(eq(games.id, game.id));
         progress.increment();
         continue;
       }
@@ -97,7 +132,9 @@ async function main() {
   }
   progress.done();
 
-  console.log(`\nDone! Inserted ${totalShifts} shift records.`);
+  console.log(
+    `\nDone! Inserted ${totalShifts} shift records (${htmlFallbackCount} games used HTML fallback).`
+  );
   await client.end();
 }
 
