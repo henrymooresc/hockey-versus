@@ -84,6 +84,8 @@ export async function GET(request: NextRequest) {
     sameTeam: row.sameTeam,
     gamesShared: row.gamesShared,
     toiSharedSeconds: row.toiSharedSeconds,
+    winsA: swapped ? row.winsB : row.winsA,
+    winsB: swapped ? row.winsA : row.winsB,
     playerA: {
       teamId: swapped ? row.playerBTeamId : row.playerATeamId,
       goalsFor: swapped ? row.goalsForB : row.goalsForA,
@@ -95,6 +97,7 @@ export async function GET(request: NextRequest) {
       faceoffWins: swapped ? row.faceoffWinsB : row.faceoffWinsA,
       individualGoals: swapped ? row.playerBGoals : row.playerAGoals,
       individualAssists: swapped ? row.playerBAssists : row.playerAAssists,
+      individualShots: swapped ? row.playerBShots : row.playerAShots,
     },
     playerB: {
       teamId: swapped ? row.playerATeamId : row.playerBTeamId,
@@ -107,6 +110,7 @@ export async function GET(request: NextRequest) {
       faceoffWins: swapped ? row.faceoffWinsA : row.faceoffWinsB,
       individualGoals: swapped ? row.playerAGoals : row.playerBGoals,
       individualAssists: swapped ? row.playerAAssists : row.playerBAssists,
+      individualShots: swapped ? row.playerAShots : row.playerBShots,
     },
   }));
 
@@ -117,6 +121,8 @@ export async function GET(request: NextRequest) {
       sameTeam: s.sameTeam,
       gamesShared: acc.gamesShared + s.gamesShared,
       toiSharedSeconds: acc.toiSharedSeconds + s.toiSharedSeconds,
+      winsA: acc.winsA + s.winsA,
+      winsB: acc.winsB + s.winsB,
       playerA: {
         teamId: s.playerA.teamId,
         goalsFor: acc.playerA.goalsFor + s.playerA.goalsFor,
@@ -130,6 +136,8 @@ export async function GET(request: NextRequest) {
           acc.playerA.individualGoals + s.playerA.individualGoals,
         individualAssists:
           acc.playerA.individualAssists + s.playerA.individualAssists,
+        individualShots:
+          acc.playerA.individualShots + s.playerA.individualShots,
       },
       playerB: {
         teamId: s.playerB.teamId,
@@ -144,6 +152,8 @@ export async function GET(request: NextRequest) {
           acc.playerB.individualGoals + s.playerB.individualGoals,
         individualAssists:
           acc.playerB.individualAssists + s.playerB.individualAssists,
+        individualShots:
+          acc.playerB.individualShots + s.playerB.individualShots,
       },
     }),
     {
@@ -151,6 +161,8 @@ export async function GET(request: NextRequest) {
       sameTeam: false,
       gamesShared: 0,
       toiSharedSeconds: 0,
+      winsA: 0,
+      winsB: 0,
       playerA: {
         teamId: null,
         goalsFor: 0,
@@ -162,6 +174,7 @@ export async function GET(request: NextRequest) {
         faceoffWins: 0,
         individualGoals: 0,
         individualAssists: 0,
+        individualShots: 0,
       },
       playerB: {
         teamId: null,
@@ -174,6 +187,7 @@ export async function GET(request: NextRequest) {
         faceoffWins: 0,
         individualGoals: 0,
         individualAssists: 0,
+        individualShots: 0,
       },
     }
   );
