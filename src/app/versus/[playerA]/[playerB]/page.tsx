@@ -205,6 +205,18 @@ export default async function VersusPage({
           <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">
             {totals.gamesShared} game{totals.gamesShared !== 1 ? "s" : ""} together
           </span>
+          {!totals.sameTeam && (
+            <div className="mt-2 flex items-center gap-3">
+              <span className={`text-2xl font-black ${totals.winsA > totals.winsB ? "text-green-400" : totals.winsA < totals.winsB ? "text-red-400" : "text-gray-300"}`}>
+                {totals.winsA}
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">-</span>
+              <span className={`text-2xl font-black ${totals.winsB > totals.winsA ? "text-green-400" : totals.winsB < totals.winsA ? "text-red-400" : "text-gray-300"}`}>
+                {totals.winsB}
+              </span>
+            </div>
+          )}
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-600">(W/L)</span>
         </div>
         <PlayerCard player={playerBInfo} />
       </div>
