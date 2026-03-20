@@ -232,7 +232,7 @@ function GoalieVsSkaterTable({
               <div className="flex justify-between">
                 <span className="text-gray-400">Save % vs {skaterName}</span>
                 <span className="font-mono font-bold text-white">
-                  {skaterShots > 0 ? (goaliesSaves / skaterShots).toFixed(3) : "—"}
+                  {savePct(skaterShots, skaterGoals)}
                 </span>
               </div>
             </div>

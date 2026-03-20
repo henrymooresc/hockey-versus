@@ -1,34 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { PlayerSearchResult } from "@/types/versus";
-
-interface RivalEntry {
-  playerId: number;
-  firstName: string;
-  lastName: string;
-  position: string | null;
-  headshotUrl: string | null;
-  teamAbbrev: string | null;
-  teamLogoUrl: string | null;
-  value: number;
-  opponentValue: number;
-  toiSharedSeconds: number;
-  gamesShared: number;
-}
-
-interface StatRivals {
-  label: string;
-  top: RivalEntry[];
-  bottom: RivalEntry[];
-}
-
-function formatTOI(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
+import type { PlayerSearchResult, RivalEntry, StatRivals } from "@/types/versus";
+import { formatSecondsToHMS } from "@/lib/time-utils";
 
 function RivalRow({
   rival,
@@ -55,7 +29,7 @@ function RivalRow({
           {rival.firstName} {rival.lastName}
         </div>
         <div className="text-xs text-gray-500">
-          {rival.teamAbbrev ?? "—"} &middot; {rival.gamesShared}G &middot; {formatTOI(rival.toiSharedSeconds)} TOI
+          {rival.teamAbbrev ?? "—"} &middot; {rival.gamesShared}G &middot; {formatSecondsToHMS(rival.toiSharedSeconds)} TOI
         </div>
       </div>
       <div className="text-right">

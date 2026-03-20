@@ -52,3 +52,23 @@ export interface PlayerSearchResult {
   teamName: string | null;
   teamLogoUrl: string | null;
 }
+
+export interface RivalEntry {
+  playerId: number;
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  headshotUrl: string | null;
+  teamAbbrev: string | null;
+  teamLogoUrl: string | null;
+  value: number;
+  opponentValue: number;
+  toiSharedSeconds: number;
+  gamesShared: number;
+}
+
+export interface StatRivals {
+  label: string;
+  top: RivalEntry[];
+  bottom: RivalEntry[];
+}

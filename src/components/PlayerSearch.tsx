@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { PlayerSearchResult } from "@/types/versus";
 import { SoloAnalysis } from "./SoloAnalysis";
 import { HeadToHeadComparison } from "./HeadToHeadComparison";
@@ -166,29 +166,34 @@ function PlayerList({
 }) {
   const filtered = results.filter((p) => p.id !== exclude?.id);
 
-  // Group by team
-  const teamMap = new Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>();
-  for (const player of filtered) {
-    const key = player.teamAbbrev ?? "—";
-    if (!teamMap.has(key)) {
-      teamMap.set(key, {
-        teamName: player.teamName ?? key,
-        logoUrl: player.teamLogoUrl,
-        players: [],
-      });
-    }
-    teamMap.get(key)!.players.push(player);
-  }
-
-  // Group teams by division
-  const divisionMap = new Map<string, Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>>();
   const divisionOrder = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
-  for (const div of divisionOrder) divisionMap.set(div, new Map());
 
-  for (const [abbrev, group] of teamMap.entries()) {
-    const div = abbrevToDivision(abbrev);
-    divisionMap.get(div)!.set(abbrev, group);
-  }
+  const divisionMap = useMemo(() => {
+    // Group by team
+    const teamMap = new Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>();
+    for (const player of filtered) {
+      const key = player.teamAbbrev ?? "—";
+      if (!teamMap.has(key)) {
+        teamMap.set(key, {
+          teamName: player.teamName ?? key,
+          logoUrl: player.teamLogoUrl,
+          players: [],
+        });
+      }
+      teamMap.get(key)!.players.push(player);
+    }
+
+    // Group teams by division
+    const map = new Map<string, Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>>();
+    for (const div of divisionOrder) map.set(div, new Map());
+
+    for (const [abbrev, group] of teamMap.entries()) {
+      const div = abbrevToDivision(abbrev);
+      map.get(div)!.set(abbrev, group);
+    }
+
+    return map;
+  }, [filtered]);
 
   return (
     <ul className="overflow-auto scroll-smooth rounded-xl border border-gray-700/70 bg-gray-800/90 backdrop-blur-sm" style={{ maxHeight: "28rem" }}>

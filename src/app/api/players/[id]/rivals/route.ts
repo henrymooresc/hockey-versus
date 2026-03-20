@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { versusStats, players, teams } from "@/db/schema";
-import { sql, eq, or, and, gt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import type { RivalEntry, StatRivals } from "@/types/versus";
 
 /**
  * For each stat, returns the top 3 opponents where the selected player
@@ -10,46 +10,6 @@ import { sql, eq, or, and, gt } from "drizzle-orm";
  * "Rivalry" weight = stat difference * log(1 + toiSharedSeconds)
  * so high-interaction matchups rank higher than flukey low-sample ones.
  */
-
-interface RivalEntry {
-  playerId: number;
-  firstName: string;
-  lastName: string;
-  position: string | null;
-  headshotUrl: string | null;
-  teamAbbrev: string | null;
-  teamLogoUrl: string | null;
-  value: number;
-  opponentValue: number;
-  toiSharedSeconds: number;
-  gamesShared: number;
-}
-
-interface StatRivals {
-  label: string;
-  top: RivalEntry[];
-  bottom: RivalEntry[];
-}
-
-// Stats to rank, from the selected player's perspective.
-// "field" = the column for the selected player, "oppField" = the opponent's column.
-// "higherIsBetter" controls which direction is "top" vs "bottom".
-const SKATER_STATS: {
-  label: string;
-  fieldA: string;
-  fieldB: string;
-  higherIsBetter: boolean;
-}[] = [
-  { label: "Goals", fieldA: "player_a_goals", fieldB: "player_b_goals", higherIsBetter: true },
-  { label: "Assists", fieldA: "player_a_assists", fieldB: "player_b_assists", higherIsBetter: true },
-  { label: "Points", fieldA: "(player_a_goals + player_a_assists)", fieldB: "(player_b_goals + player_b_assists)", higherIsBetter: true },
-  { label: "Goals For", fieldA: "goals_for_a", fieldB: "goals_for_b", higherIsBetter: true },
-  { label: "Goals Against", fieldA: "goals_against_a", fieldB: "goals_against_b", higherIsBetter: false },
-  { label: "Shots For", fieldA: "shots_for_a", fieldB: "shots_for_b", higherIsBetter: true },
-  { label: "Shots Against", fieldA: "shots_against_a", fieldB: "shots_against_b", higherIsBetter: false },
-  { label: "Hits", fieldA: "hits_by_a", fieldB: "hits_by_b", higherIsBetter: true },
-  { label: "Penalties", fieldA: "penalties_by_a", fieldB: "penalties_by_b", higherIsBetter: false },
-];
 
 export async function GET(
   request: NextRequest,
@@ -197,9 +157,7 @@ export async function GET(
       return { ...opp, playerVal, oppVal, weightedScore: diff * weight };
     });
 
-    // Top 3: highest weighted score (player dominated)
-    const sortedBest = [...scored].sort((a, b) => b.weightedScore - a.weightedScore);
-    const top = sortedBest.slice(0, 3).map((o) => ({
+    const toRivalEntry = (o: (typeof scored)[number]): RivalEntry => ({
       playerId: o.opponentId,
       firstName: o.firstName,
       lastName: o.lastName,
@@ -211,23 +169,11 @@ export async function GET(
       opponentValue: o.oppVal,
       toiSharedSeconds: o.toiSharedSeconds,
       gamesShared: o.gamesShared,
-    }));
+    });
 
-    // Bottom 3: lowest weighted score (player was dominated)
-    const sortedWorst = [...scored].sort((a, b) => a.weightedScore - b.weightedScore);
-    const bottom = sortedWorst.slice(0, 3).map((o) => ({
-      playerId: o.opponentId,
-      firstName: o.firstName,
-      lastName: o.lastName,
-      position: o.position,
-      headshotUrl: o.headshotUrl,
-      teamAbbrev: o.teamAbbrev,
-      teamLogoUrl: o.teamLogoUrl,
-      value: o.playerVal,
-      opponentValue: o.oppVal,
-      toiSharedSeconds: o.toiSharedSeconds,
-      gamesShared: o.gamesShared,
-    }));
+    const sorted = [...scored].sort((a, b) => b.weightedScore - a.weightedScore);
+    const top = sorted.slice(0, 3).map(toRivalEntry);
+    const bottom = sorted.slice(-3).reverse().map(toRivalEntry);
 
     return { label, top, bottom };
   });
