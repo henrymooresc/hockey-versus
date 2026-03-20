@@ -113,7 +113,7 @@ async function main() {
       const BATCH_SIZE = 500;
       for (let i = 0; i < shiftRows.length; i += BATCH_SIZE) {
         const batch = shiftRows.slice(i, i + BATCH_SIZE);
-        await db.insert(shifts).values(batch);
+        await db.insert(shifts).values(batch).onConflictDoNothing();
       }
 
       // Mark game as shifts-ingested

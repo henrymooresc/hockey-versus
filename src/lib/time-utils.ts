@@ -40,6 +40,27 @@ export function intervalOverlap(
 }
 
 /**
+ * Merge a list of potentially overlapping intervals into a minimal set of
+ * non-overlapping intervals, sorted by start time.
+ * Must be applied to each player's own shifts before cross-player overlap
+ * computation to prevent double-counting shared seconds.
+ */
+export function mergeIntervals(intervals: Interval[]): Interval[] {
+  if (intervals.length === 0) return [];
+  const sorted = [...intervals].sort((a, b) => a.start - b.start);
+  const merged: Interval[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = merged[merged.length - 1];
+    if (sorted[i].start <= last.end) {
+      last.end = Math.max(last.end, sorted[i].end);
+    } else {
+      merged.push({ ...sorted[i] });
+    }
+  }
+  return merged;
+}
+
+/**
  * Given two lists of shifts (each as {start, end} in seconds within the same period),
  * compute total overlap seconds and the merged overlap intervals.
  */

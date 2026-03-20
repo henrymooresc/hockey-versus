@@ -93,6 +93,13 @@ export const shifts = pgTable(
       table.startSeconds,
       table.endSeconds
     ),
+    uniqueIndex("uq_shifts_game_player_period_time").on(
+      table.gameId,
+      table.playerId,
+      table.period,
+      table.startSeconds,
+      table.endSeconds
+    ),
   ]
 );
 

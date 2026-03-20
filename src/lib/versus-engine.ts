@@ -1,6 +1,7 @@
 import {
   computeShiftOverlaps,
   isTimeInIntervals,
+  mergeIntervals,
   type Interval,
 } from "./time-utils";
 
@@ -99,12 +100,16 @@ export function computeGameVersus(
       const allOverlapIntervals: Map<number, Interval[]> = new Map();
 
       for (const period of periods) {
-        const pShiftsA = shiftsA
-          .filter((s) => s.period === period)
-          .map((s) => ({ start: s.startSeconds, end: s.endSeconds }));
-        const pShiftsB = shiftsB
-          .filter((s) => s.period === period)
-          .map((s) => ({ start: s.startSeconds, end: s.endSeconds }));
+        const pShiftsA = mergeIntervals(
+          shiftsA
+            .filter((s) => s.period === period)
+            .map((s) => ({ start: s.startSeconds, end: s.endSeconds }))
+        );
+        const pShiftsB = mergeIntervals(
+          shiftsB
+            .filter((s) => s.period === period)
+            .map((s) => ({ start: s.startSeconds, end: s.endSeconds }))
+        );
 
         if (pShiftsA.length === 0 || pShiftsB.length === 0) continue;
 
