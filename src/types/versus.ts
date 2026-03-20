@@ -65,10 +65,14 @@ export interface RivalEntry {
   opponentValue: number;
   toiSharedSeconds: number;
   gamesShared: number;
+  breakdown?: { goals: number; assists: number; shots?: number };
+  opponentBreakdown?: { goals: number; assists: number; shots?: number };
 }
 
 export interface StatRivals {
   label: string;
   top: RivalEntry[];
   bottom: RivalEntry[];
+  hideOpponentValue?: boolean;
+  valueFormat?: "savePct";
 }

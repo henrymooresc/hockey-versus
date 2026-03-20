@@ -4,14 +4,25 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult, RivalEntry, StatRivals } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 
+function formatValue(value: number, format?: "savePct"): string {
+  if (format === "savePct") {
+    return "." + Math.round(value * 1000).toString().padStart(3, "0");
+  }
+  return String(value);
+}
+
 function RivalRow({
   rival,
   playerName,
   isTop,
+  hideOpponentValue,
+  valueFormat,
 }: {
   rival: RivalEntry;
   playerName: string;
   isTop: boolean;
+  hideOpponentValue?: boolean;
+  valueFormat?: "savePct";
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-gray-700/50 bg-gray-800/60 px-4 py-3 transition-colors duration-150 hover:bg-gray-800">
@@ -32,17 +43,33 @@ function RivalRow({
           {rival.teamAbbrev ?? "—"} &middot; {rival.gamesShared}G &middot; {formatSecondsToHMS(rival.toiSharedSeconds)} TOI
         </div>
       </div>
-      <div className="text-right">
-        <div className="flex items-center gap-2 text-sm font-mono">
+      <div className="w-36 shrink-0 text-right">
+        <div className="flex items-center justify-end gap-2 text-sm font-mono">
           <span className={isTop ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
-            {rival.value}
+            {formatValue(rival.value, valueFormat)}
           </span>
-          <span className="text-gray-600">v</span>
-          <span className="text-gray-400">{rival.opponentValue}</span>
+          {!hideOpponentValue && (
+            <>
+              <span className="text-gray-600">v</span>
+              <span className="text-gray-400">{formatValue(rival.opponentValue, valueFormat)}</span>
+            </>
+          )}
         </div>
-        <div className="text-xs text-gray-600">
-          {playerName} v opp
-        </div>
+        {rival.breakdown ? (
+          <div className="flex items-center justify-end gap-1 text-xs font-mono text-gray-600 text-right">
+            <span>{rival.breakdown.goals}G+{rival.breakdown.assists}A{rival.breakdown.shots !== undefined ? ` · ${rival.breakdown.shots} Shots` : ""}</span>
+            {!hideOpponentValue && rival.opponentBreakdown && (
+              <>
+                <span className="text-gray-700">v</span>
+                <span>{rival.opponentBreakdown.goals}G+{rival.opponentBreakdown.assists}A</span>
+              </>
+            )}
+          </div>
+        ) : (
+          !hideOpponentValue && (
+            <div className="text-xs text-gray-600">{playerName} v opp</div>
+          )
+        )}
       </div>
     </div>
   );
@@ -77,6 +104,8 @@ function StatSection({
                   rival={rival}
                   playerName={playerName}
                   isTop={true}
+                  hideOpponentValue={stat.hideOpponentValue}
+                  valueFormat={stat.valueFormat}
                 />
               ))
             ) : (
@@ -101,6 +130,8 @@ function StatSection({
                   rival={rival}
                   playerName={playerName}
                   isTop={false}
+                  hideOpponentValue={stat.hideOpponentValue}
+                  valueFormat={stat.valueFormat}
                 />
               ))
             ) : (
@@ -113,8 +144,37 @@ function StatSection({
   );
 }
 
+function RivalSection({
+  title,
+  subtitle,
+  rivals,
+  playerName,
+  accentColor,
+}: {
+  title: string;
+  subtitle: string;
+  rivals: StatRivals[];
+  playerName: string;
+  accentColor: string;
+}) {
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className={`text-xl font-bold ${accentColor}`}>{title}</h2>
+        <p className="text-sm text-gray-500">{subtitle}</p>
+      </div>
+      <div className="flex flex-col gap-6">
+        {rivals.map((stat) => (
+          <StatSection key={stat.label} stat={stat} playerName={playerName} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
-  const [rivals, setRivals] = useState<StatRivals[] | null>(null);
+  const [skaterRivals, setSkaterRivals] = useState<StatRivals[] | null>(null);
+  const [goalieRivals, setGoalieRivals] = useState<StatRivals[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +187,10 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
         if (!r.ok) throw new Error(data.error || "Failed to fetch rivals");
         return data;
       })
-      .then((data) => setRivals(data.rivals))
+      .then((data) => {
+        setSkaterRivals(data.skaterRivals);
+        setGoalieRivals(data.goalieRivals);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [player.id]);
@@ -151,7 +214,10 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
     );
   }
 
-  if (!rivals || rivals.length === 0) {
+  const hasSkaterData = skaterRivals && skaterRivals.length > 0;
+  const hasGoalieData = goalieRivals && goalieRivals.length > 0;
+
+  if (!hasSkaterData && !hasGoalieData) {
     return (
       <div className="mt-8 text-center text-gray-500">No rivalry data found</div>
     );
@@ -159,14 +225,29 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
 
   return (
     <div className="mt-8">
-      <h2 className="mb-6 text-center text-2xl font-bold text-white">
+      <h2 className="mb-8 text-center text-2xl font-bold text-white">
         {player.firstName} {player.lastName}
         <span className="ml-2 text-lg text-gray-500">Rivalry Breakdown</span>
       </h2>
-      <div className="flex flex-col gap-6">
-        {rivals.map((stat) => (
-          <StatSection key={stat.label} stat={stat} playerName={playerName} />
-        ))}
+      <div className="flex flex-col gap-12">
+        {hasSkaterData && (
+          <RivalSection
+            title="Skater Rivals"
+            subtitle="Performance vs opponent skaters sharing ice time"
+            rivals={skaterRivals}
+            playerName={playerName}
+            accentColor="text-blue-400"
+          />
+        )}
+        {hasGoalieData && (
+          <RivalSection
+            title="Goalie Rivals"
+            subtitle="Offensive performance vs opponent goalies — goals against excluded (always on-ice for GA)"
+            rivals={goalieRivals}
+            playerName={playerName}
+            accentColor="text-amber-400"
+          />
+        )}
       </div>
     </div>
   );
