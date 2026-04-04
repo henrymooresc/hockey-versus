@@ -232,16 +232,12 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
       </h2>
       <div className="flex flex-col gap-12">
         {/* Upcoming Matchups */}
-        <div>
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-emerald-400">Upcoming Matchups</h2>
-            <p className="text-sm text-gray-500">
-              Select a game to see historical performance vs projected opponent roster
-            </p>
-          </div>
-          <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
-            <UpcomingMatchups player={player} />
-          </div>
+        <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
+          <h2 className="text-xl font-bold text-emerald-400">Upcoming Matchups</h2>
+          <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
+            Select a game to see historical performance vs projected opponent roster
+          </p>
+          <UpcomingMatchups player={player} />
         </div>
 
         {/* Rivalry Breakdown */}
