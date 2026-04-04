@@ -76,3 +76,45 @@ export interface StatRivals {
   hideOpponentValue?: boolean;
   valueFormat?: "savePct";
 }
+
+export interface UpcomingGame {
+  gameId: number;
+  gameDate: string;
+  opponentTeamId: number;
+  opponentAbbrev: string;
+  opponentLogoUrl: string | null;
+  isHome: boolean;
+}
+
+export interface MatchupPlayer {
+  playerId: number;
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  headshotUrl: string | null;
+  sweaterNumber: number | null;
+  gamesShared: number;
+  toiSharedSeconds: number;
+  stats: {
+    points: number;
+    goals: number;
+    assists: number;
+    shotsFor: number;
+    shotsAgainst: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    hits: number;
+    penalties: number;
+  };
+  oppStats: {
+    points: number;
+    goals: number;
+    assists: number;
+    shotsFor: number;
+    shotsAgainst: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    hits: number;
+    penalties: number;
+  };
+}

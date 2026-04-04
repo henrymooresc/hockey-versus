@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { PlayerSearchResult, RivalEntry, StatRivals } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
+import { UpcomingMatchups } from "./UpcomingMatchups";
 
 function formatValue(value: number, format?: "savePct"): string {
   if (format === "savePct") {
@@ -227,9 +228,23 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
     <div className="mt-8">
       <h2 className="mb-8 text-center text-2xl font-bold text-white">
         {player.firstName} {player.lastName}
-        <span className="ml-2 text-lg text-gray-500">Rivalry Breakdown</span>
+        <span className="ml-2 text-lg text-gray-500">Analysis</span>
       </h2>
       <div className="flex flex-col gap-12">
+        {/* Upcoming Matchups */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-emerald-400">Upcoming Matchups</h2>
+            <p className="text-sm text-gray-500">
+              Select a game to see historical performance vs projected opponent roster
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
+            <UpcomingMatchups player={player} />
+          </div>
+        </div>
+
+        {/* Rivalry Breakdown */}
         {hasSkaterData && (
           <RivalSection
             title="Skater Rivals"
