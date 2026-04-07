@@ -99,22 +99,26 @@ export interface MatchupPlayer {
     points: number;
     goals: number;
     assists: number;
+    individualShots: number;
     shotsFor: number;
     shotsAgainst: number;
     goalsFor: number;
     goalsAgainst: number;
     hits: number;
     penalties: number;
+    faceoffWins: number;
   };
   oppStats: {
     points: number;
     goals: number;
     assists: number;
+    individualShots: number;
     shotsFor: number;
     shotsAgainst: number;
     goalsFor: number;
     goalsAgainst: number;
     hits: number;
     penalties: number;
+    faceoffWins: number;
   };
 }

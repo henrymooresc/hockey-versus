@@ -42,8 +42,10 @@ export async function GET(
           SUM(games_shared)::int AS games_shared,
           SUM(player_a_goals)::int AS player_a_goals,
           SUM(player_a_assists)::int AS player_a_assists,
+          SUM(player_a_shots)::int AS player_a_shots,
           SUM(player_b_goals)::int AS player_b_goals,
           SUM(player_b_assists)::int AS player_b_assists,
+          SUM(player_b_shots)::int AS player_b_shots,
           SUM(goals_for_a)::int AS goals_for_a,
           SUM(goals_against_a)::int AS goals_against_a,
           SUM(goals_for_b)::int AS goals_for_b,
@@ -55,7 +57,9 @@ export async function GET(
           SUM(hits_by_a)::int AS hits_by_a,
           SUM(hits_by_b)::int AS hits_by_b,
           SUM(penalties_by_a)::int AS penalties_by_a,
-          SUM(penalties_by_b)::int AS penalties_by_b
+          SUM(penalties_by_b)::int AS penalties_by_b,
+          SUM(faceoff_wins_a)::int AS faceoff_wins_a,
+          SUM(faceoff_wins_b)::int AS faceoff_wins_b
         FROM versus_stats
         WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
           AND same_team = false
@@ -107,12 +111,14 @@ export async function GET(
             : (row.player_b_goals as number) + (row.player_b_assists as number),
           goals: isA ? row.player_a_goals as number : row.player_b_goals as number,
           assists: isA ? row.player_a_assists as number : row.player_b_assists as number,
+          individualShots: isA ? row.player_a_shots as number : row.player_b_shots as number,
           shotsFor: isA ? row.shots_for_a as number : row.shots_for_b as number,
           shotsAgainst: isA ? row.shots_against_a as number : row.shots_against_b as number,
           goalsFor: isA ? row.goals_for_a as number : row.goals_for_b as number,
           goalsAgainst: isA ? row.goals_against_a as number : row.goals_against_b as number,
           hits: isA ? row.hits_by_a as number : row.hits_by_b as number,
           penalties: isA ? row.penalties_by_a as number : row.penalties_by_b as number,
+          faceoffWins: isA ? row.faceoff_wins_a as number : row.faceoff_wins_b as number,
         },
         oppStats: {
           points: isA
@@ -120,12 +126,14 @@ export async function GET(
             : (row.player_a_goals as number) + (row.player_a_assists as number),
           goals: isA ? row.player_b_goals as number : row.player_a_goals as number,
           assists: isA ? row.player_b_assists as number : row.player_a_assists as number,
+          individualShots: isA ? row.player_b_shots as number : row.player_a_shots as number,
           shotsFor: isA ? row.shots_for_b as number : row.shots_for_a as number,
           shotsAgainst: isA ? row.shots_against_b as number : row.shots_against_a as number,
           goalsFor: isA ? row.goals_for_b as number : row.goals_for_a as number,
           goalsAgainst: isA ? row.goals_against_b as number : row.goals_against_a as number,
           hits: isA ? row.hits_by_b as number : row.hits_by_a as number,
           penalties: isA ? row.penalties_by_b as number : row.penalties_by_a as number,
+          faceoffWins: isA ? row.faceoff_wins_b as number : row.faceoff_wins_a as number,
         },
       };
     });
@@ -150,8 +158,8 @@ export async function GET(
       sweaterNumber: row.sweater_number,
       gamesShared: 0,
       toiSharedSeconds: 0,
-      stats: { points: 0, goals: 0, assists: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0 },
-      oppStats: { points: 0, goals: 0, assists: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0 },
+      stats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0, faceoffWins: 0 },
+      oppStats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0, faceoffWins: 0 },
     }));
 
     return NextResponse.json({ matchups: [...matchups, ...noHistory] });
