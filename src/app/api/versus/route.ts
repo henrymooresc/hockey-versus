@@ -1,8 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { versusStats, players, teams } from "@/db/schema";
-import { eq, and, or, sql, inArray } from "drizzle-orm";
-import type { VersusSeasonStats, VersusResult } from "@/types/versus";
+import { eq, and, sql, inArray } from "drizzle-orm";
+import type {
+  VersusSeasonStats,
+  VersusPlayerSeasonStats,
+  VersusResult,
+} from "@/types/versus";
+
+const playerInfoSelect = {
+  id: players.id,
+  firstName: players.firstName,
+  lastName: players.lastName,
+  position: players.position,
+  headshotUrl: players.headshotUrl,
+  teamAbbrev: teams.abbrev,
+  teamId: players.currentTeamId,
+  sweaterNumber: players.sweaterNumber,
+};
+
+function getPlayerInfo(playerId: number) {
+  return db
+    .select(playerInfoSelect)
+    .from(players)
+    .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
+    .where(eq(players.id, playerId))
+    .limit(1);
+}
+
+type VersusRow = typeof versusStats.$inferSelect;
+
+function mapPlayerStats(
+  row: VersusRow,
+  side: "a" | "b"
+): VersusPlayerSeasonStats {
+  const isA = side === "a";
+  return {
+    teamId: isA ? row.playerATeamId : row.playerBTeamId,
+    goalsFor: isA ? row.goalsForA : row.goalsForB,
+    goalsAgainst: isA ? row.goalsAgainstA : row.goalsAgainstB,
+    shotsFor: isA ? row.shotsForA : row.shotsForB,
+    shotsAgainst: isA ? row.shotsAgainstA : row.shotsAgainstB,
+    hits: isA ? row.hitsByA : row.hitsByB,
+    penalties: isA ? row.penaltiesByA : row.penaltiesByB,
+    faceoffWins: isA ? row.faceoffWinsA : row.faceoffWinsB,
+    individualGoals: isA ? row.playerAGoals : row.playerBGoals,
+    individualAssists: isA ? row.playerAAssists : row.playerBAssists,
+    individualShots: isA ? row.playerAShots : row.playerBShots,
+  };
+}
+
+function emptyPlayerStats(): VersusPlayerSeasonStats {
+  return {
+    teamId: null,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    shotsFor: 0,
+    shotsAgainst: 0,
+    hits: 0,
+    penalties: 0,
+    faceoffWins: 0,
+    individualGoals: 0,
+    individualAssists: 0,
+    individualShots: 0,
+  };
+}
+
+function addPlayerStats(
+  a: VersusPlayerSeasonStats,
+  b: VersusPlayerSeasonStats
+): VersusPlayerSeasonStats {
+  return {
+    teamId: b.teamId,
+    goalsFor: a.goalsFor + b.goalsFor,
+    goalsAgainst: a.goalsAgainst + b.goalsAgainst,
+    shotsFor: a.shotsFor + b.shotsFor,
+    shotsAgainst: a.shotsAgainst + b.shotsAgainst,
+    hits: a.hits + b.hits,
+    penalties: a.penalties + b.penalties,
+    faceoffWins: a.faceoffWins + b.faceoffWins,
+    individualGoals: a.individualGoals + b.individualGoals,
+    individualAssists: a.individualAssists + b.individualAssists,
+    individualShots: a.individualShots + b.individualShots,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -14,14 +95,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid player IDs" }, { status: 400 });
   }
 
-  // Canonicalize: lower ID = player_a
+  // Canonicalize: lower ID = player_a (matches DB storage convention)
   let swapped = false;
   if (playerAId > playerBId) {
     [playerAId, playerBId] = [playerBId, playerAId];
     swapped = true;
   }
 
-  // Build conditions
+  // The "first"/"second" sides map DB columns back to the user's original A/B
+  const first = swapped ? "b" : "a";
+  const second = swapped ? "a" : "b";
+
   const conditions = [
     eq(versusStats.playerAId, playerAId),
     eq(versusStats.playerBId, playerBId),
@@ -40,45 +124,15 @@ export async function GET(request: NextRequest) {
     .where(and(...conditions))
     .orderBy(versusStats.seasonId);
 
-  // Fetch player info
   const [playerAInfo, playerBInfo] = await Promise.all([
-    db
-      .select({
-        id: players.id,
-        firstName: players.firstName,
-        lastName: players.lastName,
-        position: players.position,
-        headshotUrl: players.headshotUrl,
-        teamAbbrev: teams.abbrev,
-        teamId: players.currentTeamId,
-        sweaterNumber: players.sweaterNumber,
-      })
-      .from(players)
-      .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
-      .where(eq(players.id, playerAId))
-      .limit(1),
-    db
-      .select({
-        id: players.id,
-        firstName: players.firstName,
-        lastName: players.lastName,
-        position: players.position,
-        headshotUrl: players.headshotUrl,
-        teamAbbrev: teams.abbrev,
-        teamId: players.currentTeamId,
-        sweaterNumber: players.sweaterNumber,
-      })
-      .from(players)
-      .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
-      .where(eq(players.id, playerBId))
-      .limit(1),
+    getPlayerInfo(playerAId),
+    getPlayerInfo(playerBId),
   ]);
 
   if (!playerAInfo[0] || !playerBInfo[0]) {
     return NextResponse.json({ error: "Player not found" }, { status: 404 });
   }
 
-  // Map rows to response, swapping A/B if we canonicalized
   const seasonStats: VersusSeasonStats[] = rows.map((row) => ({
     seasonId: row.seasonId,
     sameTeam: row.sameTeam,
@@ -86,35 +140,10 @@ export async function GET(request: NextRequest) {
     toiSharedSeconds: row.toiSharedSeconds,
     winsA: swapped ? row.winsB : row.winsA,
     winsB: swapped ? row.winsA : row.winsB,
-    playerA: {
-      teamId: swapped ? row.playerBTeamId : row.playerATeamId,
-      goalsFor: swapped ? row.goalsForB : row.goalsForA,
-      goalsAgainst: swapped ? row.goalsAgainstB : row.goalsAgainstA,
-      shotsFor: swapped ? row.shotsForB : row.shotsForA,
-      shotsAgainst: swapped ? row.shotsAgainstB : row.shotsAgainstA,
-      hits: swapped ? row.hitsByB : row.hitsByA,
-      penalties: swapped ? row.penaltiesByB : row.penaltiesByA,
-      faceoffWins: swapped ? row.faceoffWinsB : row.faceoffWinsA,
-      individualGoals: swapped ? row.playerBGoals : row.playerAGoals,
-      individualAssists: swapped ? row.playerBAssists : row.playerAAssists,
-      individualShots: swapped ? row.playerBShots : row.playerAShots,
-    },
-    playerB: {
-      teamId: swapped ? row.playerATeamId : row.playerBTeamId,
-      goalsFor: swapped ? row.goalsForA : row.goalsForB,
-      goalsAgainst: swapped ? row.goalsAgainstA : row.goalsAgainstB,
-      shotsFor: swapped ? row.shotsForA : row.shotsForB,
-      shotsAgainst: swapped ? row.shotsAgainstA : row.shotsAgainstB,
-      hits: swapped ? row.hitsByA : row.hitsByB,
-      penalties: swapped ? row.penaltiesByA : row.penaltiesByB,
-      faceoffWins: swapped ? row.faceoffWinsA : row.faceoffWinsB,
-      individualGoals: swapped ? row.playerAGoals : row.playerBGoals,
-      individualAssists: swapped ? row.playerAAssists : row.playerBAssists,
-      individualShots: swapped ? row.playerAShots : row.playerBShots,
-    },
+    playerA: mapPlayerStats(row, first),
+    playerB: mapPlayerStats(row, second),
   }));
 
-  // Compute totals
   const totals: VersusSeasonStats = seasonStats.reduce(
     (acc, s) => ({
       seasonId: "all",
@@ -123,38 +152,8 @@ export async function GET(request: NextRequest) {
       toiSharedSeconds: acc.toiSharedSeconds + s.toiSharedSeconds,
       winsA: acc.winsA + s.winsA,
       winsB: acc.winsB + s.winsB,
-      playerA: {
-        teamId: s.playerA.teamId,
-        goalsFor: acc.playerA.goalsFor + s.playerA.goalsFor,
-        goalsAgainst: acc.playerA.goalsAgainst + s.playerA.goalsAgainst,
-        shotsFor: acc.playerA.shotsFor + s.playerA.shotsFor,
-        shotsAgainst: acc.playerA.shotsAgainst + s.playerA.shotsAgainst,
-        hits: acc.playerA.hits + s.playerA.hits,
-        penalties: acc.playerA.penalties + s.playerA.penalties,
-        faceoffWins: acc.playerA.faceoffWins + s.playerA.faceoffWins,
-        individualGoals:
-          acc.playerA.individualGoals + s.playerA.individualGoals,
-        individualAssists:
-          acc.playerA.individualAssists + s.playerA.individualAssists,
-        individualShots:
-          acc.playerA.individualShots + s.playerA.individualShots,
-      },
-      playerB: {
-        teamId: s.playerB.teamId,
-        goalsFor: acc.playerB.goalsFor + s.playerB.goalsFor,
-        goalsAgainst: acc.playerB.goalsAgainst + s.playerB.goalsAgainst,
-        shotsFor: acc.playerB.shotsFor + s.playerB.shotsFor,
-        shotsAgainst: acc.playerB.shotsAgainst + s.playerB.shotsAgainst,
-        hits: acc.playerB.hits + s.playerB.hits,
-        penalties: acc.playerB.penalties + s.playerB.penalties,
-        faceoffWins: acc.playerB.faceoffWins + s.playerB.faceoffWins,
-        individualGoals:
-          acc.playerB.individualGoals + s.playerB.individualGoals,
-        individualAssists:
-          acc.playerB.individualAssists + s.playerB.individualAssists,
-        individualShots:
-          acc.playerB.individualShots + s.playerB.individualShots,
-      },
+      playerA: addPlayerStats(acc.playerA, s.playerA),
+      playerB: addPlayerStats(acc.playerB, s.playerB),
     }),
     {
       seasonId: "all",
@@ -163,32 +162,8 @@ export async function GET(request: NextRequest) {
       toiSharedSeconds: 0,
       winsA: 0,
       winsB: 0,
-      playerA: {
-        teamId: null,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        shotsFor: 0,
-        shotsAgainst: 0,
-        hits: 0,
-        penalties: 0,
-        faceoffWins: 0,
-        individualGoals: 0,
-        individualAssists: 0,
-        individualShots: 0,
-      },
-      playerB: {
-        teamId: null,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        shotsFor: 0,
-        shotsAgainst: 0,
-        hits: 0,
-        penalties: 0,
-        faceoffWins: 0,
-        individualGoals: 0,
-        individualAssists: 0,
-        individualShots: 0,
-      },
+      playerA: emptyPlayerStats(),
+      playerB: emptyPlayerStats(),
     }
   );
 

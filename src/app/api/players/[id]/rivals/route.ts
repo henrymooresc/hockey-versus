@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { versusStats, players, teams } from "@/db/schema";
-import { sql, eq, or, and, gt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
+import type { RivalEntry, StatRivals } from "@/types/versus";
 
 /**
  * For each stat, returns the top 3 opponents where the selected player
@@ -10,46 +10,6 @@ import { sql, eq, or, and, gt } from "drizzle-orm";
  * "Rivalry" weight = stat difference * log(1 + toiSharedSeconds)
  * so high-interaction matchups rank higher than flukey low-sample ones.
  */
-
-interface RivalEntry {
-  playerId: number;
-  firstName: string;
-  lastName: string;
-  position: string | null;
-  headshotUrl: string | null;
-  teamAbbrev: string | null;
-  teamLogoUrl: string | null;
-  value: number;
-  opponentValue: number;
-  toiSharedSeconds: number;
-  gamesShared: number;
-}
-
-interface StatRivals {
-  label: string;
-  top: RivalEntry[];
-  bottom: RivalEntry[];
-}
-
-// Stats to rank, from the selected player's perspective.
-// "field" = the column for the selected player, "oppField" = the opponent's column.
-// "higherIsBetter" controls which direction is "top" vs "bottom".
-const SKATER_STATS: {
-  label: string;
-  fieldA: string;
-  fieldB: string;
-  higherIsBetter: boolean;
-}[] = [
-  { label: "Goals", fieldA: "player_a_goals", fieldB: "player_b_goals", higherIsBetter: true },
-  { label: "Assists", fieldA: "player_a_assists", fieldB: "player_b_assists", higherIsBetter: true },
-  { label: "Points", fieldA: "(player_a_goals + player_a_assists)", fieldB: "(player_b_goals + player_b_assists)", higherIsBetter: true },
-  { label: "Goals For", fieldA: "goals_for_a", fieldB: "goals_for_b", higherIsBetter: true },
-  { label: "Goals Against", fieldA: "goals_against_a", fieldB: "goals_against_b", higherIsBetter: false },
-  { label: "Shots For", fieldA: "shots_for_a", fieldB: "shots_for_b", higherIsBetter: true },
-  { label: "Shots Against", fieldA: "shots_against_a", fieldB: "shots_against_b", higherIsBetter: false },
-  { label: "Hits", fieldA: "hits_by_a", fieldB: "hits_by_b", higherIsBetter: true },
-  { label: "Penalties", fieldA: "penalties_by_a", fieldB: "penalties_by_b", higherIsBetter: false },
-];
 
 export async function GET(
   request: NextRequest,
@@ -168,71 +128,120 @@ export async function GET(
     };
   });
 
-  // For each stat, rank opponents by weighted difference
-  const statKeys: {
-    key: string;
-    label: string;
-    higherIsBetter: boolean;
-  }[] = [
-    { key: "goals", label: "Goals", higherIsBetter: true },
-    { key: "assists", label: "Assists", higherIsBetter: true },
+  // Split opponents into goalies and skaters
+  const goalieOpponents = opponents.filter((o) => o.position === "G");
+  const skaterOpponents = opponents.filter((o) => o.position !== "G");
+
+  type StatKeyDef = { key: string; label: string; higherIsBetter: boolean };
+
+  // Full stat set for skater opponents (goals/assists omitted — surfaced as breakdown under Points)
+  const skaterStatKeys: StatKeyDef[] = [
     { key: "points", label: "Points", higherIsBetter: true },
-    { key: "goalsFor", label: "Goals For", higherIsBetter: true },
-    { key: "goalsAgainst", label: "Goals Against", higherIsBetter: false },
-    { key: "shotsFor", label: "Shots For", higherIsBetter: true },
-    { key: "shotsAgainst", label: "Shots Against", higherIsBetter: false },
+    { key: "shotsFor", label: "Shots", higherIsBetter: true },
     { key: "hits", label: "Hits", higherIsBetter: true },
     { key: "penalties", label: "Penalties", higherIsBetter: false },
   ];
 
-  const results: StatRivals[] = statKeys.map(({ key, label, higherIsBetter }) => {
-    // Weighted score: stat difference * log(1 + toi)
-    // For "higherIsBetter" stats: positive = player outperformed opponent
-    // For "lowerIsBetter" stats: positive = player had fewer (better)
-    const scored = opponents.map((opp) => {
-      const playerVal = opp.stats[key as keyof typeof opp.stats] as number;
-      const oppVal = opp.oppStats[key as keyof typeof opp.oppStats] as number;
-      const diff = higherIsBetter ? playerVal - oppVal : oppVal - playerVal;
-      const weight = Math.log(1 + opp.toiSharedSeconds);
-      return { ...opp, playerVal, oppVal, weightedScore: diff * weight };
+  // Enrich goalie opponents with computed save % (shots faced - goals allowed) / shots faced
+  const goalieOpponentsEnriched = goalieOpponents.map((o) => ({
+    ...o,
+    stats: {
+      ...o.stats,
+      savePct: o.stats.shotsFor > 0 ? (o.stats.shotsFor - o.stats.goalsFor) / o.stats.shotsFor : 1,
+    },
+    oppStats: { ...o.oppStats, savePct: 1 },
+  }));
+
+  // Goalie opponent stat set — only Points (goals/assists as breakdown); opponent value hidden since goalies rarely score
+  const goalieStatKeys: StatKeyDef[] = [
+    { key: "points", label: "Points", higherIsBetter: true },
+    { key: "savePct", label: "Save %", higherIsBetter: false },
+  ];
+
+  function buildRivals(
+    pool: typeof opponents,
+    keys: StatKeyDef[]
+  ): StatRivals[] {
+    return keys.map(({ key, label, higherIsBetter }) => {
+      const scored = pool.map((opp) => {
+        const playerVal = opp.stats[key as keyof typeof opp.stats] as number;
+        const oppVal = opp.oppStats[key as keyof typeof opp.oppStats] as number;
+        const diff = higherIsBetter ? playerVal - oppVal : oppVal - playerVal;
+        const weight = Math.log(1 + opp.toiSharedSeconds);
+        return { ...opp, playerVal, oppVal, weightedScore: diff * weight };
+      });
+
+      const toRivalEntry = (o: (typeof scored)[number]): RivalEntry => ({
+        playerId: o.opponentId,
+        firstName: o.firstName,
+        lastName: o.lastName,
+        position: o.position,
+        headshotUrl: o.headshotUrl,
+        teamAbbrev: o.teamAbbrev,
+        teamLogoUrl: o.teamLogoUrl,
+        value: o.playerVal,
+        opponentValue: o.oppVal,
+        toiSharedSeconds: o.toiSharedSeconds,
+        gamesShared: o.gamesShared,
+      });
+
+      const sorted = [...scored].sort((a, b) => b.weightedScore - a.weightedScore);
+      return {
+        label,
+        top: sorted.slice(0, 3).map(toRivalEntry),
+        bottom: sorted.slice(-3).reverse().map(toRivalEntry),
+      };
     });
+  }
 
-    // Top 3: highest weighted score (player dominated)
-    const sortedBest = [...scored].sort((a, b) => b.weightedScore - a.weightedScore);
-    const top = sortedBest.slice(0, 3).map((o) => ({
-      playerId: o.opponentId,
-      firstName: o.firstName,
-      lastName: o.lastName,
-      position: o.position,
-      headshotUrl: o.headshotUrl,
-      teamAbbrev: o.teamAbbrev,
-      teamLogoUrl: o.teamLogoUrl,
-      value: o.playerVal,
-      opponentValue: o.oppVal,
-      toiSharedSeconds: o.toiSharedSeconds,
-      gamesShared: o.gamesShared,
-    }));
+  const skaterRivals = buildRivals(skaterOpponents, skaterStatKeys);
 
-    // Bottom 3: lowest weighted score (player was dominated)
-    const sortedWorst = [...scored].sort((a, b) => a.weightedScore - b.weightedScore);
-    const bottom = sortedWorst.slice(0, 3).map((o) => ({
-      playerId: o.opponentId,
-      firstName: o.firstName,
-      lastName: o.lastName,
-      position: o.position,
-      headshotUrl: o.headshotUrl,
-      teamAbbrev: o.teamAbbrev,
-      teamLogoUrl: o.teamLogoUrl,
-      value: o.playerVal,
-      opponentValue: o.oppVal,
-      toiSharedSeconds: o.toiSharedSeconds,
-      gamesShared: o.gamesShared,
-    }));
+  // Enrich Points entries with goals+assists breakdown for display
+  const skaterOppMap = new Map(skaterOpponents.map((o) => [o.opponentId, o]));
+  const pointsEntry = skaterRivals.find((r) => r.label === "Points");
+  if (pointsEntry) {
+    for (const entry of [...pointsEntry.top, ...pointsEntry.bottom]) {
+      const opp = skaterOppMap.get(entry.playerId);
+      if (opp) {
+        entry.breakdown = { goals: opp.stats.goals, assists: opp.stats.assists };
+        entry.opponentBreakdown = { goals: opp.oppStats.goals, assists: opp.oppStats.assists };
+      }
+    }
+  }
 
-    return { label, top, bottom };
-  });
+  const goalieRivals = buildRivals(goalieOpponentsEnriched, goalieStatKeys);
 
-  return NextResponse.json({ rivals: results });
+  // Set formatter and hide opponent value for save %
+  const savePctEntry = goalieRivals.find((r) => r.label === "Save %");
+  if (savePctEntry) {
+    savePctEntry.hideOpponentValue = true;
+    savePctEntry.valueFormat = "savePct";
+  }
+
+  // Enrich Points entries with goals+assists breakdown for display
+  const goalieOppMap = new Map(goalieOpponents.map((o) => [o.opponentId, o]));
+  const goaliePointsEntry = goalieRivals.find((r) => r.label === "Points");
+  if (goaliePointsEntry) {
+    goaliePointsEntry.hideOpponentValue = true;
+    for (const entry of [...goaliePointsEntry.top, ...goaliePointsEntry.bottom]) {
+      const opp = goalieOppMap.get(entry.playerId);
+      if (opp) {
+        entry.breakdown = { goals: opp.stats.goals, assists: opp.stats.assists };
+      }
+    }
+  }
+
+  // Enrich Save % entries with goals+assists+shots breakdown for context
+  if (savePctEntry) {
+    for (const entry of [...savePctEntry.top, ...savePctEntry.bottom]) {
+      const opp = goalieOppMap.get(entry.playerId);
+      if (opp) {
+        entry.breakdown = { goals: opp.stats.goals, assists: opp.stats.assists, shots: opp.stats.shotsFor };
+      }
+    }
+  }
+
+  return NextResponse.json({ skaterRivals, goalieRivals });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Rivals API error:", message);
