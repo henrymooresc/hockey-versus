@@ -13,7 +13,7 @@ function getMatchupType(posA: string | null, posB: string | null): MatchupType {
 }
 
 function savePct(shotsAgainst: number, goalsAgainst: number): string {
-  if (shotsAgainst === 0) return ".000";
+  if (shotsAgainst === 0) return "1.000";
   return ((shotsAgainst - goalsAgainst) / shotsAgainst).toFixed(3);
 }
 
