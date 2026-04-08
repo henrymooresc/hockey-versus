@@ -159,13 +159,13 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
           </div>
 
           <div className="grid grid-cols-3 gap-8 items-start">
-            <PositionGroup label="Forwards" matchups={forwards} collapsible mode={player.position === "C" ? "center" : "skater"} />
-            <PositionGroup label="Defense" matchups={defensemen} collapsible />
+            <PositionGroup label="Forwards" matchups={forwards} collapsible mode={player.position === "C" ? "center" : "skater"} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
+            <PositionGroup label="Defense" matchups={defensemen} collapsible playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
             <div>
-              <PositionGroup label="Goalies" matchups={goalies} mode="goalie" />
+              <PositionGroup label="Goalies" matchups={goalies} mode="goalie" playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
               {unknown.length > 0 && (
                 <div style={{ marginTop: 16 }}>
-                  <PositionGroup label="Other" matchups={unknown} />
+                  <PositionGroup label="Other" matchups={unknown} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
                 </div>
               )}
             </div>

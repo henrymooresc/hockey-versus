@@ -80,12 +80,16 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
                 collapsible
                 defaultVisible={10}
                 mode={player.position === "C" ? "center" : "skater"}
+                playerPosition={player.position}
+                playerName={`${player.firstName[0]}. ${player.lastName}`}
               />
               <PositionGroup
                 label="Defense"
                 matchups={defenseRivals}
                 collapsible
                 defaultVisible={10}
+                playerPosition={player.position}
+                playerName={`${player.firstName[0]}. ${player.lastName}`}
               />
               <PositionGroup
                 label="Goalies"
@@ -93,6 +97,8 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
                 collapsible
                 defaultVisible={10}
                 mode="goalie"
+                playerPosition={player.position}
+                playerName={`${player.firstName[0]}. ${player.lastName}`}
               />
             </div>
           </div>
