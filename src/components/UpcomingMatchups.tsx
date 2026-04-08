@@ -147,13 +147,8 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
         onSelect={setSelectedGame}
       />
 
-      {loadingMatchups ? (
-        <div className="mt-6 text-center text-gray-500">
-          <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-          <p className="mt-2 text-sm">Loading matchup data...</p>
-        </div>
-      ) : matchups.length > 0 ? (
-        <div style={{ marginTop: 28 }}>
+      {matchups.length > 0 ? (
+        <div style={{ marginTop: 28 }} className={`transition-opacity duration-200 ${loadingMatchups ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
           <div className="text-xs text-gray-600" style={{ marginBottom: 20 }}>
             {withHistory.length} of {matchups.length} players with shared history
           </div>
@@ -170,6 +165,11 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
               )}
             </div>
           </div>
+        </div>
+      ) : loadingMatchups ? (
+        <div className="mt-6 text-center text-gray-500">
+          <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
+          <p className="mt-2 text-sm">Loading matchup data...</p>
         </div>
       ) : (
         <div className="mt-6 text-center text-sm text-gray-500">
