@@ -29,60 +29,58 @@ export interface GoalieRivalryInput {
 }
 
 function computeBalance(categories: [number, number][]): number {
+  let activeCount = 0;
   let balanceSum = 0;
-  let balanceCount = 0;
 
   for (const [a, b] of categories) {
     const total = a + b;
     if (total === 0) continue;
+    activeCount++;
     balanceSum += 1 - Math.abs(a - b) / total;
-    balanceCount++;
   }
 
-  if (balanceCount === 0) return 0;
-
-  const evenness = balanceSum / balanceCount;
-  return 2 * evenness - 1;
+  if (activeCount === 0) return 0;
+  return balanceSum / activeCount;
 }
+
+const BALANCE_FLOOR = 0.5;
+
+const CATEGORY_WEIGHTS = {
+  points: 5,
+  penalties: 4,
+  hits: 3,
+  blocks: 2,
+  faceoffs: 1.5,
+  shots: 1,
+};
 
 export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   if (input.toiSharedSeconds === 0) return 0;
 
-  // Shots already include goals, so count shots + assists (not goals separately)
-  // to avoid double-counting
-  const interactions =
-    input.playerAShots +
-    input.playerBShots +
-    input.playerAAssists +
-    input.playerBAssists +
-    input.hitsByA +
-    input.hitsByB +
-    input.blocksByA +
-    input.blocksByB +
-    input.penaltiesByA +
-    input.penaltiesByB +
-    input.faceoffWinsA +
-    input.faceoffWinsB;
+  const ptsA = input.playerAGoals + input.playerAAssists;
+  const ptsB = input.playerBGoals + input.playerBAssists;
 
-  const toiMinutes = input.toiSharedSeconds / 60;
-  const base = interactions / Math.sqrt(toiMinutes);
+  const weightedVolume =
+    CATEGORY_WEIGHTS.points * (ptsA + ptsB) +
+    CATEGORY_WEIGHTS.penalties * (input.penaltiesByA + input.penaltiesByB) +
+    CATEGORY_WEIGHTS.hits * (input.hitsByA + input.hitsByB) +
+    CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
+    CATEGORY_WEIGHTS.faceoffs * (input.faceoffWinsA + input.faceoffWinsB) +
+    CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
 
-  // Measure balance per category using proportions (how close to 50/50).
-  // Categories with 0-0 are skipped — no activity isn't competitive.
-  // Using proportions normalizes across stat scales so inflated stats
-  // like shots don't dominate over rarer stats like blocks.
   const categories: [number, number][] = [
-    [input.playerAGoals + input.playerAAssists, input.playerBGoals + input.playerBAssists],
-    [input.playerAShots, input.playerBShots],
+    [ptsA, ptsB],
+    [input.penaltiesByA, input.penaltiesByB],
     [input.hitsByA, input.hitsByB],
     [input.blocksByA, input.blocksByB],
-    [input.penaltiesByA, input.penaltiesByB],
-    [input.winsA, input.winsB],
+    [input.faceoffWinsA, input.faceoffWinsB],
+    [input.playerAShots, input.playerBShots],
   ];
 
-  const evennessMultiplier = computeBalance(categories);
+  const balance = computeBalance(categories);
+  const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return base * evennessMultiplier;
+  return weightedVolume * multiplier;
 }
 
 export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
