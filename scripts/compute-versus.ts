@@ -140,6 +140,8 @@ async function main() {
           existing.shotsAgainstB += stats.shotsAgainstB;
           existing.hitsByA += stats.hitsByA;
           existing.hitsByB += stats.hitsByB;
+          existing.blocksByA += stats.blocksByA;
+          existing.blocksByB += stats.blocksByB;
           existing.penaltiesByA += stats.penaltiesByA;
           existing.penaltiesByB += stats.penaltiesByB;
           existing.faceoffWinsA += stats.faceoffWinsA;
@@ -193,6 +195,8 @@ async function main() {
           shotsAgainstB: row.shotsAgainstB,
           hitsByA: row.hitsByA,
           hitsByB: row.hitsByB,
+          blocksByA: row.blocksByA,
+          blocksByB: row.blocksByB,
           penaltiesByA: row.penaltiesByA,
           penaltiesByB: row.penaltiesByB,
           faceoffWinsA: row.faceoffWinsA,
@@ -229,6 +233,8 @@ async function main() {
             shotsAgainstB: row.shotsAgainstB,
             hitsByA: row.hitsByA,
             hitsByB: row.hitsByB,
+            blocksByA: row.blocksByA,
+            blocksByB: row.blocksByB,
             penaltiesByA: row.penaltiesByA,
             penaltiesByB: row.penaltiesByB,
             faceoffWinsA: row.faceoffWinsA,

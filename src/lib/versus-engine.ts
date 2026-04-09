@@ -40,6 +40,8 @@ export interface PairStats {
   shotsAgainstB: number;
   hitsByA: number;
   hitsByB: number;
+  blocksByA: number;
+  blocksByB: number;
   penaltiesByA: number;
   penaltiesByB: number;
   faceoffWinsA: number;
@@ -146,6 +148,8 @@ export function computeGameVersus(
         shotsAgainstB: 0,
         hitsByA: 0,
         hitsByB: 0,
+        blocksByA: 0,
+        blocksByB: 0,
         penaltiesByA: 0,
         penaltiesByB: 0,
         faceoffWinsA: 0,
@@ -183,9 +187,9 @@ export function computeGameVersus(
                 stats.goalsAgainstA++;
               }
             }
-            // Individual stats
-            if (event.player1Id === playerA) stats.playerAGoals++;
-            if (event.player1Id === playerB) stats.playerBGoals++;
+            // Individual stats (a goal is also a shot on goal)
+            if (event.player1Id === playerA) { stats.playerAGoals++; stats.playerAShots++; }
+            if (event.player1Id === playerB) { stats.playerBGoals++; stats.playerBShots++; }
             if (
               event.player2Id === playerA ||
               event.player3Id === playerA
@@ -219,6 +223,11 @@ export function computeGameVersus(
             // Individual shots (shooter is player1)
             if (event.player1Id === playerA) stats.playerAShots++;
             if (event.player1Id === playerB) stats.playerBShots++;
+            // Blocked shots (blocker is player2)
+            if (event.eventType === "blocked_shot") {
+              if (event.player2Id === playerA) stats.blocksByA++;
+              if (event.player2Id === playerB) stats.blocksByB++;
+            }
             break;
           }
           case "hit": {
@@ -232,8 +241,8 @@ export function computeGameVersus(
             break;
           }
           case "faceoff": {
-            if (event.player1Id === playerA) stats.faceoffWinsA++;
-            if (event.player1Id === playerB) stats.faceoffWinsB++;
+            if (event.player1Id === playerA && event.player2Id === playerB) stats.faceoffWinsA++;
+            if (event.player1Id === playerB && event.player2Id === playerA) stats.faceoffWinsB++;
             break;
           }
         }

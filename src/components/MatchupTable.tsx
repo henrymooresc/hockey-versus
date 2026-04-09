@@ -6,8 +6,8 @@ import { formatSecondsToHMS } from "@/lib/time-utils";
 
 export type PlayerPosition = string | null;
 
-type SkaterSortKey = "rivalry" | "points" | "shots" | "hits" | "pim" | "toi";
-type CenterSortKey = "rivalry" | "points" | "shots" | "hits" | "pim" | "foPct" | "toi";
+type SkaterSortKey = "rivalry" | "points" | "shots" | "hits" | "blocks" | "pim" | "toi";
+type CenterSortKey = "rivalry" | "points" | "shots" | "hits" | "blocks" | "pim" | "foPct" | "toi";
 type GoalieSortKey = "rivalry" | "savePct" | "goals" | "assists" | "shots" | "toi";
 type SortKey = SkaterSortKey | CenterSortKey | GoalieSortKey;
 
@@ -17,9 +17,10 @@ function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey
   switch (key) {
     case "rivalry": return m.rivalryScore;
     case "points": return m.stats.points - m.oppStats.points;
-    case "shots": return m.stats.shotsFor - m.oppStats.shotsFor;
+    case "shots": return m.stats.individualShots - m.oppStats.individualShots;
     case "hits": return m.stats.hits - m.oppStats.hits;
-    case "pim": return m.stats.penalties - m.oppStats.penalties;
+    case "blocks": return m.stats.blocks - m.oppStats.blocks;
+    case "pim": return m.oppStats.penalties - m.stats.penalties;
     case "foPct": {
       const total = m.stats.faceoffWins + m.oppStats.faceoffWins;
       return total > 0 ? m.stats.faceoffWins / total : 0;
@@ -48,24 +49,15 @@ function getSortValue(m: MatchupPlayer, key: SortKey, mode: ColumnMode): number 
     : getSkaterSortValue(m, key as SkaterSortKey | CenterSortKey);
 }
 
-const SKATER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px";
-const CENTER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px";
+const SKATER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px";
+const CENTER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px 40px";
 const GOALIE_ROW_GRID = "30px 1fr 40px 60px 40px 40px 40px";
 
-function StatValue({ mine, opp }: { mine: number; opp: number }) {
-  const diff = mine - opp;
+function DiffCell({ diff }: { diff: number }) {
+  const label = diff > 0 ? `+${diff}` : `${diff}`;
   return (
-    <div className="flex items-center justify-center font-mono text-[11px]" style={{ gap: 2 }}>
-      <span
-        className={diff > 0 ? "text-green-400 font-bold" : diff < 0 ? "text-red-400 font-bold" : "text-gray-300"}
-        style={{ width: 16, textAlign: "right", display: "inline-block" }}
-      >
-        {mine}
-      </span>
-      <span className="text-gray-700">&ndash;</span>
-      <span className="text-gray-500" style={{ width: 16, textAlign: "left", display: "inline-block" }}>
-        {opp}
-      </span>
+    <div className={`text-center font-mono text-[11px] ${diff > 0 ? "text-green-400 font-bold" : diff < 0 ? "text-red-400 font-bold" : "text-gray-500"}`}>
+      {diff === 0 ? "0" : label}
     </div>
   );
 }
@@ -93,24 +85,28 @@ function savePct(shotsAgainst: number, goalsAgainst: number): string {
   return ((shotsAgainst - goalsAgainst) / shotsAgainst).toFixed(3);
 }
 
-const SKATER_HEADER_COLUMNS: { label: string; key: SkaterSortKey }[] = [
+type HeaderColumn = { label: string; key: SortKey };
+
+const SKATER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
+  { label: "BLK", key: "blocks" },
   { label: "PIM", key: "pim" },
 ];
 
-const CENTER_HEADER_COLUMNS: { label: string; key: CenterSortKey }[] = [
+const CENTER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
+  { label: "BLK", key: "blocks" },
   { label: "PIM", key: "pim" },
   { label: "FO%", key: "foPct" },
 ];
 
-const GOALIE_HEADER_COLUMNS: { label: string; key: GoalieSortKey }[] = [
+const GOALIE_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
   { label: "SV%", key: "savePct" },
   { label: "G", key: "goals" },
@@ -128,7 +124,7 @@ function StatHeader({
   sortKey: SortKey;
   sortDir: "asc" | "desc";
   onSort: (key: SortKey) => void;
-  columns: { label: string; key: SortKey }[];
+  columns: HeaderColumn[];
   gridTemplate: string;
 }) {
   return (
@@ -232,18 +228,15 @@ function SkaterExpandedDetail({
         </span>
       </div>
 
-      <DetailSectionLabel label="Individual" />
+      <DetailSectionLabel label="Scoring" />
       <DetailStatRow label="Goals" mine={stats.goals} opp={oppStats.goals} />
       <DetailStatRow label="Assists" mine={stats.assists} opp={oppStats.assists} />
       <DetailStatRow label="Points" mine={stats.points} opp={oppStats.points} />
       <DetailStatRow label="Shots" mine={stats.individualShots} opp={oppStats.individualShots} />
 
-      <DetailSectionLabel label="On-Ice Team" />
-      <DetailStatRow label="Goals" mine={stats.goalsFor} opp={oppStats.goalsFor} />
-      <DetailStatRow label="Shots" mine={stats.shotsFor} opp={oppStats.shotsFor} />
-
       <DetailSectionLabel label="Physical" />
       <DetailStatRow label="Hits" mine={stats.hits} opp={oppStats.hits} />
+      <DetailStatRow label="Blocks" mine={stats.blocks} opp={oppStats.blocks} />
       <DetailStatRow label="Penalties" mine={stats.penalties} opp={oppStats.penalties} higherIsBetter={false} />
 
       {showFaceoffs && (
@@ -398,7 +391,7 @@ function MatchupRow({
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
-  const emptyCount = mode === "center" ? 6 : 5;
+  const emptyCount = mode === "goalie" ? 5 : mode === "center" ? 8 : 7;
   const isClickable = hasHistory;
 
   return (
@@ -458,10 +451,11 @@ function MatchupRow({
           ) : (
             <>
               <RivalryScoreCell score={matchup.rivalryScore} />
-              <StatValue mine={matchup.stats.points} opp={matchup.oppStats.points} />
-              <StatValue mine={matchup.stats.shotsFor} opp={matchup.oppStats.shotsFor} />
-              <StatValue mine={matchup.stats.hits} opp={matchup.oppStats.hits} />
-              <StatValue mine={matchup.stats.penalties} opp={matchup.oppStats.penalties} />
+              <DiffCell diff={matchup.stats.points - matchup.oppStats.points} />
+              <DiffCell diff={matchup.stats.individualShots - matchup.oppStats.individualShots} />
+              <DiffCell diff={matchup.stats.hits - matchup.oppStats.hits} />
+              <DiffCell diff={matchup.stats.blocks - matchup.oppStats.blocks} />
+              <DiffCell diff={matchup.oppStats.penalties - matchup.stats.penalties} />
               {mode === "center" && (
                 <GoalieStatValue
                   value={foPct(matchup.stats.faceoffWins, matchup.oppStats.faceoffWins)}
@@ -542,7 +536,7 @@ export function PositionGroup({
       <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500" style={{ marginBottom: 12, paddingLeft: 4 }}>
         {label}
       </h4>
-      <StatHeader sortKey={sortKey} sortDir={sortDir} onSort={handleSort} columns={columns as { label: string; key: SortKey }[]} gridTemplate={gridTemplate} />
+      <StatHeader sortKey={sortKey} sortDir={sortDir} onSort={handleSort} columns={columns} gridTemplate={gridTemplate} />
       <div className={`flex flex-col gap-3 ${showAll ? "max-h-[600px] overflow-y-auto" : ""}`}>
         {visible.map((m) => (
           <MatchupRow

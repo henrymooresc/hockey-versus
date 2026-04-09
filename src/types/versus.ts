@@ -28,6 +28,7 @@ export interface VersusPlayerSeasonStats {
   shotsFor: number;
   shotsAgainst: number;
   hits: number;
+  blocks: number;
   penalties: number;
   faceoffWins: number;
   individualGoals: number;
@@ -82,6 +83,7 @@ export interface MatchupPlayer {
     goalsFor: number;
     goalsAgainst: number;
     hits: number;
+    blocks: number;
     penalties: number;
     faceoffWins: number;
   };
@@ -95,6 +97,7 @@ export interface MatchupPlayer {
     goalsFor: number;
     goalsAgainst: number;
     hits: number;
+    blocks: number;
     penalties: number;
     faceoffWins: number;
   };
