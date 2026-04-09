@@ -6,15 +6,16 @@ import { formatSecondsToHMS } from "@/lib/time-utils";
 
 export type PlayerPosition = string | null;
 
-type SkaterSortKey = "points" | "shots" | "hits" | "pim" | "toi";
-type CenterSortKey = "points" | "shots" | "hits" | "pim" | "foPct" | "toi";
-type GoalieSortKey = "savePct" | "goals" | "assists" | "shots" | "toi";
+type SkaterSortKey = "rivalry" | "points" | "shots" | "hits" | "pim" | "toi";
+type CenterSortKey = "rivalry" | "points" | "shots" | "hits" | "pim" | "foPct" | "toi";
+type GoalieSortKey = "rivalry" | "savePct" | "goals" | "assists" | "shots" | "toi";
 type SortKey = SkaterSortKey | CenterSortKey | GoalieSortKey;
 
 export type ColumnMode = "skater" | "center" | "goalie";
 
 function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey): number {
   switch (key) {
+    case "rivalry": return m.rivalryScore;
     case "points": return m.stats.points - m.oppStats.points;
     case "shots": return m.stats.shotsFor - m.oppStats.shotsFor;
     case "hits": return m.stats.hits - m.oppStats.hits;
@@ -29,6 +30,7 @@ function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey
 
 function getGoalieSortValue(m: MatchupPlayer, key: GoalieSortKey): number {
   switch (key) {
+    case "rivalry": return m.rivalryScore;
     case "savePct": {
       const sog = m.stats.individualShots;
       return sog > 0 ? (sog - m.stats.goals) / sog : 0;
@@ -46,9 +48,9 @@ function getSortValue(m: MatchupPlayer, key: SortKey, mode: ColumnMode): number 
     : getSkaterSortValue(m, key as SkaterSortKey | CenterSortKey);
 }
 
-const SKATER_ROW_GRID = "30px 1fr 40px 40px 40px 40px";
-const CENTER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px";
-const GOALIE_ROW_GRID = "30px 1fr 60px 40px 40px 40px";
+const SKATER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px";
+const CENTER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px";
+const GOALIE_ROW_GRID = "30px 1fr 40px 60px 40px 40px 40px";
 
 function StatValue({ mine, opp }: { mine: number; opp: number }) {
   const diff = mine - opp;
@@ -76,12 +78,23 @@ function GoalieStatValue({ value, className }: { value: string | number; classNa
   );
 }
 
+function RivalryScoreCell({ score }: { score: number }) {
+  return (
+    <div className="flex items-center justify-center font-mono text-[11px]">
+      <span className={score > 0 ? "text-green-400 font-bold" : score < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
+        {score.toFixed(1)}
+      </span>
+    </div>
+  );
+}
+
 function savePct(shotsAgainst: number, goalsAgainst: number): string {
   if (shotsAgainst === 0) return "1.000";
   return ((shotsAgainst - goalsAgainst) / shotsAgainst).toFixed(3);
 }
 
 const SKATER_HEADER_COLUMNS: { label: string; key: SkaterSortKey }[] = [
+  { label: "RIV", key: "rivalry" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
@@ -89,6 +102,7 @@ const SKATER_HEADER_COLUMNS: { label: string; key: SkaterSortKey }[] = [
 ];
 
 const CENTER_HEADER_COLUMNS: { label: string; key: CenterSortKey }[] = [
+  { label: "RIV", key: "rivalry" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
@@ -97,6 +111,7 @@ const CENTER_HEADER_COLUMNS: { label: string; key: CenterSortKey }[] = [
 ];
 
 const GOALIE_HEADER_COLUMNS: { label: string; key: GoalieSortKey }[] = [
+  { label: "RIV", key: "rivalry" },
   { label: "SV%", key: "savePct" },
   { label: "G", key: "goals" },
   { label: "A", key: "assists" },
@@ -210,6 +225,13 @@ function SkaterExpandedDetail({
         <div className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{matchup.firstName[0]}. {matchup.lastName}</div>
       </div>
 
+      <div className="text-center py-1.5">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
+        <span className={`font-mono text-sm font-bold ${matchup.rivalryScore > 0 ? "text-green-400" : matchup.rivalryScore < 0 ? "text-red-400" : "text-gray-400"}`}>
+          {matchup.rivalryScore.toFixed(2)}
+        </span>
+      </div>
+
       <DetailSectionLabel label="Individual" />
       <DetailStatRow label="Goals" mine={stats.goals} opp={oppStats.goals} />
       <DetailStatRow label="Assists" mine={stats.assists} opp={oppStats.assists} />
@@ -263,6 +285,13 @@ function GoalieExpandedDetail({
           <div className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{matchup.firstName[0]}. {matchup.lastName}</div>
         </div>
 
+        <div className="text-center py-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
+          <span className={`font-mono text-sm font-bold ${matchup.rivalryScore > 0 ? "text-green-400" : matchup.rivalryScore < 0 ? "text-red-400" : "text-gray-400"}`}>
+            {matchup.rivalryScore.toFixed(2)}
+          </span>
+        </div>
+
         <DetailSectionLabel label="Save Performance" />
         <DetailStatRow label="Shots Faced" mine={stats.individualShots} opp={oppStats.individualShots} />
         <DetailStatRow label="Saves" mine={mySaves} opp={oppSaves} />
@@ -289,6 +318,12 @@ function GoalieExpandedDetail({
 
   return (
     <div className="px-2 pb-2">
+      <div className="text-center py-1.5">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
+        <span className={`font-mono text-sm font-bold ${matchup.rivalryScore > 0 ? "text-green-400" : matchup.rivalryScore < 0 ? "text-red-400" : "text-gray-400"}`}>
+          {matchup.rivalryScore.toFixed(2)}
+        </span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         {/* Skater stats against this goalie */}
         <div className="rounded-lg border border-gray-700/50 bg-gray-800/40 p-3">
@@ -363,7 +398,7 @@ function MatchupRow({
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
-  const emptyCount = mode === "center" ? 5 : 4;
+  const emptyCount = mode === "center" ? 6 : 5;
   const isClickable = hasHistory;
 
   return (
@@ -389,8 +424,12 @@ function MatchupRow({
         )}
         <div className="min-w-0">
           <div className="text-xs font-semibold text-white truncate">
-            {matchup.sweaterNumber && (
-              <span className="text-gray-500" style={{ marginRight: 8 }}>#{matchup.sweaterNumber}</span>
+            {(matchup.sweaterNumber || matchup.position) && (
+              <span className="text-gray-500" style={{ marginRight: 8 }}>
+                {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
+                {matchup.sweaterNumber && matchup.position && " "}
+                {matchup.position && <span className={matchup.position === "D" ? "text-blue-400" : "text-gray-400"}>{matchup.position}</span>}
+              </span>
             )}
             {matchup.firstName[0]}. {matchup.lastName}
           </div>
@@ -407,6 +446,7 @@ function MatchupRow({
         {hasHistory ? (
           mode === "goalie" ? (
             <>
+              <RivalryScoreCell score={matchup.rivalryScore} />
               <GoalieStatValue
                 value={savePct(matchup.stats.individualShots, matchup.stats.goals)}
                 className="text-white font-bold"
@@ -417,6 +457,7 @@ function MatchupRow({
             </>
           ) : (
             <>
+              <RivalryScoreCell score={matchup.rivalryScore} />
               <StatValue mine={matchup.stats.points} opp={matchup.oppStats.points} />
               <StatValue mine={matchup.stats.shotsFor} opp={matchup.oppStats.shotsFor} />
               <StatValue mine={matchup.stats.hits} opp={matchup.oppStats.hits} />
@@ -465,7 +506,7 @@ export function PositionGroup({
   playerPosition?: PlayerPosition;
   playerName?: string;
 }) {
-  const defaultSort: SortKey = mode === "goalie" ? "savePct" : "points";
+  const defaultSort: SortKey = "rivalry";
   const [showAll, setShowAll] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>(defaultSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");

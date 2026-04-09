@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import type { MatchupPlayer } from "@/types/versus";
+import { computeRivalryScore } from "@/lib/rivalry-score";
 
 /**
  * Returns aggregated versus stats for a player against all players
@@ -59,7 +60,9 @@ export async function GET(
           SUM(penalties_by_a)::int AS penalties_by_a,
           SUM(penalties_by_b)::int AS penalties_by_b,
           SUM(faceoff_wins_a)::int AS faceoff_wins_a,
-          SUM(faceoff_wins_b)::int AS faceoff_wins_b
+          SUM(faceoff_wins_b)::int AS faceoff_wins_b,
+          SUM(wins_a)::int AS wins_a,
+          SUM(wins_b)::int AS wins_b
         FROM versus_stats
         WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
           AND same_team = false
@@ -96,6 +99,27 @@ export async function GET(
 
     const matchups: MatchupPlayer[] = (rowsArray as AggRow[]).map((row) => {
       const isA = row.player_side === "A";
+      const pGoals = (isA ? row.player_a_goals : row.player_b_goals) as number;
+      const pAssists = (isA ? row.player_a_assists : row.player_b_assists) as number;
+      const oGoals = (isA ? row.player_b_goals : row.player_a_goals) as number;
+      const oAssists = (isA ? row.player_b_assists : row.player_a_assists) as number;
+      const rivalryScore = computeRivalryScore({
+        toiSharedSeconds: row.toi_shared_seconds as number,
+        hitsByA: (isA ? row.hits_by_a : row.hits_by_b) as number,
+        hitsByB: (isA ? row.hits_by_b : row.hits_by_a) as number,
+        penaltiesByA: (isA ? row.penalties_by_a : row.penalties_by_b) as number,
+        penaltiesByB: (isA ? row.penalties_by_b : row.penalties_by_a) as number,
+        faceoffWinsA: (isA ? row.faceoff_wins_a : row.faceoff_wins_b) as number,
+        faceoffWinsB: (isA ? row.faceoff_wins_b : row.faceoff_wins_a) as number,
+        playerAGoals: pGoals,
+        playerAAssists: pAssists,
+        playerBGoals: oGoals,
+        playerBAssists: oAssists,
+        goalsForA: (isA ? row.goals_for_a : row.goals_for_b) as number,
+        goalsForB: (isA ? row.goals_for_b : row.goals_for_a) as number,
+        winsA: (isA ? row.wins_a : row.wins_b) as number,
+        winsB: (isA ? row.wins_b : row.wins_a) as number,
+      });
       return {
         playerId: row.opponent_id,
         firstName: row.first_name,
@@ -105,12 +129,11 @@ export async function GET(
         sweaterNumber: row.sweater_number,
         gamesShared: row.games_shared,
         toiSharedSeconds: row.toi_shared_seconds,
+        rivalryScore,
         stats: {
-          points: isA
-            ? (row.player_a_goals as number) + (row.player_a_assists as number)
-            : (row.player_b_goals as number) + (row.player_b_assists as number),
-          goals: isA ? row.player_a_goals as number : row.player_b_goals as number,
-          assists: isA ? row.player_a_assists as number : row.player_b_assists as number,
+          points: pGoals + pAssists,
+          goals: pGoals,
+          assists: pAssists,
           individualShots: isA ? row.player_a_shots as number : row.player_b_shots as number,
           shotsFor: isA ? row.shots_for_a as number : row.shots_for_b as number,
           shotsAgainst: isA ? row.shots_against_a as number : row.shots_against_b as number,
@@ -121,11 +144,9 @@ export async function GET(
           faceoffWins: isA ? row.faceoff_wins_a as number : row.faceoff_wins_b as number,
         },
         oppStats: {
-          points: isA
-            ? (row.player_b_goals as number) + (row.player_b_assists as number)
-            : (row.player_a_goals as number) + (row.player_a_assists as number),
-          goals: isA ? row.player_b_goals as number : row.player_a_goals as number,
-          assists: isA ? row.player_b_assists as number : row.player_a_assists as number,
+          points: oGoals + oAssists,
+          goals: oGoals,
+          assists: oAssists,
           individualShots: isA ? row.player_b_shots as number : row.player_a_shots as number,
           shotsFor: isA ? row.shots_for_b as number : row.shots_for_a as number,
           shotsAgainst: isA ? row.shots_against_b as number : row.shots_against_a as number,
@@ -158,6 +179,7 @@ export async function GET(
       sweaterNumber: row.sweater_number,
       gamesShared: 0,
       toiSharedSeconds: 0,
+      rivalryScore: 0,
       stats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0, faceoffWins: 0 },
       oppStats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, penalties: 0, faceoffWins: 0 },
     }));

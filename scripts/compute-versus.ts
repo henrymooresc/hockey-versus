@@ -14,6 +14,7 @@ import {
   type EventRecord,
   type PairStats,
 } from "../src/lib/versus-engine";
+import { computeRivalryScore } from "../src/lib/rivalry-score";
 import { Progress } from "./lib/progress";
 
 const seasonFilter = process.argv.find(
@@ -202,6 +203,7 @@ async function main() {
           playerBGoals: row.playerBGoals,
           playerBAssists: row.playerBAssists,
           playerBShots: row.playerBShots,
+          rivalryScore: row.sameTeam ? null : computeRivalryScore(row),
         })
         .onConflictDoUpdate({
           target: [
@@ -237,6 +239,7 @@ async function main() {
             playerBGoals: row.playerBGoals,
             playerBAssists: row.playerBAssists,
             playerBShots: row.playerBShots,
+            rivalryScore: row.sameTeam ? null : computeRivalryScore(row),
             computedAt: new Date(),
           },
         });

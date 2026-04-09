@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import type { MatchupPlayer } from "@/types/versus";
+import { computeRivalryScore } from "@/lib/rivalry-score";
 
 /**
  * Returns all opponents (split into skaters and goalies) with full stats
@@ -93,6 +94,23 @@ export async function GET(
     const oGoals = (isA ? row.player_b_goals : row.player_a_goals) as number;
     const oAssists = (isA ? row.player_b_assists : row.player_a_assists) as number;
     const oShots = (isA ? row.player_b_shots : row.player_a_shots) as number;
+    const rivalryScore = computeRivalryScore({
+      toiSharedSeconds: row.toi_shared_seconds as number,
+      hitsByA: (isA ? row.hits_by_a : row.hits_by_b) as number,
+      hitsByB: (isA ? row.hits_by_b : row.hits_by_a) as number,
+      penaltiesByA: (isA ? row.penalties_by_a : row.penalties_by_b) as number,
+      penaltiesByB: (isA ? row.penalties_by_b : row.penalties_by_a) as number,
+      faceoffWinsA: (isA ? row.faceoff_wins_a : row.faceoff_wins_b) as number,
+      faceoffWinsB: (isA ? row.faceoff_wins_b : row.faceoff_wins_a) as number,
+      playerAGoals: pGoals,
+      playerAAssists: pAssists,
+      playerBGoals: oGoals,
+      playerBAssists: oAssists,
+      goalsForA: (isA ? row.goals_for_a : row.goals_for_b) as number,
+      goalsForB: (isA ? row.goals_for_b : row.goals_for_a) as number,
+      winsA: (isA ? row.wins_a : row.wins_b) as number,
+      winsB: (isA ? row.wins_b : row.wins_a) as number,
+    });
     return {
       playerId: row.opponent_id,
       firstName: row.first_name,
@@ -102,6 +120,7 @@ export async function GET(
       sweaterNumber: row.sweater_number,
       toiSharedSeconds: row.toi_shared_seconds,
       gamesShared: row.games_shared,
+      rivalryScore,
       stats: {
         points: pGoals + pAssists,
         goals: pGoals,

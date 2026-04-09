@@ -45,12 +45,9 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
     );
   }
 
-  const forwardRivals = (skaterRivals ?? []).filter(
-    (m) => m.position === "C" || m.position === "L" || m.position === "R"
-  );
-  const defenseRivals = (skaterRivals ?? []).filter((m) => m.position === "D");
+  const allSkaterRivals = skaterRivals ?? [];
 
-  const hasSkaterData = skaterRivals && skaterRivals.length > 0;
+  const hasSkaterData = allSkaterRivals.length > 0;
   const hasGoalieData = goalieRivals && goalieRivals.length > 0;
 
   if (!hasSkaterData && !hasGoalieData) {
@@ -73,21 +70,13 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
             <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
               Performance vs opponent players sharing ice time
             </p>
-            <div className="grid grid-cols-3 gap-8 items-start">
+            <div className="grid grid-cols-2 gap-8 items-start">
               <PositionGroup
-                label="Forwards"
-                matchups={forwardRivals}
+                label="Skaters"
+                matchups={allSkaterRivals}
                 collapsible
                 defaultVisible={10}
                 mode={player.position === "C" ? "center" : "skater"}
-                playerPosition={player.position}
-                playerName={`${player.firstName[0]}. ${player.lastName}`}
-              />
-              <PositionGroup
-                label="Defense"
-                matchups={defenseRivals}
-                collapsible
-                defaultVisible={10}
                 playerPosition={player.position}
                 playerName={`${player.firstName[0]}. ${player.lastName}`}
               />
