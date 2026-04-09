@@ -48,7 +48,13 @@ function computeBalance(categories: [number, number][]): number {
 export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   if (input.toiSharedSeconds === 0) return 0;
 
+  // Shots already include goals, so count shots + assists (not goals separately)
+  // to avoid double-counting
   const interactions =
+    input.playerAShots +
+    input.playerBShots +
+    input.playerAAssists +
+    input.playerBAssists +
     input.hitsByA +
     input.hitsByB +
     input.blocksByA +
@@ -56,21 +62,25 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
     input.penaltiesByA +
     input.penaltiesByB +
     input.faceoffWinsA +
-    input.faceoffWinsB +
-    input.playerAGoals +
-    input.playerBGoals;
+    input.faceoffWinsB;
 
   const toiMinutes = input.toiSharedSeconds / 60;
   const base = interactions / Math.sqrt(toiMinutes);
 
-  const evennessMultiplier = computeBalance([
+  // Measure balance per category using proportions (how close to 50/50).
+  // Categories with 0-0 are skipped — no activity isn't competitive.
+  // Using proportions normalizes across stat scales so inflated stats
+  // like shots don't dominate over rarer stats like blocks.
+  const categories: [number, number][] = [
     [input.playerAGoals + input.playerAAssists, input.playerBGoals + input.playerBAssists],
     [input.playerAShots, input.playerBShots],
     [input.hitsByA, input.hitsByB],
     [input.blocksByA, input.blocksByB],
     [input.penaltiesByA, input.penaltiesByB],
     [input.winsA, input.winsB],
-  ]);
+  ];
+
+  const evennessMultiplier = computeBalance(categories);
 
   return base * evennessMultiplier;
 }
