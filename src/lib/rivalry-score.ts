@@ -30,7 +30,12 @@ export function computeRivalryScore(input: RivalryInput): number {
     input.playerBGoals;
 
   const toiMinutes = input.toiSharedSeconds / 60;
-  const intensity = interactions / toiMinutes;
+
+  // Geometric mean of raw volume and per-minute rate:
+  // interactions / sqrt(toiMinutes) = sqrt(interactions * interactions/toiMinutes)
+  // This rewards both high total interactions AND high interaction rate,
+  // preventing low-TOI matchups with few interactions from scoring high.
+  const base = interactions / Math.sqrt(toiMinutes);
 
   const categories: [number, number][] = [
     [input.hitsByA, input.hitsByB],
@@ -54,5 +59,5 @@ export function computeRivalryScore(input: RivalryInput): number {
   const evenness = balanceSum / balanceCount;
   const evennessMultiplier = 2 * evenness - 1;
 
-  return intensity * evennessMultiplier;
+  return base * evennessMultiplier;
 }
