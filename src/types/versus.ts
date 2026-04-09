@@ -71,6 +71,7 @@ export interface MatchupPlayer {
   sweaterNumber: number | null;
   gamesShared: number;
   toiSharedSeconds: number;
+  rivalryScore: number;
   stats: {
     points: number;
     goals: number;

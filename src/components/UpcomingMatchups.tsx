@@ -128,10 +128,9 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
     );
   }
 
-  const forwards = matchups.filter(
-    (m) => m.position === "C" || m.position === "L" || m.position === "R"
+  const skaters = matchups.filter(
+    (m) => m.position === "C" || m.position === "L" || m.position === "R" || m.position === "D"
   );
-  const defensemen = matchups.filter((m) => m.position === "D");
   const goalies = matchups.filter((m) => m.position === "G");
   const unknown = matchups.filter(
     (m) => !["C", "L", "R", "D", "G"].includes(m.position ?? "")
@@ -153,9 +152,8 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
             {withHistory.length} of {matchups.length} players with shared history
           </div>
 
-          <div className="grid grid-cols-3 gap-8 items-start">
-            <PositionGroup label="Forwards" matchups={forwards} collapsible mode={player.position === "C" ? "center" : "skater"} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
-            <PositionGroup label="Defense" matchups={defensemen} collapsible playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
+          <div className="grid grid-cols-2 gap-8 items-start">
+            <PositionGroup label="Skaters" matchups={skaters} collapsible mode={player.position === "C" ? "center" : "skater"} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
             <div>
               <PositionGroup label="Goalies" matchups={goalies} mode="goalie" playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
               {unknown.length > 0 && (
