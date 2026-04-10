@@ -64,6 +64,7 @@ export async function GET(
       p.position,
       p.headshot_url,
       p.sweater_number,
+      p.birth_date,
       t.abbrev AS team_abbrev,
       t.logo_url AS team_logo_url
     FROM aggregated a
@@ -82,6 +83,7 @@ export async function GET(
     position: string | null;
     headshot_url: string | null;
     sweater_number: number | null;
+    birth_date: string | null;
     team_abbrev: string | null;
     team_logo_url: string | null;
     [key: string]: unknown;
@@ -131,6 +133,9 @@ export async function GET(
       position: row.position,
       headshotUrl: row.headshot_url,
       sweaterNumber: row.sweater_number,
+      birthDate: row.birth_date,
+      teamAbbrev: row.team_abbrev,
+      teamLogoUrl: row.team_logo_url,
       toiSharedSeconds: row.toi_shared_seconds,
       gamesShared: row.games_shared,
       rivalryScore,

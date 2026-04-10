@@ -7,6 +7,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { eq } from "drizzle-orm";
 import { seasons, games, teams } from "../src/db/schema";
 import { getStandings, getClubSeasonSchedule } from "../src/lib/nhl-api";
 import { Progress } from "./lib/progress";
@@ -153,7 +154,7 @@ async function main() {
     await db
       .update(seasons)
       .set({ ingested: true })
-      .where(({ id }: any) => id === sid);
+      .where(eq(seasons.id, sid));
   }
 
   console.log(

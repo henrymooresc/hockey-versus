@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { PlayerSearchResult, UpcomingGame, MatchupPlayer } from "@/types/versus";
 import { PositionGroup } from "./MatchupTable";
+import { PositionTabs } from "./PositionTabs";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T12:00:00");
@@ -64,6 +65,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
   const [loadingGames, setLoadingGames] = useState(true);
   const [loadingMatchups, setLoadingMatchups] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
 
   useEffect(() => {
     setLoadingGames(true);
@@ -92,6 +94,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
     if (!selectedGame) return;
 
     setLoadingMatchups(true);
+    setActiveTab("skaters");
     fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}`)
       .then(async (r) => {
         const data = await r.json();
@@ -135,8 +138,10 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
   const unknown = matchups.filter(
     (m) => !["C", "L", "R", "D", "G"].includes(m.position ?? "")
   );
+  const allSkaters = [...skaters, ...unknown];
 
   const withHistory = matchups.filter((m) => m.gamesShared > 0);
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
 
   return (
     <div>
@@ -148,21 +153,38 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
 
       {matchups.length > 0 ? (
         <div style={{ marginTop: 28 }} className={`transition-opacity duration-200 ${loadingMatchups ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
-          <div className="text-xs text-gray-600" style={{ marginBottom: 20 }}>
-            {withHistory.length} of {matchups.length} players with shared history
+          <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
+            <div className="text-xs text-gray-600">
+              {withHistory.length} of {matchups.length} players with shared history
+            </div>
+            <PositionTabs
+              active={activeTab}
+              onChange={setActiveTab}
+              skaterCount={allSkaters.length}
+              goalieCount={goalies.length}
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-8 items-start">
-            <PositionGroup label="Skaters" matchups={skaters} collapsible mode={player.position === "C" ? "center" : "skater"} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
-            <div>
-              <PositionGroup label="Goalies" matchups={goalies} mode="goalie" playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
-              {unknown.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <PositionGroup label="Other" matchups={unknown} playerPosition={player.position} playerName={`${player.firstName[0]}. ${player.lastName}`} />
-                </div>
-              )}
-            </div>
-          </div>
+          {activeTab === "skaters" ? (
+            <PositionGroup
+              label="Skaters"
+              matchups={allSkaters}
+              collapsible
+              mode={player.position === "C" ? "center" : "skater"}
+              playerPosition={player.position}
+              playerName={playerName}
+              playerId={player.id}
+            />
+          ) : (
+            <PositionGroup
+              label="Goalies"
+              matchups={goalies}
+              mode="goalie"
+              playerPosition={player.position}
+              playerName={playerName}
+              playerId={player.id}
+            />
+          )}
         </div>
       ) : loadingMatchups ? (
         <div className="mt-6 text-center text-gray-500">

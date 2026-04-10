@@ -77,9 +77,13 @@ export async function GET(
         p.last_name,
         p.position,
         p.headshot_url,
-        p.sweater_number
+        p.sweater_number,
+        p.birth_date,
+        t.abbrev AS team_abbrev,
+        t.logo_url AS team_logo_url
       FROM aggregated a
       JOIN players p ON p.id = a.opponent_id
+      LEFT JOIN teams t ON t.id = p.current_team_id
       WHERE p.current_team_id = ${teamId}
       ORDER BY a.toi_shared_seconds DESC
     `);
@@ -94,6 +98,9 @@ export async function GET(
       position: string | null;
       headshot_url: string | null;
       sweater_number: number | null;
+      birth_date: string | null;
+      team_abbrev: string | null;
+      team_logo_url: string | null;
       [key: string]: unknown;
     }
 
@@ -142,6 +149,9 @@ export async function GET(
         position: row.position,
         headshotUrl: row.headshot_url,
         sweaterNumber: row.sweater_number,
+        birthDate: row.birth_date as string | null,
+        teamAbbrev: row.team_abbrev as string | null,
+        teamLogoUrl: row.team_logo_url as string | null,
         gamesShared: row.games_shared,
         toiSharedSeconds: row.toi_shared_seconds,
         rivalryScore,
@@ -179,9 +189,11 @@ export async function GET(
     // Also return opponent roster players with no versus data
     const matchupPlayerIds = new Set(matchups.map((m) => m.playerId));
     const rosterRows = await db.execute(sql`
-      SELECT id, first_name, last_name, position, headshot_url, sweater_number
-      FROM players
-      WHERE current_team_id = ${teamId}
+      SELECT p.id, p.first_name, p.last_name, p.position, p.headshot_url, p.sweater_number, p.birth_date,
+             t.abbrev AS team_abbrev, t.logo_url AS team_logo_url
+      FROM players p
+      LEFT JOIN teams t ON t.id = p.current_team_id
+      WHERE p.current_team_id = ${teamId}
     `);
 
     const rosterArray = Array.isArray(rosterRows) ? rosterRows : (rosterRows as any).rows ?? [];
@@ -194,6 +206,9 @@ export async function GET(
       position: row.position,
       headshotUrl: row.headshot_url,
       sweaterNumber: row.sweater_number,
+      birthDate: row.birth_date ?? null,
+      teamAbbrev: row.team_abbrev ?? null,
+      teamLogoUrl: row.team_logo_url ?? null,
       gamesShared: 0,
       toiSharedSeconds: 0,
       rivalryScore: 0,

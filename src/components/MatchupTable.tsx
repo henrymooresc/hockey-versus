@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { MatchupPlayer } from "@/types/versus";
+import { useState, useEffect } from "react";
+import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
+import { getTeamColors } from "@/lib/team-colors";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export type PlayerPosition = string | null;
 
@@ -163,6 +165,152 @@ function foPct(wins: number, oppWins: number): string {
   return ((wins / total) * 100).toFixed(0) + "%";
 }
 
+function computeAge(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate + "T00:00:00");
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+// ── Player Bio Card ────────────────────────────────────────────────────────
+
+function PlayerBioCard({
+  matchup,
+  standings,
+}: {
+  matchup: MatchupPlayer;
+  standings: StandingsEntry | null;
+}) {
+  const teamColors = getTeamColors(matchup.teamAbbrev);
+  const age = computeAge(matchup.birthDate);
+
+  return (
+    <div
+      className="rounded-lg border bg-gray-800/60 p-3"
+      style={{ borderColor: teamColors.primary + "60" }}
+    >
+      <div className="flex items-center gap-3">
+        {matchup.headshotUrl ? (
+          <img
+            src={matchup.headshotUrl}
+            alt={`${matchup.firstName} ${matchup.lastName}`}
+            className="rounded-lg object-cover shrink-0"
+            style={{
+              width: 64,
+              height: 64,
+              minWidth: 64,
+              maxWidth: 64,
+              boxShadow: `0 0 12px ${teamColors.primary}30`,
+              border: `2px solid ${teamColors.primary}80`,
+            }}
+          />
+        ) : (
+          <div
+            className="rounded-lg bg-gray-700"
+            style={{ width: 64, height: 64, border: `2px solid ${teamColors.primary}80` }}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-white">
+            {matchup.firstName} {matchup.lastName}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            {matchup.teamLogoUrl && (
+              <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+            )}
+            <span className="text-xs" style={{ color: teamColors.primary }}>
+              {matchup.teamAbbrev}
+            </span>
+            {matchup.sweaterNumber && (
+              <span className="text-xs text-gray-400">#{matchup.sweaterNumber}</span>
+            )}
+            {matchup.position && (
+              <span className={`text-xs ${matchup.position === "D" ? "text-blue-400" : "text-gray-400"}`}>
+                {matchup.position}
+              </span>
+            )}
+          </div>
+          {age !== null && (
+            <div className="text-[10px] text-gray-500 mt-0.5">Age {age}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Team standings info */}
+      {standings && (
+        <div
+          className="mt-2 flex items-center justify-between rounded px-2 py-1 text-[10px]"
+          style={{ backgroundColor: teamColors.primary + "15", borderLeft: `3px solid ${teamColors.primary}` }}
+        >
+          <span className="text-gray-400">
+            <span className="font-bold text-white">{standings.points}</span> pts
+          </span>
+          <span className="text-gray-400">
+            {standings.wins}-{standings.losses}-{standings.otLosses}
+          </span>
+          <span className="text-gray-400">
+            L10: <span className="text-gray-300">{standings.l10Record}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Rivalry Trend Chart ────────────────────────────────────────────────────
+
+function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) {
+  if (history.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+        Rivalry Score by Game
+      </div>
+      <div style={{ width: "100%", height: 100 }}>
+        <ResponsiveContainer>
+          <LineChart data={history} margin={{ top: 5, right: 10, bottom: 0, left: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 9, fill: "#6B7280" }}
+              axisLine={{ stroke: "#374151" }}
+              tickLine={false}
+              interval={history.length > 10 ? Math.floor(history.length / 6) : 0}
+            />
+            <YAxis
+              tick={{ fontSize: 9, fill: "#6B7280" }}
+              axisLine={false}
+              tickLine={false}
+              width={30}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#1F2937",
+                border: "1px solid #374151",
+                borderRadius: 8,
+                fontSize: 11,
+              }}
+              labelStyle={{ color: "#9CA3AF" }}
+              formatter={(value) => [Number(value).toFixed(1), "Rivalry"]}
+            />
+            <Line
+              type="monotone"
+              dataKey="rivalryScore"
+              stroke="#60A5FA"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#60A5FA" }}
+              activeDot={{ r: 5, fill: "#3B82F6" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 // ── Expanded Detail Components ─────────────────────────────────────────────
 
 function DetailStatRow({
@@ -206,15 +354,35 @@ function SkaterExpandedDetail({
   matchup,
   showFaceoffs,
   playerName,
+  playerId,
+  standings,
 }: {
   matchup: MatchupPlayer;
   showFaceoffs: boolean;
   playerName: string;
+  playerId: number;
+  standings: Map<string, StandingsEntry>;
 }) {
   const { stats, oppStats } = matchup;
+  const [history, setHistory] = useState<RivalGameHistory[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/players/${playerId}/rival-history?opponentId=${matchup.playerId}`)
+      .then((r) => r.json())
+      .then((d) => setHistory(d.games ?? []))
+      .catch(() => setHistory([]));
+  }, [playerId, matchup.playerId]);
+
+  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-2 pb-3">
+      {/* Player bio card */}
+      <div className="mb-3">
+        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+      </div>
+
+      {/* Stat comparison */}
       <div className="grid grid-cols-3 items-center pb-1 mb-1 border-b border-gray-700/50">
         <div className="text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">{playerName}</div>
         <div />
@@ -250,6 +418,14 @@ function SkaterExpandedDetail({
           />
         </>
       )}
+
+      {/* Trend chart */}
+      {history && history.length > 0 && <RivalryTrendChart history={history} />}
+      {history === null && (
+        <div className="mt-2 text-center">
+          <div className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-600 border-t-blue-400" />
+        </div>
+      )}
     </div>
   );
 }
@@ -258,20 +434,37 @@ function GoalieExpandedDetail({
   matchup,
   playerPosition,
   playerName,
+  playerId,
+  standings,
 }: {
   matchup: MatchupPlayer;
   playerPosition: PlayerPosition;
   playerName: string;
+  playerId: number;
+  standings: Map<string, StandingsEntry>;
 }) {
   const { stats, oppStats } = matchup;
   const isPlayerGoalie = playerPosition === "G";
+  const [history, setHistory] = useState<RivalGameHistory[] | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/players/${playerId}/rival-history?opponentId=${matchup.playerId}`)
+      .then((r) => r.json())
+      .then((d) => setHistory(d.games ?? []))
+      .catch(() => setHistory([]));
+  }, [playerId, matchup.playerId]);
+
+  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
 
   if (isPlayerGoalie) {
-    // Selected player is a goalie, opponent is a goalie too — goalie vs goalie
     const mySaves = stats.individualShots - stats.goals;
     const oppSaves = oppStats.individualShots - oppStats.goals;
     return (
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-3">
+        <div className="mb-3">
+          <PlayerBioCard matchup={matchup} standings={teamStandings} />
+        </div>
+
         <div className="grid grid-cols-3 items-center pb-1 mb-1 border-b border-gray-700/50">
           <div className="text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">{playerName}</div>
           <div />
@@ -298,19 +491,29 @@ function GoalieExpandedDetail({
         <DetailSectionLabel label="On-Ice Team" />
         <DetailStatRow label="Goals" mine={stats.goalsFor} opp={oppStats.goalsFor} />
         <DetailStatRow label="Shots" mine={stats.shotsFor} opp={oppStats.shotsFor} />
+
+        {history && history.length > 0 && <RivalryTrendChart history={history} />}
+        {history === null && (
+          <div className="mt-2 text-center">
+            <div className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-600 border-t-blue-400" />
+          </div>
+        )}
       </div>
     );
   }
 
   // Selected player is a skater, opponent is a goalie
-  // The skater's individual shots/goals ARE the goalie's shots faced/goals allowed
   const shotsOnGoalie = stats.individualShots;
   const goalsOnGoalie = stats.goals;
   const shootingPct = shotsOnGoalie > 0 ? ((goalsOnGoalie / shotsOnGoalie) * 100).toFixed(1) + "%" : "\u2014";
   const goalieSavePct = savePct(shotsOnGoalie, goalsOnGoalie);
 
   return (
-    <div className="px-2 pb-2">
+    <div className="px-2 pb-3">
+      <div className="mb-3">
+        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+      </div>
+
       <div className="text-center py-1.5">
         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
         <span className={`font-mono text-sm font-bold ${matchup.rivalryScore > 0 ? "text-green-400" : matchup.rivalryScore < 0 ? "text-red-400" : "text-gray-400"}`}>
@@ -368,6 +571,13 @@ function GoalieExpandedDetail({
           </div>
         </div>
       </div>
+
+      {history && history.length > 0 && <RivalryTrendChart history={history} />}
+      {history === null && (
+        <div className="mt-2 text-center">
+          <div className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-600 border-t-blue-400" />
+        </div>
+      )}
     </div>
   );
 }
@@ -381,6 +591,8 @@ function MatchupRow({
   onToggle,
   playerPosition,
   playerName,
+  playerId,
+  standings,
 }: {
   matchup: MatchupPlayer;
   mode?: ColumnMode;
@@ -388,18 +600,24 @@ function MatchupRow({
   onToggle: () => void;
   playerPosition: PlayerPosition;
   playerName: string;
+  playerId: number;
+  standings: Map<string, StandingsEntry>;
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
   const emptyCount = mode === "goalie" ? 5 : mode === "center" ? 8 : 7;
   const isClickable = hasHistory;
+  const teamColors = getTeamColors(matchup.teamAbbrev);
 
   return (
-    <div className={`rounded-lg border transition-colors duration-150 ${
-      expanded
-        ? "border-blue-500/50 bg-gray-800/80"
-        : "border-gray-700/50 bg-gray-800/60 hover:bg-gray-800"
-    }`}>
+    <div
+      className={`rounded-lg border transition-colors duration-150 ${
+        expanded
+          ? "bg-gray-800/80"
+          : "border-gray-700/50 bg-gray-800/60 hover:bg-gray-800"
+      }`}
+      style={expanded ? { borderColor: teamColors.primary + "60" } : undefined}
+    >
       <div
         className={`grid items-center ${isClickable ? "cursor-pointer" : ""}`}
         style={{ gridTemplateColumns: gridTemplate, padding: "10px 10px", gap: 6 }}
@@ -473,9 +691,9 @@ function MatchupRow({
       {expanded && hasHistory && (
         <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
           {mode === "goalie" ? (
-            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} playerName={playerName} />
+            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} playerName={playerName} playerId={playerId} standings={standings} />
           ) : (
-            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} playerName={playerName} />
+            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} playerName={playerName} playerId={playerId} standings={standings} />
           )}
         </div>
       )}
@@ -491,6 +709,7 @@ export function PositionGroup({
   mode = "skater",
   playerPosition = null,
   playerName = "",
+  playerId = 0,
 }: {
   label: string;
   matchups: MatchupPlayer[];
@@ -499,12 +718,27 @@ export function PositionGroup({
   mode?: ColumnMode;
   playerPosition?: PlayerPosition;
   playerName?: string;
+  playerId?: number;
 }) {
   const defaultSort: SortKey = "rivalry";
   const [showAll, setShowAll] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>(defaultSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [standings, setStandings] = useState<Map<string, StandingsEntry>>(new Map());
+
+  useEffect(() => {
+    fetch("/api/standings")
+      .then((r) => r.json())
+      .then((d) => {
+        const map = new Map<string, StandingsEntry>();
+        for (const s of d.standings ?? []) {
+          map.set(s.abbrev, s);
+        }
+        setStandings(map);
+      })
+      .catch(() => {});
+  }, []);
 
   if (matchups.length === 0) return null;
 
@@ -547,6 +781,8 @@ export function PositionGroup({
             onToggle={() => setExpandedId(expandedId === m.playerId ? null : m.playerId)}
             playerPosition={playerPosition}
             playerName={playerName}
+            playerId={playerId}
+            standings={standings}
           />
         ))}
       </div>

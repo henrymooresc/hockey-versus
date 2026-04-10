@@ -15,6 +15,7 @@ const playerInfoSelect = {
   position: players.position,
   headshotUrl: players.headshotUrl,
   teamAbbrev: teams.abbrev,
+  teamLogoUrl: teams.logoUrl,
   teamId: players.currentTeamId,
   sweaterNumber: players.sweaterNumber,
 };
