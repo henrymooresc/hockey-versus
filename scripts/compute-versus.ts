@@ -6,7 +6,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { games, shifts, gameEvents, versusStats } from "../src/db/schema";
 import {
   computeGameVersus,
@@ -14,7 +14,7 @@ import {
   type EventRecord,
   type PairStats,
 } from "../src/lib/versus-engine";
-import { computeRivalryScore } from "../src/lib/rivalry-score";
+import { computeSkaterRivalryScore } from "../src/lib/rivalry-score";
 import { Progress } from "./lib/progress";
 
 const seasonFilter = process.argv.find(
@@ -22,7 +22,10 @@ const seasonFilter = process.argv.find(
 );
 
 async function main() {
-  const client = postgres(process.env.DATABASE_URL!);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
   // Get games that have both shifts and events ingested
@@ -62,11 +65,17 @@ async function main() {
     PairStats & { seasonId: string; gamesShared: number; winsA: number; winsB: number }
   >();
 
-  for (const game of filtered) {
-    try {
-      // Load shifts for this game
-      const gameShifts = await db
+  // Process in chunks to avoid loading all shifts+events into memory at once
+  const GAME_CHUNK = 500;
+
+  for (let gi = 0; gi < filtered.length; gi += GAME_CHUNK) {
+    const chunk = filtered.slice(gi, gi + GAME_CHUNK);
+    const chunkIds = chunk.map((g) => g.id);
+
+    const [chunkShifts, chunkEvents] = await Promise.all([
+      db
         .select({
+          gameId: shifts.gameId,
           playerId: shifts.playerId,
           teamId: shifts.teamId,
           period: shifts.period,
@@ -74,11 +83,10 @@ async function main() {
           endSeconds: shifts.endSeconds,
         })
         .from(shifts)
-        .where(eq(shifts.gameId, game.id));
-
-      // Load events for this game
-      const gameEvts = await db
+        .where(inArray(shifts.gameId, chunkIds)),
+      db
         .select({
+          gameId: gameEvents.gameId,
           eventType: gameEvents.eventType,
           period: gameEvents.period,
           timeSeconds: gameEvents.timeSeconds,
@@ -88,78 +96,94 @@ async function main() {
           player3Id: gameEvents.player3Id,
         })
         .from(gameEvents)
-        .where(eq(gameEvents.gameId, game.id));
+        .where(inArray(gameEvents.gameId, chunkIds)),
+    ]);
 
-      if (gameShifts.length === 0) {
-        progress.increment();
-        continue;
-      }
-
-      const pairStats = computeGameVersus(
-        gameShifts as ShiftRecord[],
-        gameEvts as EventRecord[]
-      );
-
-      // Determine game winner team ID
-      const winnerTeamId =
-        game.homeScore !== null && game.awayScore !== null && game.homeScore !== game.awayScore
-          ? game.homeScore > game.awayScore
-            ? game.homeTeamId
-            : game.awayTeamId
-          : null;
-
-      // Accumulate into season-level stats
-      for (const [pairKey, stats] of pairStats) {
-        const accKey = `${pairKey}-${game.seasonId}`;
-
-        const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
-        const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
-
-        if (!accumulator.has(accKey)) {
-          accumulator.set(accKey, {
-            ...stats,
-            seasonId: game.seasonId,
-            gamesShared: 1,
-            winsA: pairWinsA,
-            winsB: pairWinsB,
-          });
-        } else {
-          const existing = accumulator.get(accKey)!;
-          existing.gamesShared++;
-          existing.winsA += pairWinsA;
-          existing.winsB += pairWinsB;
-
-          existing.toiSharedSeconds += stats.toiSharedSeconds;
-          existing.goalsForA += stats.goalsForA;
-          existing.goalsAgainstA += stats.goalsAgainstA;
-          existing.goalsForB += stats.goalsForB;
-          existing.goalsAgainstB += stats.goalsAgainstB;
-          existing.shotsForA += stats.shotsForA;
-          existing.shotsAgainstA += stats.shotsAgainstA;
-          existing.shotsForB += stats.shotsForB;
-          existing.shotsAgainstB += stats.shotsAgainstB;
-          existing.hitsByA += stats.hitsByA;
-          existing.hitsByB += stats.hitsByB;
-          existing.blocksByA += stats.blocksByA;
-          existing.blocksByB += stats.blocksByB;
-          existing.penaltiesByA += stats.penaltiesByA;
-          existing.penaltiesByB += stats.penaltiesByB;
-          existing.faceoffWinsA += stats.faceoffWinsA;
-          existing.faceoffWinsB += stats.faceoffWinsB;
-          existing.playerAGoals += stats.playerAGoals;
-          existing.playerAAssists += stats.playerAAssists;
-          existing.playerAShots += stats.playerAShots;
-          existing.playerBGoals += stats.playerBGoals;
-          existing.playerBAssists += stats.playerBAssists;
-          existing.playerBShots += stats.playerBShots;
-        }
-      }
-    } catch (err) {
-      console.warn(
-        `\nWarning: Failed to compute versus for game ${game.id}: ${err instanceof Error ? err.message : err}`
-      );
+    const shiftsByGame = new Map<number, ShiftRecord[]>();
+    for (const s of chunkShifts) {
+      if (!shiftsByGame.has(s.gameId)) shiftsByGame.set(s.gameId, []);
+      shiftsByGame.get(s.gameId)!.push(s as ShiftRecord);
     }
-    progress.increment();
+
+    const eventsByGame = new Map<number, EventRecord[]>();
+    for (const e of chunkEvents) {
+      if (!eventsByGame.has(e.gameId)) eventsByGame.set(e.gameId, []);
+      eventsByGame.get(e.gameId)!.push(e as EventRecord);
+    }
+
+    for (const game of chunk) {
+      try {
+        const gameShifts = shiftsByGame.get(game.id) ?? [];
+        const gameEvts = eventsByGame.get(game.id) ?? [];
+
+        if (gameShifts.length === 0) {
+          progress.increment();
+          continue;
+        }
+
+        const pairStats = computeGameVersus(gameShifts, gameEvts);
+
+        // Determine game winner team ID
+        const winnerTeamId =
+          game.homeScore !== null && game.awayScore !== null && game.homeScore !== game.awayScore
+            ? game.homeScore > game.awayScore
+              ? game.homeTeamId
+              : game.awayTeamId
+            : null;
+
+        // Accumulate into season-level stats
+        for (const [pairKey, stats] of pairStats) {
+          const accKey = `${pairKey}-${game.seasonId}`;
+
+          const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
+          const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
+
+          if (!accumulator.has(accKey)) {
+            accumulator.set(accKey, {
+              ...stats,
+              seasonId: game.seasonId,
+              gamesShared: 1,
+              winsA: pairWinsA,
+              winsB: pairWinsB,
+            });
+          } else {
+            const existing = accumulator.get(accKey)!;
+            existing.gamesShared++;
+            existing.winsA += pairWinsA;
+            existing.winsB += pairWinsB;
+
+            existing.toiSharedSeconds += stats.toiSharedSeconds;
+            existing.goalsForA += stats.goalsForA;
+            existing.goalsAgainstA += stats.goalsAgainstA;
+            existing.goalsForB += stats.goalsForB;
+            existing.goalsAgainstB += stats.goalsAgainstB;
+            existing.shotsForA += stats.shotsForA;
+            existing.shotsAgainstA += stats.shotsAgainstA;
+            existing.shotsForB += stats.shotsForB;
+            existing.shotsAgainstB += stats.shotsAgainstB;
+            existing.hitsByA += stats.hitsByA;
+            existing.hitsByB += stats.hitsByB;
+            existing.blocksByA += stats.blocksByA;
+            existing.blocksByB += stats.blocksByB;
+            existing.penaltiesByA += stats.penaltiesByA;
+            existing.penaltiesByB += stats.penaltiesByB;
+            existing.faceoffWinsA += stats.faceoffWinsA;
+            existing.faceoffWinsB += stats.faceoffWinsB;
+            existing.playerAGoals += stats.playerAGoals;
+            existing.playerAAssists += stats.playerAAssists;
+            existing.playerAShots += stats.playerAShots;
+            existing.playerBGoals += stats.playerBGoals;
+            existing.playerBAssists += stats.playerBAssists;
+            existing.playerBShots += stats.playerBShots;
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `\nWarning: Failed to compute versus for game ${game.id}: ${err instanceof Error ? err.message : err}`
+        );
+      }
+      progress.increment();
+    }
   }
   progress.done();
 
@@ -170,86 +194,83 @@ async function main() {
   const BATCH_SIZE = 100;
 
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE);
-    for (const row of batch) {
-      await db
-        .insert(versusStats)
-        .values({
-          playerAId: row.playerAId,
-          playerBId: row.playerBId,
-          seasonId: row.seasonId,
-          sameTeam: row.sameTeam,
-          gamesShared: row.gamesShared,
-          toiSharedSeconds: row.toiSharedSeconds,
-          winsA: row.winsA,
-          winsB: row.winsB,
-          playerATeamId: row.playerATeamId,
-          playerBTeamId: row.playerBTeamId,
-          goalsForA: row.goalsForA,
-          goalsAgainstA: row.goalsAgainstA,
-          goalsForB: row.goalsForB,
-          goalsAgainstB: row.goalsAgainstB,
-          shotsForA: row.shotsForA,
-          shotsAgainstA: row.shotsAgainstA,
-          shotsForB: row.shotsForB,
-          shotsAgainstB: row.shotsAgainstB,
-          hitsByA: row.hitsByA,
-          hitsByB: row.hitsByB,
-          blocksByA: row.blocksByA,
-          blocksByB: row.blocksByB,
-          penaltiesByA: row.penaltiesByA,
-          penaltiesByB: row.penaltiesByB,
-          faceoffWinsA: row.faceoffWinsA,
-          faceoffWinsB: row.faceoffWinsB,
-          playerAGoals: row.playerAGoals,
-          playerAAssists: row.playerAAssists,
-          playerAShots: row.playerAShots,
-          playerBGoals: row.playerBGoals,
-          playerBAssists: row.playerBAssists,
-          playerBShots: row.playerBShots,
-          rivalryScore: row.sameTeam ? null : computeRivalryScore(row),
-        })
-        .onConflictDoUpdate({
-          target: [
-            versusStats.playerAId,
-            versusStats.playerBId,
-            versusStats.seasonId,
-          ],
-          set: {
-            sameTeam: row.sameTeam,
-            gamesShared: row.gamesShared,
-            toiSharedSeconds: row.toiSharedSeconds,
-            winsA: row.winsA,
-            winsB: row.winsB,
-            playerATeamId: row.playerATeamId,
-            playerBTeamId: row.playerBTeamId,
-            goalsForA: row.goalsForA,
-            goalsAgainstA: row.goalsAgainstA,
-            goalsForB: row.goalsForB,
-            goalsAgainstB: row.goalsAgainstB,
-            shotsForA: row.shotsForA,
-            shotsAgainstA: row.shotsAgainstA,
-            shotsForB: row.shotsForB,
-            shotsAgainstB: row.shotsAgainstB,
-            hitsByA: row.hitsByA,
-            hitsByB: row.hitsByB,
-            blocksByA: row.blocksByA,
-            blocksByB: row.blocksByB,
-            penaltiesByA: row.penaltiesByA,
-            penaltiesByB: row.penaltiesByB,
-            faceoffWinsA: row.faceoffWinsA,
-            faceoffWinsB: row.faceoffWinsB,
-            playerAGoals: row.playerAGoals,
-            playerAAssists: row.playerAAssists,
-            playerAShots: row.playerAShots,
-            playerBGoals: row.playerBGoals,
-            playerBAssists: row.playerBAssists,
-            playerBShots: row.playerBShots,
-            rivalryScore: row.sameTeam ? null : computeRivalryScore(row),
-            computedAt: new Date(),
-          },
-        });
-    }
+    const batch = entries.slice(i, i + BATCH_SIZE).map((row) => ({
+      playerAId: row.playerAId,
+      playerBId: row.playerBId,
+      seasonId: row.seasonId,
+      sameTeam: row.sameTeam,
+      gamesShared: row.gamesShared,
+      toiSharedSeconds: row.toiSharedSeconds,
+      winsA: row.winsA,
+      winsB: row.winsB,
+      playerATeamId: row.playerATeamId,
+      playerBTeamId: row.playerBTeamId,
+      goalsForA: row.goalsForA,
+      goalsAgainstA: row.goalsAgainstA,
+      goalsForB: row.goalsForB,
+      goalsAgainstB: row.goalsAgainstB,
+      shotsForA: row.shotsForA,
+      shotsAgainstA: row.shotsAgainstA,
+      shotsForB: row.shotsForB,
+      shotsAgainstB: row.shotsAgainstB,
+      hitsByA: row.hitsByA,
+      hitsByB: row.hitsByB,
+      blocksByA: row.blocksByA,
+      blocksByB: row.blocksByB,
+      penaltiesByA: row.penaltiesByA,
+      penaltiesByB: row.penaltiesByB,
+      faceoffWinsA: row.faceoffWinsA,
+      faceoffWinsB: row.faceoffWinsB,
+      playerAGoals: row.playerAGoals,
+      playerAAssists: row.playerAAssists,
+      playerAShots: row.playerAShots,
+      playerBGoals: row.playerBGoals,
+      playerBAssists: row.playerBAssists,
+      playerBShots: row.playerBShots,
+      rivalryScore: row.sameTeam ? null : computeSkaterRivalryScore(row),
+    }));
+
+    // Single insert per batch using excluded pseudo-table for conflict resolution
+    await db
+      .insert(versusStats)
+      .values(batch)
+      .onConflictDoUpdate({
+        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId],
+        set: {
+          sameTeam: sql`excluded.same_team`,
+          gamesShared: sql`excluded.games_shared`,
+          toiSharedSeconds: sql`excluded.toi_shared_seconds`,
+          winsA: sql`excluded.wins_a`,
+          winsB: sql`excluded.wins_b`,
+          playerATeamId: sql`excluded.player_a_team_id`,
+          playerBTeamId: sql`excluded.player_b_team_id`,
+          goalsForA: sql`excluded.goals_for_a`,
+          goalsAgainstA: sql`excluded.goals_against_a`,
+          goalsForB: sql`excluded.goals_for_b`,
+          goalsAgainstB: sql`excluded.goals_against_b`,
+          shotsForA: sql`excluded.shots_for_a`,
+          shotsAgainstA: sql`excluded.shots_against_a`,
+          shotsForB: sql`excluded.shots_for_b`,
+          shotsAgainstB: sql`excluded.shots_against_b`,
+          hitsByA: sql`excluded.hits_by_a`,
+          hitsByB: sql`excluded.hits_by_b`,
+          blocksByA: sql`excluded.blocks_by_a`,
+          blocksByB: sql`excluded.blocks_by_b`,
+          penaltiesByA: sql`excluded.penalties_by_a`,
+          penaltiesByB: sql`excluded.penalties_by_b`,
+          faceoffWinsA: sql`excluded.faceoff_wins_a`,
+          faceoffWinsB: sql`excluded.faceoff_wins_b`,
+          playerAGoals: sql`excluded.player_a_goals`,
+          playerAAssists: sql`excluded.player_a_assists`,
+          playerAShots: sql`excluded.player_a_shots`,
+          playerBGoals: sql`excluded.player_b_goals`,
+          playerBAssists: sql`excluded.player_b_assists`,
+          playerBShots: sql`excluded.player_b_shots`,
+          rivalryScore: sql`excluded.rivalry_score`,
+          computedAt: new Date(),
+        },
+      });
+
     upsertProgress.increment(batch.length);
   }
   upsertProgress.done();

@@ -1,5 +1,6 @@
 export interface SkaterRivalryInput {
   toiSharedSeconds: number;
+  gamesShared: number;
   hitsByA: number;
   hitsByB: number;
   blocksByA: number;
@@ -56,6 +57,7 @@ const CATEGORY_WEIGHTS = {
 
 export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   if (input.toiSharedSeconds === 0) return 0;
+  if (input.gamesShared === 0) return 0;
 
   const ptsA = input.playerAGoals + input.playerAAssists;
   const ptsB = input.playerBGoals + input.playerBAssists;
@@ -67,6 +69,8 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
     CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
     CATEGORY_WEIGHTS.faceoffs * (input.faceoffWinsA + input.faceoffWinsB) +
     CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
+
+  const avgWeightedVolume = weightedVolume / input.gamesShared;
 
   const categories: [number, number][] = [
     [ptsA, ptsB],
@@ -80,7 +84,7 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   const balance = computeBalance(categories);
   const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return weightedVolume * multiplier;
+  return avgWeightedVolume * multiplier;
 }
 
 export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
@@ -102,9 +106,4 @@ export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
   ]);
 
   return base * evennessMultiplier;
-}
-
-/** @deprecated Use computeSkaterRivalryScore or computeGoalieRivalryScore */
-export function computeRivalryScore(input: SkaterRivalryInput): number {
-  return computeSkaterRivalryScore(input);
 }
