@@ -39,3 +39,30 @@ export function getTeamColors(abbrev: string | null | undefined) {
   if (!abbrev) return { primary: "#6B7280", secondary: "#374151" };
   return TEAM_COLORS[abbrev] ?? { primary: "#6B7280", secondary: "#374151" };
 }
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+function getLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Returns a version of the team's primary color that's readable on a dark background. */
+export function getTeamDisplayColor(abbrev: string | null | undefined): string {
+  if (!abbrev) return "#9CA3AF";
+  const colors = TEAM_COLORS[abbrev] ?? { primary: "#6B7280", secondary: "#9CA3AF" };
+  if (getLuminance(colors.primary) >= 0.08) return colors.primary;
+  // Lighten by mixing 65% toward white
+  const [r, g, b] = hexToRgb(colors.primary);
+  const mix = (c: number) => Math.round(c + (255 - c) * 0.65);
+  return `#${[r, g, b].map((c) => mix(c).toString(16).padStart(2, "0")).join("")}`;
+}

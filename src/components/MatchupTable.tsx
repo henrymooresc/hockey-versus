@@ -224,7 +224,9 @@ function MatchupRow({
         <div className="min-w-0">
           <div className="flex items-center gap-1 text-xs font-semibold text-white truncate">
             {matchup.teamLogoUrl ? (
-              <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="shrink-0 object-contain" style={{ width: 14, height: 14 }} />
+              <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 16, height: 16, background: "rgba(255,255,255,0.10)" }}>
+                <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="object-contain" style={{ width: 12, height: 12 }} />
+              </span>
             ) : matchup.teamAbbrev ? (
               <span className="text-[10px] text-gray-500">{matchup.teamAbbrev}</span>
             ) : null}

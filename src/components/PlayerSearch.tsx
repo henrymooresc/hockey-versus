@@ -98,7 +98,9 @@ function TeamGroup({
         className="flex w-full items-center gap-3 px-5 py-3 hover:bg-gray-800/80 active:bg-gray-700/60 transition-all duration-150 active:scale-[0.995]"
       >
         {logoUrl ? (
-          <img src={logoUrl} alt={teamAbbrev} className="h-8 w-8 object-contain" />
+          <span className="flex items-center justify-center rounded" style={{ width: 32, height: 32, background: "rgba(255,255,255,0.15)" }}>
+            <img src={logoUrl} alt={teamAbbrev} className="object-contain" style={{ width: 26, height: 26 }} />
+          </span>
         ) : (
           <div className="h-8 w-8" />
         )}
