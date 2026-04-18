@@ -7,9 +7,9 @@ import { getTeamColors } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
 
-type SkaterSortKey = "rivalry" | "points" | "shots" | "hits" | "blocks" | "pim" | "toi";
-type CenterSortKey = "rivalry" | "points" | "shots" | "hits" | "blocks" | "pim" | "foPct" | "toi";
-type GoalieSortKey = "rivalry" | "savePct" | "goals" | "assists" | "shots" | "toi";
+type SkaterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim";
+type CenterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim" | "foPct";
+type GoalieSortKey = "rivalry" | "games" | "toi" | "savePct" | "goals" | "assists" | "shots";
 type SortKey = SkaterSortKey | CenterSortKey | GoalieSortKey;
 
 export type ColumnMode = "skater" | "center" | "goalie";
@@ -17,6 +17,8 @@ export type ColumnMode = "skater" | "center" | "goalie";
 function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey): number {
   switch (key) {
     case "rivalry": return m.rivalryScore;
+    case "games": return m.gamesShared;
+    case "toi": return m.toiSharedSeconds;
     case "points": return m.stats.points - m.oppStats.points;
     case "shots": return m.stats.individualShots - m.oppStats.individualShots;
     case "hits": return m.stats.hits - m.oppStats.hits;
@@ -26,13 +28,14 @@ function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey
       const total = m.stats.faceoffWins + m.oppStats.faceoffWins;
       return total > 0 ? m.stats.faceoffWins / total : 0;
     }
-    case "toi": return m.toiSharedSeconds;
   }
 }
 
 function getGoalieSortValue(m: MatchupPlayer, key: GoalieSortKey): number {
   switch (key) {
     case "rivalry": return m.rivalryScore;
+    case "games": return m.gamesShared;
+    case "toi": return m.toiSharedSeconds;
     case "savePct": {
       const sog = m.stats.individualShots;
       return sog > 0 ? (sog - m.stats.goals) / sog : 0;
@@ -40,7 +43,6 @@ function getGoalieSortValue(m: MatchupPlayer, key: GoalieSortKey): number {
     case "goals": return m.stats.goals;
     case "assists": return m.stats.assists;
     case "shots": return m.stats.individualShots;
-    case "toi": return m.toiSharedSeconds;
   }
 }
 
@@ -50,9 +52,9 @@ function getSortValue(m: MatchupPlayer, key: SortKey, mode: ColumnMode): number 
     : getSkaterSortValue(m, key as SkaterSortKey | CenterSortKey);
 }
 
-const SKATER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px";
-const CENTER_ROW_GRID = "30px 1fr 40px 40px 40px 40px 40px 40px 40px";
-const GOALIE_ROW_GRID = "30px 1fr 40px 60px 40px 40px 40px";
+const SKATER_ROW_GRID = "30px 1fr 40px 32px 58px 40px 40px 40px 40px 40px";
+const CENTER_ROW_GRID = "30px 1fr 40px 32px 58px 40px 40px 40px 40px 40px 40px";
+const GOALIE_ROW_GRID = "30px 1fr 40px 32px 58px 60px 40px 40px 40px";
 
 function DiffCell({ diff }: { diff: number }) {
   const label = diff > 0 ? `+${diff}` : `${diff}`;
@@ -96,6 +98,8 @@ type HeaderColumn = { label: string; key: SortKey };
 
 const SKATER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
+  { label: "GP", key: "games" },
+  { label: "TOI", key: "toi" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
@@ -105,6 +109,8 @@ const SKATER_HEADER_COLUMNS: HeaderColumn[] = [
 
 const CENTER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
+  { label: "GP", key: "games" },
+  { label: "TOI", key: "toi" },
   { label: "PTS", key: "points" },
   { label: "SH", key: "shots" },
   { label: "HT", key: "hits" },
@@ -115,6 +121,8 @@ const CENTER_HEADER_COLUMNS: HeaderColumn[] = [
 
 const GOALIE_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "RIV", key: "rivalry" },
+  { label: "GP", key: "games" },
+  { label: "TOI", key: "toi" },
   { label: "SV%", key: "savePct" },
   { label: "G", key: "goals" },
   { label: "A", key: "assists" },
@@ -185,7 +193,7 @@ function MatchupRow({
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
-  const emptyCount = mode === "goalie" ? 5 : mode === "center" ? 8 : 7;
+  const emptyCount = mode === "goalie" ? 7 : mode === "center" ? 9 : 8;
   const isClickable = hasHistory;
   const teamColors = getTeamColors(matchup.teamAbbrev);
 
@@ -214,30 +222,28 @@ function MatchupRow({
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
         )}
         <div className="min-w-0">
-          <div className="text-xs font-semibold text-white truncate">
+          <div className="flex items-center gap-1 text-xs font-semibold text-white truncate">
+            {matchup.teamLogoUrl ? (
+              <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="shrink-0 object-contain" style={{ width: 14, height: 14 }} />
+            ) : matchup.teamAbbrev ? (
+              <span className="text-[10px] text-gray-500">{matchup.teamAbbrev}</span>
+            ) : null}
             {(matchup.sweaterNumber || matchup.position) && (
-              <span className="text-gray-500" style={{ marginRight: 8 }}>
+              <span className="text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
                 {matchup.sweaterNumber && matchup.position && " "}
                 {matchup.position && <span className={matchup.position === "D" ? "text-blue-400" : "text-gray-400"}>{matchup.position}</span>}
               </span>
             )}
-            {matchup.firstName[0]}. {matchup.lastName}
-          </div>
-          <div className="text-[10px] text-gray-500 truncate" style={{ marginTop: 2 }}>
-            {hasHistory ? (
-              <>
-                {matchup.gamesShared}G &middot; {formatSecondsToHMS(matchup.toiSharedSeconds)}
-              </>
-            ) : (
-              "No history"
-            )}
+            <span className="truncate">{matchup.firstName[0]}. {matchup.lastName}</span>
           </div>
         </div>
         {hasHistory ? (
           mode === "goalie" ? (
             <>
               <RivalryScoreCell score={matchup.rivalryScore} />
+              <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
+              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
               <GoalieStatValue
                 value={savePct(matchup.stats.individualShots, matchup.stats.goals)}
                 className="text-white font-bold"
@@ -249,6 +255,8 @@ function MatchupRow({
           ) : (
             <>
               <RivalryScoreCell score={matchup.rivalryScore} />
+              <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
+              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
               <DiffCell diff={matchup.stats.points - matchup.oppStats.points} />
               <DiffCell diff={matchup.stats.individualShots - matchup.oppStats.individualShots} />
               <DiffCell diff={matchup.stats.hits - matchup.oppStats.hits} />
