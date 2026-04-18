@@ -8,9 +8,11 @@ import { VersusTable } from "./VersusTable";
 export function HeadToHeadComparison({
   playerA,
   playerB,
+  seasonIds,
 }: {
   playerA: PlayerSearchResult;
   playerB: PlayerSearchResult;
+  seasonIds: string[] | null;
 }) {
   const [data, setData] = useState<VersusResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +22,9 @@ export function HeadToHeadComparison({
     setLoading(true);
     setError(null);
     setData(null);
-    fetch(`/api/versus?playerA=${playerA.id}&playerB=${playerB.id}`)
+    const params = new URLSearchParams({ playerA: String(playerA.id), playerB: String(playerB.id) });
+    if (seasonIds) params.set("seasons", seasonIds.join(","));
+    fetch(`/api/versus?${params}`)
       .then(async (r) => {
         const json = await r.json();
         if (!r.ok) throw new Error(json.error || "Failed to fetch comparison");
@@ -29,7 +33,7 @@ export function HeadToHeadComparison({
       .then((result) => setData(result))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [playerA.id, playerB.id]);
+  }, [playerA.id, playerB.id, seasonIds]);
 
   if (loading) {
     return (
@@ -122,7 +126,9 @@ export function HeadToHeadComparison({
       {/* All Seasons Combined */}
       <div>
         <h2 className="mb-4 text-center text-xl font-bold tracking-tight text-gray-200">
-          All Seasons Combined
+          {seasonIds?.length === 1
+            ? `${seasonIds[0].slice(0, 4)}–${seasonIds[0].slice(4)} Season`
+            : "All Seasons Combined"}
         </h2>
         <VersusTable
           stats={data.totals}

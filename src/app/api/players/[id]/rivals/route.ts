@@ -20,6 +20,10 @@ export async function GET(
     return NextResponse.json({ error: "Invalid player ID" }, { status: 400 });
   }
 
+  const searchParams = request.nextUrl.searchParams;
+  const seasonsParam = searchParams.get("seasons");
+  const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
+
   const rows = await db.execute(sql`
     WITH aggregated AS (
       SELECT
@@ -55,6 +59,7 @@ export async function GET(
       WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
         AND same_team = false
         AND toi_shared_seconds > 0
+        ${seasonFilter ? sql`AND season_id = ANY(${seasonFilter})` : sql``}
       GROUP BY opponent_id, player_side
     )
     SELECT
