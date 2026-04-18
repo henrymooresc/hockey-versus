@@ -1,4 +1,3 @@
-import { rateLimitedFetch } from "../../scripts/lib/rate-limiter";
 import type {
   ScheduleResponse,
   PlayByPlayResponse,
@@ -12,8 +11,18 @@ import type {
 const WEB_API = "https://api-web.nhle.com";
 const STATS_API = "https://api.nhle.com/stats/rest";
 
+/**
+ * Optional custom fetch function. Scripts inject the rate-limited version;
+ * the Next.js server uses plain fetch by default.
+ */
+let customFetch: typeof fetch = globalThis.fetch;
+
+export function setFetchImpl(impl: typeof fetch) {
+  customFetch = impl;
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await rateLimitedFetch(url);
+  const response = await customFetch(url);
   if (!response.ok) {
     throw new Error(`NHL API error: ${response.status} ${response.statusText} for ${url}`);
   }

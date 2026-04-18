@@ -122,6 +122,7 @@ export const gameEvents = pgTable(
     detailsJson: jsonb("details_json"),
   },
   (table) => [
+    uniqueIndex("uq_game_events_game_event").on(table.gameId, table.eventId),
     index("idx_events_game_time").on(
       table.gameId,
       table.period,

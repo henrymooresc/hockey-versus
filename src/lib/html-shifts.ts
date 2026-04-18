@@ -6,7 +6,6 @@
  *   https://www.nhl.com/scores/htmlreports/{seasonId}/TV{gameSuffix}.HTM  (visitor)
  *   https://www.nhl.com/scores/htmlreports/{seasonId}/TH{gameSuffix}.HTM  (home)
  */
-import { rateLimitedFetch } from "../../scripts/lib/rate-limiter";
 import type {
   ShiftChartResponse,
   ShiftEntry,
@@ -159,7 +158,8 @@ export async function getShiftChartFromHtml(
   seasonId: string,
   homeTeam: { id: number; abbrev: string; name: string },
   awayTeam: { id: number; abbrev: string; name: string },
-  rosterSpots: RosterSpot[]
+  rosterSpots: RosterSpot[],
+  fetchFn: typeof fetch = globalThis.fetch
 ): Promise<ShiftChartResponse> {
   const rosterLookup = buildRosterLookup(rosterSpots);
 
@@ -167,12 +167,12 @@ export async function getShiftChartFromHtml(
   const homeUrl = buildReportUrl(gameId, seasonId, "home");
 
   const [visitorHtml, homeHtml] = await Promise.all([
-    rateLimitedFetch(visitorUrl).then((r) => {
+    fetchFn(visitorUrl).then((r) => {
       if (!r.ok)
         throw new Error(`HTML report error: ${r.status} for ${visitorUrl}`);
       return r.text();
     }),
-    rateLimitedFetch(homeUrl).then((r) => {
+    fetchFn(homeUrl).then((r) => {
       if (!r.ok)
         throw new Error(`HTML report error: ${r.status} for ${homeUrl}`);
       return r.text();

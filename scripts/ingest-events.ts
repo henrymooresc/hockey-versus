@@ -6,16 +6,27 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { games, gameEvents, players, teams } from "../src/db/schema";
-import { getPlayByPlay } from "../src/lib/nhl-api";
+import { getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
+import { rateLimitedFetch } from "./lib/rate-limiter";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
+
+setFetchImpl(rateLimitedFetch);
 import type { Play } from "../src/types/nhl-api";
 
 const seasonFilter = process.argv.find(
   (_, i, a) => a[i - 1] === "--season"
 );
+
+// --game 2016020294,2016020322  (comma-separated, targets specific games regardless of ingested flag)
+const gameIdFilter = (() => {
+  const val = process.argv.find((_, i, a) => a[i - 1] === "--game");
+  return val ? val.split(",").map(Number) : null;
+})();
+
+const CONCURRENCY = 5;
 
 // Map NHL typeDescKey to our normalized event types
 const EVENT_TYPE_MAP: Record<string, string> = {
@@ -86,21 +97,25 @@ function normalizeEvent(play: Play) {
 }
 
 async function main() {
-  const client = postgres(process.env.DATABASE_URL!);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
   const pendingGames = await db
     .select({ id: games.id, seasonId: games.seasonId })
     .from(games)
-    .where(eq(games.eventsIngested, false));
+    .where(gameIdFilter ? inArray(games.id, gameIdFilter) : eq(games.eventsIngested, false));
 
-  const filtered = seasonFilter
+  const filtered = !gameIdFilter && seasonFilter
     ? pendingGames.filter((g) => g.seasonId === seasonFilter)
     : pendingGames;
 
-  console.log(
-    `${filtered.length} games need event ingestion${seasonFilter ? ` (season ${seasonFilter})` : ""}`
-  );
+  const filterDesc = gameIdFilter
+    ? ` (games ${gameIdFilter.join(", ")})`
+    : seasonFilter ? ` (season ${seasonFilter})` : "";
+  console.log(`${filtered.length} games need event ingestion${filterDesc}`);
 
   if (filtered.length === 0) {
     console.log("Nothing to do.");
@@ -123,41 +138,59 @@ async function main() {
   const progress = new Progress(filtered.length, "Ingesting events");
   let totalEvents = 0;
 
-  for (const game of filtered) {
-    try {
-      const pbp = await getPlayByPlay(game.id);
+  for (let i = 0; i < filtered.length; i += CONCURRENCY) {
+    const batch = filtered.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (game) => {
+        try {
+          const pbp = await getPlayByPlay(game.id);
 
-      const eventRows = pbp.plays
-        .map(normalizeEvent)
-        .filter((e): e is NonNullable<typeof e> => e !== null)
-        .map((e) => ({
-          ...e,
-          gameId: game.id,
-          teamId: sanitizeTeam(e.teamId),
-          player1Id: sanitizePlayer(e.player1Id),
-          player2Id: sanitizePlayer(e.player2Id),
-          player3Id: sanitizePlayer(e.player3Id),
-        }));
+          const eventRows = pbp.plays
+            .map(normalizeEvent)
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+            .map((e) => ({
+              ...e,
+              gameId: game.id,
+              teamId: sanitizeTeam(e.teamId),
+              player1Id: sanitizePlayer(e.player1Id),
+              player2Id: sanitizePlayer(e.player2Id),
+              player3Id: sanitizePlayer(e.player3Id),
+            }));
 
-      // Batch insert
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < eventRows.length; i += BATCH_SIZE) {
-        const batch = eventRows.slice(i, i + BATCH_SIZE);
-        await db.insert(gameEvents).values(batch);
-      }
+          // Batch insert
+          const BATCH_SIZE = 500;
+          for (let j = 0; j < eventRows.length; j += BATCH_SIZE) {
+            const chunk = eventRows.slice(j, j + BATCH_SIZE);
+            await db.insert(gameEvents).values(chunk).onConflictDoNothing();
+          }
 
-      await db
-        .update(games)
-        .set({ eventsIngested: true })
-        .where(eq(games.id, game.id));
+          await db
+            .update(games)
+            .set({ eventsIngested: true })
+            .where(eq(games.id, game.id));
 
-      totalEvents += eventRows.length;
-    } catch (err) {
-      console.warn(
-        `\nWarning: Failed to ingest events for game ${game.id}: ${err instanceof Error ? err.message : err}`
-      );
-    }
-    progress.increment();
+          totalEvents += eventRows.length;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // 403: API explicitly blocks access (e.g. old seasons not supported)
+          // 404: game data doesn't exist (e.g. postponed/rescheduled game with no PBP)
+          // Both are permanent — mark done so we don't retry on every future run.
+          // Other errors (network drops, 5xx, 429 exhausted) stay pending for retry.
+          const isPermanent =
+            /NHL API error: 403/.test(msg) || /NHL API error: 404/.test(msg);
+          if (isPermanent) {
+            console.warn(`\nSkipping game ${game.id} permanently (${msg})`);
+            await db
+              .update(games)
+              .set({ eventsIngested: true })
+              .where(eq(games.id, game.id));
+          } else {
+            console.warn(`\nWarning: Failed to ingest events for game ${game.id}: ${msg}`);
+          }
+        }
+        progress.increment();
+      })
+    );
   }
   progress.done();
 

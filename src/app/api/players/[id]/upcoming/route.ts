@@ -82,8 +82,7 @@ export async function GET(
 
     return NextResponse.json({ upcoming, teamAbbrev });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Upcoming API error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Upcoming API error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

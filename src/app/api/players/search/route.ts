@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { players, teams, shifts, versusStats } from "@/db/schema";
-import { ilike, asc, isNotNull, inArray, and, or, eq, gt, sql } from "drizzle-orm";
+import { players, teams, shifts, games, seasons, versusStats } from "@/db/schema";
+import { ilike, asc, isNotNull, inArray, and, or, eq, gt, desc, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get("q")?.trim();
   const onRosterOnly = request.nextUrl.searchParams.get("onRoster") === "true";
   const minGames = parseInt(request.nextUrl.searchParams.get("minGames") ?? "0", 10);
   const versusWith = parseInt(request.nextUrl.searchParams.get("versusWith") ?? "", 10);
+
+  // Players who have shifts in the most recent season
+  const currentSeasonPlayerIds = onRosterOnly
+    ? db
+        .selectDistinct({ playerId: shifts.playerId })
+        .from(shifts)
+        .innerJoin(games, eq(shifts.gameId, games.id))
+        .where(
+          eq(
+            games.seasonId,
+            db.select({ id: seasons.id }).from(seasons).orderBy(desc(seasons.id)).limit(1)
+          )
+        )
+    : null;
 
   const qualifiedPlayerIds =
     minGames > 0
@@ -42,9 +56,10 @@ export async function GET(request: NextRequest) {
 
   const where = and(
     onRosterOnly ? isNotNull(players.currentTeamId) : undefined,
+    currentSeasonPlayerIds ? inArray(players.id, currentSeasonPlayerIds) : undefined,
     qualifiedPlayerIds ? inArray(players.id, qualifiedPlayerIds) : undefined,
     versusPlayerIds ? inArray(players.id, versusPlayerIds) : undefined,
-    q && q.length >= 2 ? ilike(players.searchText, `%${q.toLowerCase()}%`) : undefined,
+    q && q.length >= 2 ? ilike(players.searchText, `%${q.toLowerCase().replace(/%/g, "\\%").replace(/_/g, "\\_")}%`) : undefined,
   );
 
   const results = await db

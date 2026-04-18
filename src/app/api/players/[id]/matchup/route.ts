@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { unwrapRows } from "@/lib/db-utils";
+import { mapAggRowToMatchup, emptyMatchupStats, type AggRow } from "@/lib/matchup-mapper";
 import type { MatchupPlayer } from "@/types/versus";
-import { computeSkaterRivalryScore, computeGoalieRivalryScore } from "@/lib/rivalry-score";
 
 /**
  * Returns aggregated versus stats for a player against all players
@@ -32,8 +33,6 @@ export async function GET(
       );
     }
 
-    // Get all versus stats for this player against players currently on the opponent team,
-    // aggregated across all seasons, only opponents (sameTeam = false)
     const rows = await db.execute(sql`
       WITH aggregated AS (
         SELECT
@@ -88,103 +87,7 @@ export async function GET(
       ORDER BY a.toi_shared_seconds DESC
     `);
 
-    interface AggRow {
-      opponent_id: number;
-      player_side: string;
-      toi_shared_seconds: number;
-      games_shared: number;
-      first_name: string;
-      last_name: string;
-      position: string | null;
-      headshot_url: string | null;
-      sweater_number: number | null;
-      birth_date: string | null;
-      team_abbrev: string | null;
-      team_logo_url: string | null;
-      [key: string]: unknown;
-    }
-
-    const rowsArray = Array.isArray(rows) ? rows : (rows as any).rows ?? [];
-
-    const matchups: MatchupPlayer[] = (rowsArray as AggRow[]).map((row) => {
-      const isA = row.player_side === "A";
-      const pGoals = (isA ? row.player_a_goals : row.player_b_goals) as number;
-      const pAssists = (isA ? row.player_a_assists : row.player_b_assists) as number;
-      const oGoals = (isA ? row.player_b_goals : row.player_a_goals) as number;
-      const oAssists = (isA ? row.player_b_assists : row.player_a_assists) as number;
-      const pShots = isA ? row.player_a_shots as number : row.player_b_shots as number;
-      const oShots = isA ? row.player_b_shots as number : row.player_a_shots as number;
-      const isGoalie = row.position === "G";
-      const rivalryScore = isGoalie
-        ? computeGoalieRivalryScore({
-            toiSharedSeconds: row.toi_shared_seconds as number,
-            skaterShots: pShots,
-            skaterGoals: pGoals,
-            winsA: (isA ? row.wins_a : row.wins_b) as number,
-            winsB: (isA ? row.wins_b : row.wins_a) as number,
-          })
-        : computeSkaterRivalryScore({
-            toiSharedSeconds: row.toi_shared_seconds as number,
-            hitsByA: (isA ? row.hits_by_a : row.hits_by_b) as number,
-            hitsByB: (isA ? row.hits_by_b : row.hits_by_a) as number,
-            blocksByA: (isA ? row.blocks_by_a : row.blocks_by_b) as number,
-            blocksByB: (isA ? row.blocks_by_b : row.blocks_by_a) as number,
-            penaltiesByA: (isA ? row.penalties_by_a : row.penalties_by_b) as number,
-            penaltiesByB: (isA ? row.penalties_by_b : row.penalties_by_a) as number,
-            faceoffWinsA: (isA ? row.faceoff_wins_a : row.faceoff_wins_b) as number,
-            faceoffWinsB: (isA ? row.faceoff_wins_b : row.faceoff_wins_a) as number,
-            playerAGoals: pGoals,
-            playerAAssists: pAssists,
-            playerAShots: pShots,
-            playerBGoals: oGoals,
-            playerBAssists: oAssists,
-            playerBShots: oShots,
-            winsA: (isA ? row.wins_a : row.wins_b) as number,
-            winsB: (isA ? row.wins_b : row.wins_a) as number,
-          });
-      return {
-        playerId: row.opponent_id,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        position: row.position,
-        headshotUrl: row.headshot_url,
-        sweaterNumber: row.sweater_number,
-        birthDate: row.birth_date as string | null,
-        teamAbbrev: row.team_abbrev as string | null,
-        teamLogoUrl: row.team_logo_url as string | null,
-        gamesShared: row.games_shared,
-        toiSharedSeconds: row.toi_shared_seconds,
-        rivalryScore,
-        stats: {
-          points: pGoals + pAssists,
-          goals: pGoals,
-          assists: pAssists,
-          individualShots: isA ? row.player_a_shots as number : row.player_b_shots as number,
-          shotsFor: isA ? row.shots_for_a as number : row.shots_for_b as number,
-          shotsAgainst: isA ? row.shots_against_a as number : row.shots_against_b as number,
-          goalsFor: isA ? row.goals_for_a as number : row.goals_for_b as number,
-          goalsAgainst: isA ? row.goals_against_a as number : row.goals_against_b as number,
-          hits: isA ? row.hits_by_a as number : row.hits_by_b as number,
-          blocks: isA ? row.blocks_by_a as number : row.blocks_by_b as number,
-          penalties: isA ? row.penalties_by_a as number : row.penalties_by_b as number,
-          faceoffWins: isA ? row.faceoff_wins_a as number : row.faceoff_wins_b as number,
-        },
-        oppStats: {
-          points: oGoals + oAssists,
-          goals: oGoals,
-          assists: oAssists,
-          individualShots: isA ? row.player_b_shots as number : row.player_a_shots as number,
-          shotsFor: isA ? row.shots_for_b as number : row.shots_for_a as number,
-          shotsAgainst: isA ? row.shots_against_b as number : row.shots_against_a as number,
-          goalsFor: isA ? row.goals_for_b as number : row.goals_for_a as number,
-          goalsAgainst: isA ? row.goals_against_b as number : row.goals_against_a as number,
-          hits: isA ? row.hits_by_b as number : row.hits_by_a as number,
-          blocks: isA ? row.blocks_by_b as number : row.blocks_by_a as number,
-          penalties: isA ? row.penalties_by_b as number : row.penalties_by_a as number,
-          faceoffWins: isA ? row.faceoff_wins_b as number : row.faceoff_wins_a as number,
-        },
-      };
-    });
+    const matchups = unwrapRows<AggRow>(rows).map(mapAggRowToMatchup);
 
     // Also return opponent roster players with no versus data
     const matchupPlayerIds = new Set(matchups.map((m) => m.playerId));
@@ -196,30 +99,40 @@ export async function GET(
       WHERE p.current_team_id = ${teamId}
     `);
 
-    const rosterArray = Array.isArray(rosterRows) ? rosterRows : (rosterRows as any).rows ?? [];
-    const noHistory: MatchupPlayer[] = (rosterArray as any[])
-      .filter((row: any) => row.id !== playerId && !matchupPlayerIds.has(row.id))
-      .map((row: any) => ({
-      playerId: row.id,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      position: row.position,
-      headshotUrl: row.headshot_url,
-      sweaterNumber: row.sweater_number,
-      birthDate: row.birth_date ?? null,
-      teamAbbrev: row.team_abbrev ?? null,
-      teamLogoUrl: row.team_logo_url ?? null,
-      gamesShared: 0,
-      toiSharedSeconds: 0,
-      rivalryScore: 0,
-      stats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, blocks: 0, penalties: 0, faceoffWins: 0 },
-      oppStats: { points: 0, goals: 0, assists: 0, individualShots: 0, shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0, hits: 0, blocks: 0, penalties: 0, faceoffWins: 0 },
-    }));
+    interface RosterRow {
+      id: number;
+      first_name: string;
+      last_name: string;
+      position: string | null;
+      headshot_url: string | null;
+      sweater_number: number | null;
+      birth_date: string | null;
+      team_abbrev: string | null;
+      team_logo_url: string | null;
+    }
+
+    const noHistory: MatchupPlayer[] = unwrapRows<RosterRow>(rosterRows)
+      .filter((row) => row.id !== playerId && !matchupPlayerIds.has(row.id))
+      .map((row) => ({
+        playerId: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        position: row.position,
+        headshotUrl: row.headshot_url,
+        sweaterNumber: row.sweater_number,
+        birthDate: row.birth_date ?? null,
+        teamAbbrev: row.team_abbrev ?? null,
+        teamLogoUrl: row.team_logo_url ?? null,
+        gamesShared: 0,
+        toiSharedSeconds: 0,
+        rivalryScore: 0,
+        stats: emptyMatchupStats(),
+        oppStats: emptyMatchupStats(),
+      }));
 
     return NextResponse.json({ matchups: [...matchups, ...noHistory] });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Matchup API error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Matchup API error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

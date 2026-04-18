@@ -9,13 +9,18 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import { seasons, games, teams } from "../src/db/schema";
-import { getStandings, getClubSeasonSchedule } from "../src/lib/nhl-api";
+import { getStandings, getClubSeasonSchedule, setFetchImpl } from "../src/lib/nhl-api";
+import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
+
+setFetchImpl(rateLimitedFetch);
 
 const NUM_SEASONS = parseInt(
   process.argv.find((_, i, a) => a[i - 1] === "--seasons") ?? "10",
   10
 );
+
+const CONCURRENCY = 5;
 
 function getCurrentSeasonId(): string {
   const now = new Date();
@@ -38,7 +43,10 @@ function getSeasonIds(count: number): string[] {
 }
 
 async function main() {
-  const client = postgres(process.env.DATABASE_URL!);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
   console.log(`Ingesting ${NUM_SEASONS} seasons...`);
@@ -86,9 +94,26 @@ async function main() {
     console.log(`\nDiscovering games for season ${sid}...`);
     const progress = new Progress(abbrevList.length, `Season ${sid}`);
 
-    for (const abbrev of abbrevList) {
-      try {
-        const schedule = await getClubSeasonSchedule(abbrev, sid);
+    for (let i = 0; i < abbrevList.length; i += CONCURRENCY) {
+      const batch = abbrevList.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map(async (abbrev) => {
+          try {
+            const schedule = await getClubSeasonSchedule(abbrev, sid);
+            return { abbrev, schedule };
+          } catch (err) {
+            // Some teams may not exist in older seasons
+            console.warn(
+              `\nWarning: Could not fetch schedule for ${abbrev} in ${sid}: ${err instanceof Error ? err.message : err}`
+            );
+            return null;
+          }
+        })
+      );
+
+      for (const result of results) {
+        if (!result) continue;
+        const { schedule } = result;
         for (const game of schedule.games) {
           // Only include regular season (2) and playoffs (3)
           if (game.gameType !== 2 && game.gameType !== 3) continue;
@@ -122,20 +147,16 @@ async function main() {
             });
           }
         }
-      } catch (err) {
-        // Some teams may not exist in older seasons
-        console.warn(
-          `\nWarning: Could not fetch schedule for ${abbrev} in ${sid}: ${err instanceof Error ? err.message : err}`
-        );
       }
-      progress.increment();
+
+      progress.increment(batch.length);
     }
   }
 
   // 3b. Insert teams now that we have their IDs from schedule data
   const teamList = Array.from(teamById.values());
-  for (const team of teamList) {
-    await db.insert(teams).values(team).onConflictDoNothing();
+  if (teamList.length > 0) {
+    await db.insert(teams).values(teamList).onConflictDoNothing();
   }
   console.log(`\nInserted/updated ${teamList.length} teams`);
 
