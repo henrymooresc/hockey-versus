@@ -2,12 +2,13 @@
  * Discovers all game IDs for the target seasons and populates
  * the `seasons` and `games` tables.
  *
- * Usage: npx tsx scripts/ingest-seasons.ts [--seasons N]
+ * Usage: npx tsx scripts/ingest-seasons.ts [--seasons 20242025,20232024]
+ * Default: current season only.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { seasons, games, teams } from "../src/db/schema";
 import { getStandings, getClubSeasonSchedule, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
@@ -28,7 +29,7 @@ async function main() {
   const seasonIds = parseTargetSeasons();
   console.log(`Ingesting ${seasonIds.length} season(s): ${seasonIds.join(", ")}`);
 
-  // 1. Insert seasons
+  // 1. Insert seasons (no-op if already exist)
   for (const sid of seasonIds) {
     await db
       .insert(seasons)
@@ -36,7 +37,14 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  // 2. Get team metadata (name, logo) from standings, keyed by abbrev
+  // 2. Load last-ingested timestamps so we can skip already-known games
+  const seasonRows = await db
+    .select({ id: seasons.id, lastGamesIngestedAt: seasons.lastGamesIngestedAt })
+    .from(seasons)
+    .where(inArray(seasons.id, seasonIds));
+  const lastIngestedAt = new Map(seasonRows.map((s) => [s.id, s.lastGamesIngestedAt]));
+
+  // 3. Get team metadata (name, logo) from standings, keyed by abbrev
   console.log("Fetching team list from standings...");
   const standings = await getStandings();
   const standingsMap = new Map(
@@ -47,7 +55,7 @@ async function main() {
   );
   const abbrevList = Array.from(standingsMap.keys());
 
-  // 3. For each season, fetch schedule from each team to discover game IDs
+  // 4. For each season, fetch schedule from each team to discover game IDs
   //    and collect team IDs (standings doesn't provide them, but schedule does)
   const allGameIds = new Set<number>();
   const gameRows: Map<
@@ -66,7 +74,12 @@ async function main() {
   const teamById = new Map<number, { id: number; abbrev: string; name: string; logoUrl: string | null }>();
 
   for (const sid of seasonIds) {
-    console.log(`\nDiscovering games for season ${sid}...`);
+    const cutoff = lastIngestedAt.get(sid) ?? null;
+    console.log(
+      cutoff
+        ? `\nDiscovering games for season ${sid} since ${cutoff.toISOString().slice(0, 10)}...`
+        : `\nDiscovering all games for season ${sid} (first run)...`
+    );
     const progress = new Progress(abbrevList.length, `Season ${sid}`);
 
     for (let i = 0; i < abbrevList.length; i += CONCURRENCY) {
@@ -94,6 +107,8 @@ async function main() {
           if (game.gameType !== 2 && game.gameType !== 3) continue;
           // Only include completed games
           if (game.gameState !== "OFF" && game.gameState !== "FINAL") continue;
+          // Skip games we already know about
+          if (cutoff && new Date(game.gameDate) <= cutoff) continue;
 
           // Collect team IDs from game data
           for (const side of [game.homeTeam, game.awayTeam]) {
@@ -128,15 +143,16 @@ async function main() {
     }
   }
 
-  // 3b. Insert teams now that we have their IDs from schedule data
+  // 4b. Insert teams now that we have their IDs from schedule data
   const teamList = Array.from(teamById.values());
   if (teamList.length > 0) {
     await db.insert(teams).values(teamList).onConflictDoNothing();
   }
   console.log(`\nInserted/updated ${teamList.length} teams`);
 
-  // 4. Batch insert games
-  console.log(`\nInserting ${gameRows.size} games...`);
+  // 5. Batch insert new games
+  const newGameCount = gameRows.size;
+  console.log(`\nInserting ${newGameCount} new game(s)...`);
   const gameValues = Array.from(gameRows.values());
   const BATCH_SIZE = 500;
 
@@ -145,16 +161,17 @@ async function main() {
     await db.insert(games).values(batch).onConflictDoNothing();
   }
 
-  // 5. Mark seasons as ingested
+  // 6. Mark seasons as ingested and record timestamp
+  const now = new Date();
   for (const sid of seasonIds) {
     await db
       .update(seasons)
-      .set({ ingested: true })
+      .set({ ingested: true, lastGamesIngestedAt: now })
       .where(eq(seasons.id, sid));
   }
 
   console.log(
-    `\nDone! Discovered ${gameRows.size} games across ${seasonIds.length} season(s).`
+    `\nDone! Discovered ${newGameCount} new game(s) across ${seasonIds.length} season(s).`
   );
   await client.end();
 }
