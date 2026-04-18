@@ -1,7 +1,8 @@
 /**
  * Computes versus stats from shifts + events data and populates versus_stats.
  *
- * Usage: npx tsx scripts/compute-versus.ts [--season 20242025]
+ * Usage: npx tsx scripts/compute-versus.ts [--seasons 20242025,20232024]
+ * Default: current season only.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -16,10 +17,9 @@ import {
 } from "../src/lib/versus-engine";
 import { computeSkaterRivalryScore } from "../src/lib/rivalry-score";
 import { Progress } from "./lib/progress";
+import { parseTargetSeasons } from "./lib/seasons";
 
-const seasonFilter = process.argv.find(
-  (_, i, a) => a[i - 1] === "--season"
-);
+const targetSeasons = parseTargetSeasons();
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -28,8 +28,8 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  // Get games that have both shifts and events ingested
-  const eligibleGames = await db
+  // Get games that have both shifts and events ingested, for target seasons
+  const filtered = await db
     .select({
       id: games.id,
       seasonId: games.seasonId,
@@ -40,15 +40,15 @@ async function main() {
     })
     .from(games)
     .where(
-      and(eq(games.shiftsIngested, true), eq(games.eventsIngested, true))
+      and(
+        eq(games.shiftsIngested, true),
+        eq(games.eventsIngested, true),
+        inArray(games.seasonId, targetSeasons)
+      )
     );
 
-  const filtered = seasonFilter
-    ? eligibleGames.filter((g) => g.seasonId === seasonFilter)
-    : eligibleGames;
-
   console.log(
-    `Computing versus stats for ${filtered.length} games${seasonFilter ? ` (season ${seasonFilter})` : ""}`
+    `Computing versus stats for ${filtered.length} games (seasons: ${targetSeasons.join(", ")})`
   );
 
   if (filtered.length === 0) {

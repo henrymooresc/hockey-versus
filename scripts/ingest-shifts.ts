@@ -4,12 +4,13 @@
  * Uses the NHL Stats API as the primary source, falling back to HTML shift
  * reports when the Stats API returns empty data.
  *
- * Usage: npx tsx scripts/ingest-shifts.ts [--season 20242025]
+ * Usage: npx tsx scripts/ingest-shifts.ts [--seasons 20242025,20232024]
+ * Default: current season only.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { games, shifts, players, teams } from "../src/db/schema";
 import { getShiftChart, getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
 import { getShiftChartFromHtml } from "../src/lib/html-shifts";
@@ -18,10 +19,9 @@ import { rateLimitedFetch } from "./lib/rate-limiter";
 setFetchImpl(rateLimitedFetch);
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
+import { parseTargetSeasons } from "./lib/seasons";
 
-const seasonFilter = process.argv.find(
-  (_, i, a) => a[i - 1] === "--season"
-);
+const targetSeasons = parseTargetSeasons();
 
 // Lower concurrency since HTML fallback may trigger 2-3 API calls per game
 const CONCURRENCY = 3;
@@ -33,8 +33,8 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  // Get games that haven't had shifts ingested yet
-  let query = db
+  // Get games that haven't had shifts ingested yet, limited to target seasons
+  const filtered = await db
     .select({
       id: games.id,
       seasonId: games.seasonId,
@@ -42,15 +42,10 @@ async function main() {
       awayTeamId: games.awayTeamId,
     })
     .from(games)
-    .where(eq(games.shiftsIngested, false));
-
-  const pendingGames = await query;
-  const filtered = seasonFilter
-    ? pendingGames.filter((g) => g.seasonId === seasonFilter)
-    : pendingGames;
+    .where(and(eq(games.shiftsIngested, false), inArray(games.seasonId, targetSeasons)));
 
   console.log(
-    `${filtered.length} games need shift ingestion${seasonFilter ? ` (season ${seasonFilter})` : ""}`
+    `${filtered.length} games need shift ingestion (seasons: ${targetSeasons.join(", ")})`
   );
 
   if (filtered.length === 0) {
