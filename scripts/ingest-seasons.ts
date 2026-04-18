@@ -12,35 +12,11 @@ import { seasons, games, teams } from "../src/db/schema";
 import { getStandings, getClubSeasonSchedule, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
+import { parseTargetSeasons } from "./lib/seasons";
 
 setFetchImpl(rateLimitedFetch);
 
-const NUM_SEASONS = parseInt(
-  process.argv.find((_, i, a) => a[i - 1] === "--seasons") ?? "10",
-  10
-);
-
 const CONCURRENCY = 5;
-
-function getCurrentSeasonId(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 0-indexed
-  // NHL season starts in October. If before October, we're in the prev year's season.
-  const startYear = month >= 10 ? year : year - 1;
-  return `${startYear}${startYear + 1}`;
-}
-
-function getSeasonIds(count: number): string[] {
-  const current = getCurrentSeasonId();
-  const startYear = parseInt(current.slice(0, 4), 10);
-  const result: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const y = startYear - i;
-    result.push(`${y}${y + 1}`);
-  }
-  return result;
-}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -49,9 +25,8 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  console.log(`Ingesting ${NUM_SEASONS} seasons...`);
-  const seasonIds = getSeasonIds(NUM_SEASONS);
-  console.log("Seasons:", seasonIds.join(", "));
+  const seasonIds = parseTargetSeasons();
+  console.log(`Ingesting ${seasonIds.length} season(s): ${seasonIds.join(", ")}`);
 
   // 1. Insert seasons
   for (const sid of seasonIds) {
@@ -179,7 +154,7 @@ async function main() {
   }
 
   console.log(
-    `\nDone! Discovered ${gameRows.size} games across ${NUM_SEASONS} seasons.`
+    `\nDone! Discovered ${gameRows.size} games across ${seasonIds.length} season(s).`
   );
   await client.end();
 }

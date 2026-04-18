@@ -1,26 +1,26 @@
 /**
  * Fetches play-by-play data for all games and populates the `game_events` table.
  *
- * Usage: npx tsx scripts/ingest-events.ts [--season 20242025]
+ * Usage: npx tsx scripts/ingest-events.ts [--seasons 20242025,20232024] [--game 2016020294,2016020322]
+ * Default: current season only.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { games, gameEvents, players, teams } from "../src/db/schema";
 import { getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
+import { parseTargetSeasons } from "./lib/seasons";
 
 setFetchImpl(rateLimitedFetch);
 import type { Play } from "../src/types/nhl-api";
 
-const seasonFilter = process.argv.find(
-  (_, i, a) => a[i - 1] === "--season"
-);
+const targetSeasons = parseTargetSeasons();
 
-// --game 2016020294,2016020322  (comma-separated, targets specific games regardless of ingested flag)
+// --game 2016020294,2016020322  (comma-separated, targets specific games regardless of seasons filter)
 const gameIdFilter = (() => {
   const val = process.argv.find((_, i, a) => a[i - 1] === "--game");
   return val ? val.split(",").map(Number) : null;
@@ -103,19 +103,19 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  const pendingGames = await db
+  const filtered = await db
     .select({ id: games.id, seasonId: games.seasonId })
     .from(games)
-    .where(gameIdFilter ? inArray(games.id, gameIdFilter) : eq(games.eventsIngested, false));
-
-  const filtered = !gameIdFilter && seasonFilter
-    ? pendingGames.filter((g) => g.seasonId === seasonFilter)
-    : pendingGames;
+    .where(
+      gameIdFilter
+        ? inArray(games.id, gameIdFilter)
+        : and(eq(games.eventsIngested, false), inArray(games.seasonId, targetSeasons))
+    );
 
   const filterDesc = gameIdFilter
-    ? ` (games ${gameIdFilter.join(", ")})`
-    : seasonFilter ? ` (season ${seasonFilter})` : "";
-  console.log(`${filtered.length} games need event ingestion${filterDesc}`);
+    ? `games ${gameIdFilter.join(", ")}`
+    : `seasons: ${targetSeasons.join(", ")}`;
+  console.log(`${filtered.length} games need event ingestion (${filterDesc})`);
 
   if (filtered.length === 0) {
     console.log("Nothing to do.");

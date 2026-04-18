@@ -2,18 +2,22 @@
  * Populates the `players` table by fetching boxscores for all games
  * and then enriching with player landing page data.
  *
- * Usage: npx tsx scripts/ingest-players.ts
+ * Usage: npx tsx scripts/ingest-players.ts [--seasons 20242025,20232024]
+ * Default: current season only.
  */
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { inArray } from "drizzle-orm";
 import { games, players } from "../src/db/schema";
 import { getBoxscore, getPlayerLanding, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
+import { parseTargetSeasons } from "./lib/seasons";
 
 setFetchImpl(rateLimitedFetch);
 
+const targetSeasons = parseTargetSeasons();
 const CONCURRENCY = 5;
 
 function extractPlayersFromBoxscore(boxscore: any): Set<number> {
@@ -42,9 +46,12 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  // 1. Get all games
-  const allGames = await db.select({ id: games.id }).from(games);
-  console.log(`Found ${allGames.length} games in database`);
+  // 1. Get games for target seasons
+  const allGames = await db
+    .select({ id: games.id })
+    .from(games)
+    .where(inArray(games.seasonId, targetSeasons));
+  console.log(`Found ${allGames.length} games for seasons: ${targetSeasons.join(", ")}`);
 
   // 2. Discover unique player IDs from boxscores (parallel)
   const allPlayerIds = new Set<number>();
