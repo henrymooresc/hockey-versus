@@ -222,16 +222,16 @@ function MatchupRow({
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
         )}
         <div className="min-w-0">
-          <div className="flex items-center gap-1 text-xs font-semibold text-white truncate">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-white truncate">
             {matchup.teamLogoUrl ? (
-              <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 16, height: 16, background: "rgba(255,255,255,0.10)" }}>
-                <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="object-contain" style={{ width: 12, height: 12 }} />
+              <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
+                <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="object-contain" style={{ width: 20, height: 20 }} />
               </span>
             ) : matchup.teamAbbrev ? (
-              <span className="text-[10px] text-gray-500">{matchup.teamAbbrev}</span>
+              <span className="text-xs text-gray-500">{matchup.teamAbbrev}</span>
             ) : null}
             {(matchup.sweaterNumber || matchup.position) && (
-              <span className="text-gray-500">
+              <span className="text-xs text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
                 {matchup.sweaterNumber && matchup.position && " "}
                 {matchup.position && <span className={matchup.position === "D" ? "text-blue-400" : "text-gray-400"}>{matchup.position}</span>}
