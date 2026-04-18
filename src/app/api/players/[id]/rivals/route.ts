@@ -59,7 +59,7 @@ export async function GET(
       WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
         AND same_team = false
         AND toi_shared_seconds > 0
-        ${seasonFilter ? sql`AND season_id = ANY(${seasonFilter})` : sql``}
+        ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
       GROUP BY opponent_id, player_side
     )
     SELECT
