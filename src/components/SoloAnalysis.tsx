@@ -6,7 +6,7 @@ import { UpcomingMatchups } from "./UpcomingMatchups";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
 
-export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
+export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult; seasonIds: string[] | null }) {
   const [skaterRivals, setSkaterRivals] = useState<MatchupPlayer[] | null>(null);
   const [goalieRivals, setGoalieRivals] = useState<MatchupPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,10 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/players/${player.id}/rivals`)
+    const params = new URLSearchParams();
+    if (seasonIds) params.set("seasons", seasonIds.join(","));
+    const query = params.toString() ? `?${params}` : "";
+    fetch(`/api/players/${player.id}/rivals${query}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch rivals");
@@ -28,7 +31,7 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [player.id]);
+  }, [player.id, seasonIds]);
 
   if (loading) {
     return (

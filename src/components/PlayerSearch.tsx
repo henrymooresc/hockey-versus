@@ -5,6 +5,14 @@ import type { PlayerSearchResult } from "@/types/versus";
 import { SoloAnalysis } from "./SoloAnalysis";
 import { HeadToHeadComparison } from "./HeadToHeadComparison";
 
+type SeasonFilter = "current" | "all";
+
+interface SeasonMeta {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+}
+
 const DIVISIONS: Record<string, string[]> = {
   Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
   Metropolitan: ["CAR", "CBJ", "NJD", "NYI", "NYR", "PHI", "PIT", "WSH"],
@@ -312,6 +320,22 @@ export function PlayerSearch() {
   const [playerA, setPlayerA] = useState<PlayerSearchResult | null>(null);
   const [playerB, setPlayerB] = useState<PlayerSearchResult | null>(null);
   const [compareMode, setCompareMode] = useState(false);
+  const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("all");
+  const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
+
+  useEffect(() => {
+    fetch("/api/seasons")
+      .then((r) => r.json())
+      .then((data) => setAllSeasons(data.seasons ?? []))
+      .catch(() => {});
+  }, []);
+
+  const seasonIds: string[] | null = useMemo(() => {
+    if (seasonFilter === "all" || allSeasons.length === 0) return null;
+    return [allSeasons[0].id];
+  }, [seasonFilter, allSeasons]);
+
+  const currentSeasonLabel = "Current Season";
 
   const handleToggleCompare = () => {
     if (compareMode) {
@@ -324,8 +348,34 @@ export function PlayerSearch() {
 
   return (
     <div className="w-full">
-      {/* Compare toggle */}
-      <div className="mb-6 flex items-center justify-end gap-3">
+      {/* Top controls row */}
+      <div className="mb-6 flex items-center justify-between gap-3">
+        {/* Season toggle */}
+        <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
+          <button
+            onClick={() => setSeasonFilter("current")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+              seasonFilter === "current"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            {currentSeasonLabel}
+          </button>
+          <button
+            onClick={() => setSeasonFilter("all")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+              seasonFilter === "all"
+                ? "bg-blue-600 text-white shadow"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            Last 10 Seasons
+          </button>
+        </div>
+
+        {/* Compare toggle */}
+        <div className="flex items-center gap-3">
         <span className="text-sm text-gray-400">Head-to-Head</span>
         <button
           onClick={handleToggleCompare}
@@ -343,6 +393,7 @@ export function PlayerSearch() {
             }`}
           />
         </button>
+        </div>
       </div>
 
       {/* Player selection area */}
@@ -357,7 +408,7 @@ export function PlayerSearch() {
           />
 
           {playerA && (
-            <SoloAnalysis player={playerA} />
+            <SoloAnalysis player={playerA} seasonIds={seasonIds} />
           )}
         </div>
       ) : (
@@ -379,7 +430,7 @@ export function PlayerSearch() {
           </div>
 
           {playerA && playerB && (
-            <HeadToHeadComparison playerA={playerA} playerB={playerB} />
+            <HeadToHeadComparison playerA={playerA} playerB={playerB} seasonIds={seasonIds} />
           )}
         </div>
       )}
