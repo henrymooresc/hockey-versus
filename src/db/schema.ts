@@ -122,6 +122,7 @@ export const gameEvents = pgTable(
     detailsJson: jsonb("details_json"),
   },
   (table) => [
+    uniqueIndex("uq_game_events_game_event").on(table.gameId, table.eventId),
     index("idx_events_game_time").on(
       table.gameId,
       table.period,
@@ -162,6 +163,9 @@ export const versusStats = pgTable(
     // Hits
     hitsByA: smallint("hits_by_a").notNull().default(0),
     hitsByB: smallint("hits_by_b").notNull().default(0),
+    // Blocks
+    blocksByA: smallint("blocks_by_a").notNull().default(0),
+    blocksByB: smallint("blocks_by_b").notNull().default(0),
     // Penalties
     penaltiesByA: smallint("penalties_by_a").notNull().default(0),
     penaltiesByB: smallint("penalties_by_b").notNull().default(0),

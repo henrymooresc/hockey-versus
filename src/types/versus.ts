@@ -28,6 +28,7 @@ export interface VersusPlayerSeasonStats {
   shotsFor: number;
   shotsAgainst: number;
   hits: number;
+  blocks: number;
   penalties: number;
   faceoffWins: number;
   individualGoals: number;
@@ -62,6 +63,21 @@ export interface UpcomingGame {
   isHome: boolean;
 }
 
+export interface MatchupPlayerStats {
+  points: number;
+  goals: number;
+  assists: number;
+  individualShots: number;
+  shotsFor: number;
+  shotsAgainst: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  hits: number;
+  blocks: number;
+  penalties: number;
+  faceoffWins: number;
+}
+
 export interface MatchupPlayer {
   playerId: number;
   firstName: string;
@@ -69,33 +85,39 @@ export interface MatchupPlayer {
   position: string | null;
   headshotUrl: string | null;
   sweaterNumber: number | null;
+  birthDate: string | null;
+  teamAbbrev: string | null;
+  teamLogoUrl: string | null;
   gamesShared: number;
   toiSharedSeconds: number;
   rivalryScore: number;
-  stats: {
-    points: number;
-    goals: number;
-    assists: number;
-    individualShots: number;
-    shotsFor: number;
-    shotsAgainst: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    hits: number;
-    penalties: number;
-    faceoffWins: number;
-  };
-  oppStats: {
-    points: number;
-    goals: number;
-    assists: number;
-    individualShots: number;
-    shotsFor: number;
-    shotsAgainst: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    hits: number;
-    penalties: number;
-    faceoffWins: number;
-  };
+  stats: MatchupPlayerStats;
+  oppStats: MatchupPlayerStats;
+}
+
+export interface RivalSeasonHistory {
+  seasonId: string;
+  label: string;
+  rivalryScore: number;
+  gamesShared: number;
+}
+
+export interface RivalGameHistory {
+  gameId: number;
+  gameDate: string;
+  seasonId: string;
+  label: string;
+  rivalryScore: number;
+  toiSharedSeconds: number;
+}
+
+export interface StandingsEntry {
+  abbrev: string;
+  points: number;
+  wins: number;
+  losses: number;
+  otLosses: number;
+  gamesPlayed: number;
+  l10Record: string;
+  streak: string;
 }

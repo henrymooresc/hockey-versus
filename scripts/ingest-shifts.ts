@@ -11,8 +11,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import { games, shifts, players, teams } from "../src/db/schema";
-import { getShiftChart, getPlayByPlay } from "../src/lib/nhl-api";
+import { getShiftChart, getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
 import { getShiftChartFromHtml } from "../src/lib/html-shifts";
+import { rateLimitedFetch } from "./lib/rate-limiter";
+
+setFetchImpl(rateLimitedFetch);
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
 
@@ -20,8 +23,14 @@ const seasonFilter = process.argv.find(
   (_, i, a) => a[i - 1] === "--season"
 );
 
+// Lower concurrency since HTML fallback may trigger 2-3 API calls per game
+const CONCURRENCY = 3;
+
 async function main() {
-  const client = postgres(process.env.DATABASE_URL!);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
   // Get games that haven't had shifts ingested yet
@@ -64,71 +73,77 @@ async function main() {
   let totalShifts = 0;
   let htmlFallbackCount = 0;
 
-  for (const game of filtered) {
-    try {
-      let shiftData = await getShiftChart(game.id);
+  for (let i = 0; i < filtered.length; i += CONCURRENCY) {
+    const batch = filtered.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (game) => {
+        try {
+          let shiftData = await getShiftChart(game.id);
 
-      // Fallback to HTML shift reports if Stats API returns empty
-      if (!shiftData.data || shiftData.data.length === 0) {
-        const homeTeam = teamMap.get(game.homeTeamId!);
-        const awayTeam = teamMap.get(game.awayTeamId!);
+          // Fallback to HTML shift reports if Stats API returns empty
+          if (!shiftData.data || shiftData.data.length === 0) {
+            const homeTeam = teamMap.get(game.homeTeamId!);
+            const awayTeam = teamMap.get(game.awayTeamId!);
 
-        if (homeTeam && awayTeam) {
-          try {
-            const pbp = await getPlayByPlay(game.id);
-            shiftData = await getShiftChartFromHtml(
-              game.id,
-              game.seasonId,
-              homeTeam,
-              awayTeam,
-              pbp.rosterSpots
-            );
-            if (shiftData.data.length > 0) htmlFallbackCount++;
-          } catch (htmlErr) {
-            console.warn(
-              `\n  HTML fallback failed for game ${game.id}: ${htmlErr instanceof Error ? htmlErr.message : htmlErr}`
-            );
+            if (homeTeam && awayTeam) {
+              try {
+                const pbp = await getPlayByPlay(game.id);
+                shiftData = await getShiftChartFromHtml(
+                  game.id,
+                  game.seasonId,
+                  homeTeam,
+                  awayTeam,
+                  pbp.rosterSpots,
+                  rateLimitedFetch
+                );
+                if (shiftData.data.length > 0) htmlFallbackCount++;
+              } catch (htmlErr) {
+                console.warn(
+                  `\n  HTML fallback failed for game ${game.id}: ${htmlErr instanceof Error ? htmlErr.message : htmlErr}`
+                );
+              }
+            }
           }
+
+          if (!shiftData.data || shiftData.data.length === 0) {
+            progress.increment();
+            return;
+          }
+
+          const shiftRows = shiftData.data
+            .filter((s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId))
+            .map((s) => ({
+              gameId: game.id,
+              playerId: s.playerId,
+              teamId: s.teamId,
+              period: s.period,
+              startSeconds: parseTimeToSeconds(s.startTime),
+              endSeconds: parseTimeToSeconds(s.endTime),
+              shiftNumber: s.shiftNumber,
+            }));
+
+          // Batch insert shifts
+          const BATCH_SIZE = 500;
+          for (let j = 0; j < shiftRows.length; j += BATCH_SIZE) {
+            const chunk = shiftRows.slice(j, j + BATCH_SIZE);
+            await db.insert(shifts).values(chunk).onConflictDoNothing();
+          }
+
+          // Mark game as shifts-ingested
+          await db
+            .update(games)
+            .set({ shiftsIngested: true })
+            .where(eq(games.id, game.id));
+
+          totalShifts += shiftRows.length;
+        } catch (err) {
+          console.warn(
+            `\nWarning: Failed to ingest shifts for game ${game.id}: ${err instanceof Error ? err.message : err}`
+          );
         }
-      }
-
-      if (!shiftData.data || shiftData.data.length === 0) {
         progress.increment();
-        continue;
-      }
-
-      const shiftRows = shiftData.data
-        .filter((s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId))
-        .map((s) => ({
-          gameId: game.id,
-          playerId: s.playerId,
-          teamId: s.teamId,
-          period: s.period,
-          startSeconds: parseTimeToSeconds(s.startTime),
-          endSeconds: parseTimeToSeconds(s.endTime),
-          shiftNumber: s.shiftNumber,
-        }));
-
-      // Batch insert shifts
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < shiftRows.length; i += BATCH_SIZE) {
-        const batch = shiftRows.slice(i, i + BATCH_SIZE);
-        await db.insert(shifts).values(batch).onConflictDoNothing();
-      }
-
-      // Mark game as shifts-ingested
-      await db
-        .update(games)
-        .set({ shiftsIngested: true })
-        .where(eq(games.id, game.id));
-
-      totalShifts += shiftRows.length;
-    } catch (err) {
-      console.warn(
-        `\nWarning: Failed to ingest shifts for game ${game.id}: ${err instanceof Error ? err.message : err}`
-      );
-    }
-    progress.increment();
+      })
+    );
   }
   progress.done();
 

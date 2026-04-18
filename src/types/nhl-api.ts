@@ -103,6 +103,7 @@ export interface PlayDetails {
   committedByPlayerId?: number;
   drawnByPlayerId?: number;
   blockingPlayerId?: number;
+  playerId?: number;
   reason?: string;
   descKey?: string;
 }

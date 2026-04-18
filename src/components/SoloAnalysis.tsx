@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult, MatchupPlayer } from "@/types/versus";
 import { UpcomingMatchups } from "./UpcomingMatchups";
 import { PositionGroup } from "./MatchupTable";
+import { PositionTabs } from "./PositionTabs";
 
 export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
   const [skaterRivals, setSkaterRivals] = useState<MatchupPlayer[] | null>(null);
   const [goalieRivals, setGoalieRivals] = useState<MatchupPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
 
   useEffect(() => {
     setLoading(true);
@@ -56,6 +58,8 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
     );
   }
 
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
+
   return (
     <div className="mt-8">
       <h2 className="mb-8 text-center text-2xl font-bold text-white">
@@ -66,11 +70,21 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
         {/* All-Time Rivals */}
         {(hasSkaterData || hasGoalieData) && (
           <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
-            <h2 className="text-xl font-bold text-blue-400">All-Time Rivals</h2>
-            <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
-              Performance vs opponent players sharing ice time
-            </p>
-            <div className="grid grid-cols-2 gap-8 items-start">
+            <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
+              <div>
+                <h2 className="text-xl font-bold text-blue-400">All-Time Rivals</h2>
+                <p className="text-sm text-gray-500">
+                  Performance vs opponent players sharing ice time
+                </p>
+              </div>
+              <PositionTabs
+                active={activeTab}
+                onChange={setActiveTab}
+                skaterCount={allSkaterRivals.length}
+                goalieCount={(goalieRivals ?? []).length}
+              />
+            </div>
+            {activeTab === "skaters" ? (
               <PositionGroup
                 label="Skaters"
                 matchups={allSkaterRivals}
@@ -78,8 +92,10 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
                 defaultVisible={10}
                 mode={player.position === "C" ? "center" : "skater"}
                 playerPosition={player.position}
-                playerName={`${player.firstName[0]}. ${player.lastName}`}
+                playerName={playerName}
+                playerId={player.id}
               />
+            ) : (
               <PositionGroup
                 label="Goalies"
                 matchups={goalieRivals ?? []}
@@ -87,9 +103,10 @@ export function SoloAnalysis({ player }: { player: PlayerSearchResult }) {
                 defaultVisible={10}
                 mode="goalie"
                 playerPosition={player.position}
-                playerName={`${player.firstName[0]}. ${player.lastName}`}
+                playerName={playerName}
+                playerId={player.id}
               />
-            </div>
+            )}
           </div>
         )}
 

@@ -7,10 +7,14 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
 import { games, players } from "../src/db/schema";
-import { getBoxscore, getPlayerLanding } from "../src/lib/nhl-api";
+import { getBoxscore, getPlayerLanding, setFetchImpl } from "../src/lib/nhl-api";
+import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
+
+setFetchImpl(rateLimitedFetch);
+
+const CONCURRENCY = 5;
 
 function extractPlayersFromBoxscore(boxscore: any): Set<number> {
   const playerIds = new Set<number>();
@@ -32,14 +36,17 @@ function extractPlayersFromBoxscore(boxscore: any): Set<number> {
 }
 
 async function main() {
-  const client = postgres(process.env.DATABASE_URL!);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+  const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
   // 1. Get all games
   const allGames = await db.select({ id: games.id }).from(games);
   console.log(`Found ${allGames.length} games in database`);
 
-  // 2. Discover unique player IDs from boxscores
+  // 2. Discover unique player IDs from boxscores (parallel)
   const allPlayerIds = new Set<number>();
   const existingPlayers = await db.select({ id: players.id }).from(players);
   for (const p of existingPlayers) allPlayerIds.add(p.id);
@@ -48,9 +55,22 @@ async function main() {
   const newPlayerIds = new Set<number>();
   const progress1 = new Progress(allGames.length, "Scanning boxscores");
 
-  for (const game of allGames) {
-    try {
-      const boxscore = await getBoxscore(game.id);
+  for (let i = 0; i < allGames.length; i += CONCURRENCY) {
+    const batch = allGames.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (game) => {
+        try {
+          return await getBoxscore(game.id);
+        } catch (err) {
+          console.warn(
+            `\nWarning: Could not fetch boxscore for game ${game.id}: ${err instanceof Error ? err.message : err}`
+          );
+          return null;
+        }
+      })
+    );
+    for (const boxscore of results) {
+      if (!boxscore) continue;
       const ids = extractPlayersFromBoxscore(boxscore);
       for (const id of ids) {
         if (!allPlayerIds.has(id)) {
@@ -58,59 +78,58 @@ async function main() {
           allPlayerIds.add(id);
         }
       }
-    } catch (err) {
-      console.warn(
-        `\nWarning: Could not fetch boxscore for game ${game.id}: ${err instanceof Error ? err.message : err}`
-      );
     }
-    progress1.increment();
+    progress1.increment(batch.length);
   }
   progress1.done();
 
   console.log(`Found ${newPlayerIds.size} new players to fetch`);
 
-  // 3. Fetch player landing pages and insert
+  // 3. Fetch player landing pages and insert (parallel)
   const progress2 = new Progress(newPlayerIds.size, "Fetching player details");
   const playerIdArray = Array.from(newPlayerIds);
 
-  for (const playerId of playerIdArray) {
-    try {
-      const landing = await getPlayerLanding(playerId);
-
-      await db
-        .insert(players)
-        .values({
-          id: landing.playerId,
-          firstName: landing.firstName.default,
-          lastName: landing.lastName.default,
-          position: landing.position,
-          shootsCatches: landing.shootsCatches,
-          headshotUrl: landing.headshot,
-          birthDate: landing.birthDate,
-          currentTeamId: landing.currentTeamId ?? null,
-          sweaterNumber: landing.sweaterNumber ?? null,
-          searchText: `${landing.firstName.default} ${landing.lastName.default}`.toLowerCase(),
-        })
-        .onConflictDoUpdate({
-          target: players.id,
-          set: {
-            currentTeamId: landing.currentTeamId ?? null,
-            headshotUrl: landing.headshot,
-            sweaterNumber: landing.sweaterNumber ?? null,
-            searchText: `${landing.firstName.default} ${landing.lastName.default}`.toLowerCase(),
-          },
-        });
-    } catch (err) {
-      console.warn(
-        `\nWarning: Could not fetch player ${playerId}: ${err instanceof Error ? err.message : err}`
-      );
-    }
-    progress2.increment();
+  for (let i = 0; i < playerIdArray.length; i += CONCURRENCY) {
+    const batch = playerIdArray.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (playerId) => {
+        try {
+          const landing = await getPlayerLanding(playerId);
+          await db
+            .insert(players)
+            .values({
+              id: landing.playerId,
+              firstName: landing.firstName.default,
+              lastName: landing.lastName.default,
+              position: landing.position,
+              shootsCatches: landing.shootsCatches,
+              headshotUrl: landing.headshot,
+              birthDate: landing.birthDate,
+              currentTeamId: landing.currentTeamId ?? null,
+              sweaterNumber: landing.sweaterNumber ?? null,
+              searchText: `${landing.firstName.default} ${landing.lastName.default}`.toLowerCase(),
+            })
+            .onConflictDoUpdate({
+              target: players.id,
+              set: {
+                currentTeamId: landing.currentTeamId ?? null,
+                headshotUrl: landing.headshot,
+                sweaterNumber: landing.sweaterNumber ?? null,
+                searchText: `${landing.firstName.default} ${landing.lastName.default}`.toLowerCase(),
+              },
+            });
+        } catch (err) {
+          console.warn(
+            `\nWarning: Could not fetch player ${playerId}: ${err instanceof Error ? err.message : err}`
+          );
+        }
+      })
+    );
+    progress2.increment(batch.length);
   }
   progress2.done();
 
-  const finalCount = await db.select({ id: players.id }).from(players);
-  console.log(`\nDone! ${finalCount.length} total players in database.`);
+  console.log(`\nDone! ${allPlayerIds.size} total players in database.`);
   await client.end();
 }
 
