@@ -154,7 +154,7 @@ async function main() {
   }
 
   console.log(
-    `\nDone! Discovered ${gameRows.size} games across ${NUM_SEASONS} seasons.`
+    `\nDone! Discovered ${gameRows.size} games across ${seasonIds.length} season(s).`
   );
   await client.end();
 }
