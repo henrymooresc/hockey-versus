@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    dirs: ["src"],
-  },
-  images: {
+images: {
     remotePatterns: [
       {
         protocol: "https",
