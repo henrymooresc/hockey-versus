@@ -1,0 +1,70 @@
+name: Daily Ingestion
+
+on:
+  schedule:
+    # Runs at 10:00 AM ET (15:00 UTC) every day
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+    # Allow manual triggering from the GitHub Actions UI
+
+jobs:
+  check-and-ingest:
+    name: Check for games and ingest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check if games were played yesterday
+        id: check-games
+        run: |
+          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
+          echo "Checking NHL schedule for $YESTERDAY"
+          RESPONSE=$(curl -sf "https://api-web.nhle.com/v1/schedule/$YESTERDAY" || echo '{}')
+          GAME_COUNT=$(echo "$RESPONSE" | node -e "
+            const data = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+            const days = data.gameWeek ?? [];
+            const day = days.find(d => d.date === process.env.YESTERDAY);
+            console.log(day?.games?.length ?? 0);
+          " YESTERDAY="$YESTERDAY")
+          echo "Games found: $GAME_COUNT"
+          echo "game_count=$GAME_COUNT" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Skip if no games yesterday
+        if: steps.check-games.outputs.game_count == '0'
+        run: |
+          echo "No games played yesterday — skipping ingestion."
+
+      - name: Ingest shifts
+        if: steps.check-games.outputs.game_count != '0'
+        run: npm run ingest:shifts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Ingest events
+        if: steps.check-games.outputs.game_count != '0'
+        run: npm run ingest:events
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Compute versus stats
+        if: steps.check-games.outputs.game_count != '0'
+        run: npm run compute:versus
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Ingest players (refresh roster)
+        if: steps.check-games.outputs.game_count != '0'
+        run: npm run ingest:players
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
