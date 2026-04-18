@@ -105,8 +105,10 @@ export interface RivalSeasonHistory {
 export interface RivalGameHistory {
   gameId: number;
   gameDate: string;
+  seasonId: string;
   label: string;
   rivalryScore: number;
+  toiSharedSeconds: number;
 }
 
 export interface StandingsEntry {

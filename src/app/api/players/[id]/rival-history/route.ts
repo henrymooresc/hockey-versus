@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { unwrapRows } from "@/lib/db-utils";
 import {
   computeSkaterRivalryScore,
   computeGoalieRivalryScore,
@@ -35,6 +36,7 @@ interface EventRow {
 
 interface GameInfo {
   game_id: number;
+  season_id: string;
   game_date: string;
   home_team_id: number | null;
   away_team_id: number | null;
@@ -75,25 +77,23 @@ export async function GET(
     const playerRows = await db.execute(sql`
       SELECT position FROM players WHERE id = ${opponentId}
     `);
-    const playerArray = Array.isArray(playerRows)
-      ? playerRows
-      : (playerRows as any).rows ?? [];
-    const isGoalie = playerArray[0]?.position === "G";
+    const isGoalie = unwrapRows<{ position: string | null }>(playerRows)[0]?.position === "G";
 
-    // 1. Find all games where both players have shifts (opponents only - different teams)
+    // 1. Find all games across all seasons where both players have shifts on opposing teams
     const gameRows = await db.execute(sql`
-      SELECT DISTINCT g.id AS game_id, g.game_date,
+      SELECT DISTINCT g.id AS game_id, g.season_id, g.game_date,
              g.home_team_id, g.away_team_id,
              g.home_score, g.away_score
       FROM games g
       JOIN shifts s1 ON s1.game_id = g.id AND s1.player_id = ${playerAId}
       JOIN shifts s2 ON s2.game_id = g.id AND s2.player_id = ${playerBId}
-                     AND s2.team_id != s1.team_id
+      WHERE (
+        (s1.team_id = g.home_team_id AND s2.team_id = g.away_team_id)
+        OR (s1.team_id = g.away_team_id AND s2.team_id = g.home_team_id)
+      )
       ORDER BY g.game_date ASC
     `);
-    const gamesArray = (
-      Array.isArray(gameRows) ? gameRows : (gameRows as any).rows ?? []
-    ) as GameInfo[];
+    const gamesArray = unwrapRows<GameInfo>(gameRows);
 
     if (gamesArray.length === 0) {
       return NextResponse.json({ games: [] });
@@ -113,11 +113,7 @@ export async function GET(
         AND player_id IN (${playerAId}, ${playerBId})
       ORDER BY game_id, period, start_seconds
     `);
-    const shiftsArray = (
-      Array.isArray(shiftsResult)
-        ? shiftsResult
-        : (shiftsResult as any).rows ?? []
-    ) as ShiftRow[];
+    const shiftsArray = unwrapRows<ShiftRow>(shiftsResult);
 
     // 3. Bulk load relevant events across all shared games
     const eventsResult = await db.execute(sql`
@@ -129,11 +125,7 @@ export async function GET(
                            'hit', 'penalty', 'faceoff')
       ORDER BY game_id, period, time_seconds
     `);
-    const eventsArray = (
-      Array.isArray(eventsResult)
-        ? eventsResult
-        : (eventsResult as any).rows ?? []
-    ) as EventRow[];
+    const eventsArray = unwrapRows<EventRow>(eventsResult);
 
     // Group shifts and events by game
     const shiftsByGame = new Map<number, ShiftRow[]>();
@@ -329,6 +321,7 @@ export async function GET(
           })
         : computeSkaterRivalryScore({
             toiSharedSeconds: totalOverlap,
+            gamesShared: 1,
             hitsByA: isRequestingA ? hitsByA : hitsByB,
             hitsByB: isRequestingA ? hitsByB : hitsByA,
             blocksByA: isRequestingA ? blocksByA : blocksByB,
@@ -357,15 +350,16 @@ export async function GET(
       results.push({
         gameId: gameId,
         gameDate: gameInfo.game_date,
+        seasonId: gameInfo.season_id,
         label,
         rivalryScore: Math.round(rivalryScore * 100) / 100,
+        toiSharedSeconds: totalOverlap,
       });
     }
 
     return NextResponse.json({ games: results });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Rival history API error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Rival history API error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
