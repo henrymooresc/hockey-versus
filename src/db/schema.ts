@@ -45,6 +45,8 @@ export const seasons = pgTable("seasons", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   ingested: boolean("ingested").default(false).notNull(),
+  lastGamesIngestedAt: timestamp("last_games_ingested_at"),
+  lastPlayersScannedAt: timestamp("last_players_scanned_at"),
 });
 
 export const games = pgTable(
