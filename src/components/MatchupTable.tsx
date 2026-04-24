@@ -7,6 +7,16 @@ import { getTeamColors } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
 
+function positionColor(pos: string | null | undefined): string {
+  switch (pos) {
+    case "C": return "text-amber-400";
+    case "L": return "text-cyan-400";
+    case "R": return "text-violet-400";
+    case "D": return "text-blue-400";
+    default:  return "text-gray-400";
+  }
+}
+
 type SkaterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim";
 type CenterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim" | "foPct";
 type GoalieSortKey = "rivalry" | "games" | "toi" | "savePct" | "goals" | "assists" | "shots";
@@ -222,17 +232,19 @@ function MatchupRow({
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
         )}
         <div className="min-w-0">
-          <div className="flex items-center gap-1 text-xs font-semibold text-white truncate">
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-white truncate">
             {matchup.teamLogoUrl ? (
-              <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="shrink-0 object-contain" style={{ width: 14, height: 14 }} />
+              <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
+                <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="object-contain" style={{ width: 20, height: 20 }} />
+              </span>
             ) : matchup.teamAbbrev ? (
-              <span className="text-[10px] text-gray-500">{matchup.teamAbbrev}</span>
+              <span className="text-xs text-gray-500">{matchup.teamAbbrev}</span>
             ) : null}
             {(matchup.sweaterNumber || matchup.position) && (
-              <span className="text-gray-500">
+              <span className="text-xs text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
                 {matchup.sweaterNumber && matchup.position && " "}
-                {matchup.position && <span className={matchup.position === "D" ? "text-blue-400" : "text-gray-400"}>{matchup.position}</span>}
+                {matchup.position && <span className={positionColor(matchup.position)}>{matchup.position}</span>}
               </span>
             )}
             <span className="truncate">{matchup.firstName[0]}. {matchup.lastName}</span>

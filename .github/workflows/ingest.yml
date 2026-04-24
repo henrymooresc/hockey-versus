@@ -1,11 +1,12 @@
 name: Daily Ingestion
 
 on:
-  schedule:
-    # Runs at 10:00 AM ET (15:00 UTC) every day
-    - cron: "0 15 * * *"
+  # Scheduled ingestion disabled while using local DB.
+  # Re-enable by uncommenting the schedule block below:
+  # schedule:
+  #   - cron: "0 15 * * *"  # 10:00 AM ET daily
   workflow_dispatch:
-    # Allow manual triggering from the GitHub Actions UI
+    # Manual trigger only — run from the GitHub Actions UI
 
 jobs:
   check-and-ingest:

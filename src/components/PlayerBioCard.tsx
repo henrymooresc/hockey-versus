@@ -1,7 +1,17 @@
 "use client";
 
 import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
-import { getTeamColors } from "@/lib/team-colors";
+import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
+
+function positionColor(pos: string | null | undefined): string {
+  switch (pos) {
+    case "C": return "text-amber-400";
+    case "L": return "text-cyan-400";
+    case "R": return "text-violet-400";
+    case "D": return "text-blue-400";
+    default:  return "text-gray-400";
+  }
+}
 
 function computeAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -55,16 +65,18 @@ export function PlayerBioCard({
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             {matchup.teamLogoUrl && (
-              <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 16, height: 16, maxWidth: 16, maxHeight: 16 }} />
+              <span className="flex items-center justify-center rounded" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}>
+                <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
+              </span>
             )}
-            <span className="text-xs" style={{ color: teamColors.primary }}>
+            <span className="text-xs font-semibold" style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}>
               {matchup.teamAbbrev}
             </span>
             {matchup.sweaterNumber && (
               <span className="text-xs text-gray-400">#{matchup.sweaterNumber}</span>
             )}
             {matchup.position && (
-              <span className={`text-xs ${matchup.position === "D" ? "text-blue-400" : "text-gray-400"}`}>
+              <span className={`text-xs ${positionColor(matchup.position)}`}>
                 {matchup.position}
               </span>
             )}

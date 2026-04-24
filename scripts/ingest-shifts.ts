@@ -58,6 +58,9 @@ async function main() {
   const knownPlayerIds = new Set(knownPlayers.map((p) => p.id));
   console.log(`${knownPlayerIds.size} known players`);
 
+  const knownTeams = await db.select({ id: teams.id }).from(teams);
+  const knownTeamIds = new Set(knownTeams.map((t) => t.id));
+
   // Load team info for HTML fallback
   const allTeams = await db
     .select({ id: teams.id, abbrev: teams.abbrev, name: teams.name })
@@ -106,7 +109,7 @@ async function main() {
           }
 
           const shiftRows = shiftData.data
-            .filter((s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId))
+            .filter((s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId) && knownTeamIds.has(s.teamId))
             .map((s) => ({
               gameId: game.id,
               playerId: s.playerId,
@@ -132,9 +135,16 @@ async function main() {
 
           totalShifts += shiftRows.length;
         } catch (err) {
-          console.warn(
-            `\nWarning: Failed to ingest shifts for game ${game.id}: ${err instanceof Error ? err.message : err}`
-          );
+          // Drizzle wraps postgres errors; the actual PG error is in err.cause
+          type PgErr = Error & { detail?: string; code?: string };
+          const asAny = err as unknown as Record<string, unknown>;
+          const pgErr: PgErr | null = err instanceof Error && asAny.cause instanceof Error
+            ? (asAny.cause as PgErr)
+            : err instanceof Error ? (err as PgErr) : null;
+          const reason = pgErr
+            ? [pgErr.message, pgErr.detail, pgErr.code ? `[${pgErr.code}]` : ""].filter(Boolean).join(" — ")
+            : String(err);
+          console.warn(`\nWarning: Failed to ingest shifts for game ${game.id}: ${reason}`);
         }
         progress.increment();
       })
