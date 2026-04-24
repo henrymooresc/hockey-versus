@@ -7,6 +7,16 @@ import { getTeamColors } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
 
+function positionColor(pos: string | null | undefined): string {
+  switch (pos) {
+    case "C": return "text-amber-400";
+    case "L": return "text-cyan-400";
+    case "R": return "text-violet-400";
+    case "D": return "text-blue-400";
+    default:  return "text-gray-400";
+  }
+}
+
 type SkaterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim";
 type CenterSortKey = "rivalry" | "games" | "toi" | "points" | "shots" | "hits" | "blocks" | "pim" | "foPct";
 type GoalieSortKey = "rivalry" | "games" | "toi" | "savePct" | "goals" | "assists" | "shots";
@@ -234,7 +244,7 @@ function MatchupRow({
               <span className="text-xs text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
                 {matchup.sweaterNumber && matchup.position && " "}
-                {matchup.position && <span className={matchup.position === "D" ? "text-blue-400" : "text-gray-400"}>{matchup.position}</span>}
+                {matchup.position && <span className={positionColor(matchup.position)}>{matchup.position}</span>}
               </span>
             )}
             <span className="truncate">{matchup.firstName[0]}. {matchup.lastName}</span>

@@ -3,6 +3,16 @@
 import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 
+function positionColor(pos: string | null | undefined): string {
+  switch (pos) {
+    case "C": return "text-amber-400";
+    case "L": return "text-cyan-400";
+    case "R": return "text-violet-400";
+    case "D": return "text-blue-400";
+    default:  return "text-gray-400";
+  }
+}
+
 function computeAge(birthDate: string | null): number | null {
   if (!birthDate) return null;
   const birth = new Date(birthDate + "T00:00:00");
@@ -66,7 +76,7 @@ export function PlayerBioCard({
               <span className="text-xs text-gray-400">#{matchup.sweaterNumber}</span>
             )}
             {matchup.position && (
-              <span className={`text-xs ${matchup.position === "D" ? "text-blue-400" : "text-gray-400"}`}>
+              <span className={`text-xs ${positionColor(matchup.position)}`}>
                 {matchup.position}
               </span>
             )}
