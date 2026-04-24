@@ -2,7 +2,7 @@
 
 ## UI Enhancements
 - [x] Season toggle — switch between current/last season and last 10 seasons on all views
-- [ ] Show player team name and logo on all-time rivals player cards
+- [x] Show player team name and logo on all-time rivals player cards
 - [ ] Add TOI and games played to stat detail cards
 - [ ] Better loading states (skeletons) across all views
 - [ ] Add error boundaries for graceful degradation on component failures

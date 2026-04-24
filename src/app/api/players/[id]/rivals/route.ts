@@ -71,6 +71,7 @@ export async function GET(
       p.sweater_number,
       p.birth_date,
       t.abbrev AS team_abbrev,
+      t.name AS team_name,
       t.logo_url AS team_logo_url
     FROM aggregated a
     JOIN players p ON p.id = a.opponent_id

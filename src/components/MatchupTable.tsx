@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
-import { getTeamColors } from "@/lib/team-colors";
+import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
 
@@ -233,13 +233,26 @@ function MatchupRow({
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-white truncate">
-            {matchup.teamLogoUrl ? (
-              <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
-                <img src={matchup.teamLogoUrl} alt={matchup.teamAbbrev ?? ""} className="object-contain" style={{ width: 20, height: 20 }} />
+            {(matchup.teamLogoUrl || matchup.teamAbbrev) && (
+              <span
+                className="flex shrink-0 items-center gap-1"
+                title={matchup.teamName ?? matchup.teamAbbrev ?? undefined}
+              >
+                {matchup.teamLogoUrl && (
+                  <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
+                    <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 20, height: 20 }} />
+                  </span>
+                )}
+                {matchup.teamAbbrev && (
+                  <span
+                    className="text-[11px] font-bold tracking-wide"
+                    style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}
+                  >
+                    {matchup.teamAbbrev}
+                  </span>
+                )}
               </span>
-            ) : matchup.teamAbbrev ? (
-              <span className="text-xs text-gray-500">{matchup.teamAbbrev}</span>
-            ) : null}
+            )}
             {(matchup.sweaterNumber || matchup.position) && (
               <span className="text-xs text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}

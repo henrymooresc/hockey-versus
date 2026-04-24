@@ -79,6 +79,7 @@ export async function GET(
         p.sweater_number,
         p.birth_date,
         t.abbrev AS team_abbrev,
+        t.name AS team_name,
         t.logo_url AS team_logo_url
       FROM aggregated a
       JOIN players p ON p.id = a.opponent_id
@@ -93,7 +94,7 @@ export async function GET(
     const matchupPlayerIds = new Set(matchups.map((m) => m.playerId));
     const rosterRows = await db.execute(sql`
       SELECT p.id, p.first_name, p.last_name, p.position, p.headshot_url, p.sweater_number, p.birth_date,
-             t.abbrev AS team_abbrev, t.logo_url AS team_logo_url
+             t.abbrev AS team_abbrev, t.name AS team_name, t.logo_url AS team_logo_url
       FROM players p
       LEFT JOIN teams t ON t.id = p.current_team_id
       WHERE p.current_team_id = ${teamId}
@@ -108,6 +109,7 @@ export async function GET(
       sweater_number: number | null;
       birth_date: string | null;
       team_abbrev: string | null;
+      team_name: string | null;
       team_logo_url: string | null;
     }
 
@@ -122,6 +124,7 @@ export async function GET(
         sweaterNumber: row.sweater_number,
         birthDate: row.birth_date ?? null,
         teamAbbrev: row.team_abbrev ?? null,
+        teamName: row.team_name ?? null,
         teamLogoUrl: row.team_logo_url ?? null,
         gamesShared: 0,
         toiSharedSeconds: 0,

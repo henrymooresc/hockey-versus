@@ -13,6 +13,7 @@ export interface AggRow {
   sweater_number: number | null;
   birth_date: string | null;
   team_abbrev: string | null;
+  team_name: string | null;
   team_logo_url: string | null;
   player_a_goals: number;
   player_a_assists: number;
@@ -108,6 +109,7 @@ export function mapAggRowToMatchup(row: AggRow): MatchupPlayer {
     sweaterNumber: row.sweater_number,
     birthDate: row.birth_date,
     teamAbbrev: row.team_abbrev,
+    teamName: row.team_name,
     teamLogoUrl: row.team_logo_url,
     toiSharedSeconds: row.toi_shared_seconds,
     gamesShared: row.games_shared,
