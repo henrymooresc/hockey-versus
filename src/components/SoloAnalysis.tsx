@@ -12,7 +12,7 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
-  const [minGames, setMinGames] = useState(10);
+  const [minTOI, setMinTOI] = useState(600);
 
   useEffect(() => {
     setLoading(true);
@@ -52,8 +52,8 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
   }
 
   const allSkaterRivals = skaterRivals ?? [];
-  const filteredSkaterRivals = allSkaterRivals.filter((r) => r.gamesShared >= minGames);
-  const filteredGoalieRivals = (goalieRivals ?? []).filter((r) => r.gamesShared >= minGames);
+  const filteredSkaterRivals = allSkaterRivals.filter((r) => r.toiSharedSeconds >= minTOI);
+  const filteredGoalieRivals = (goalieRivals ?? []).filter((r) => r.toiSharedSeconds >= minTOI);
 
   const hasSkaterData = allSkaterRivals.length > 0;
   const hasGoalieData = goalieRivals && goalieRivals.length > 0;
@@ -85,12 +85,12 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <span className="uppercase tracking-wider text-[10px] text-gray-500">Min GP</span>
+                  <span className="uppercase tracking-wider text-[10px] text-gray-500">Min TOI (sec)</span>
                   <input
                     type="number"
                     min={0}
-                    value={minGames}
-                    onChange={(e) => setMinGames(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    value={minTOI}
+                    onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 600) || 0))}
                     className="w-14 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-white focus:border-blue-500 focus:outline-none"
                   />
                 </label>
