@@ -136,9 +136,11 @@ async function main() {
           totalShifts += shiftRows.length;
         } catch (err) {
           // Drizzle wraps postgres errors; the actual PG error is in err.cause
-          const pgErr = (err instanceof Error && (err as Record<string, unknown>).cause instanceof Error)
-            ? (err as Record<string, unknown>).cause as Error & Record<string, unknown>
-            : err instanceof Error ? err as Error & Record<string, unknown> : null;
+          type PgErr = Error & { detail?: string; code?: string };
+          const asAny = err as unknown as Record<string, unknown>;
+          const pgErr: PgErr | null = err instanceof Error && asAny.cause instanceof Error
+            ? (asAny.cause as PgErr)
+            : err instanceof Error ? (err as PgErr) : null;
           const reason = pgErr
             ? [pgErr.message, pgErr.detail, pgErr.code ? `[${pgErr.code}]` : ""].filter(Boolean).join(" — ")
             : String(err);
