@@ -79,7 +79,7 @@ export function PlayerBioCard({
         </div>
       </div>
 
-      {standings && (
+      {standings ? (
         <div
           className="mt-2 flex items-center gap-3 rounded px-2 py-1 text-[10px]"
           style={{ backgroundColor: teamColors.primary + "15", borderLeft: `3px solid ${teamColors.primary}` }}
@@ -110,6 +110,20 @@ export function PlayerBioCard({
               L10: <span className="text-gray-300">{standings.l10Record}</span>
             </span>
           </span>
+        </div>
+      ) : (
+        <div
+          className="mt-2 flex items-center gap-2 rounded px-2 py-1 text-[10px]"
+          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderLeft: "3px solid rgba(156,163,175,0.5)" }}
+        >
+          <span
+            className="flex shrink-0 items-center justify-center rounded text-[11px] font-bold text-gray-500"
+            style={{ width: 18, height: 18, background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(156,163,175,0.35)" }}
+            title="Not on an active roster"
+          >
+            ?
+          </span>
+          <span className="text-gray-500 italic">Not on an active roster</span>
         </div>
       )}
     </div>
