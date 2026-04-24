@@ -12,7 +12,7 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
-  const [minTOI, setMinTOI] = useState(600);
+  const [minTOI, setMinTOI] = useState(900);
 
   useEffect(() => {
     setLoading(true);
@@ -90,8 +90,8 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
                     type="number"
                     min={0}
                     value={minTOI}
-                    onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 600) || 0))}
-                    className="w-14 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-white focus:border-blue-500 focus:outline-none"
+                    onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-white focus:border-blue-500 focus:outline-none"
                   />
                 </label>
                 <PositionTabs
