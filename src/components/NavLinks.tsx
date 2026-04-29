@@ -5,6 +5,8 @@ import Link from "next/link";
 
 const links = [
   { href: "/", label: "Hockey Versus" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/about", label: "About" },
 ];
 
 export function NavLinks() {

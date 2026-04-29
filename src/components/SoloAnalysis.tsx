@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react";
 import type { PlayerSearchResult, MatchupPlayer } from "@/types/versus";
 import { UpcomingMatchups } from "./UpcomingMatchups";
+import { TeamRivalryLookup } from "./TeamRivalryLookup";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
+import { RivalsPanelSkeleton } from "./Skeleton";
 
 export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult; seasonIds: string[] | null }) {
   const [skaterRivals, setSkaterRivals] = useState<MatchupPlayer[] | null>(null);
@@ -36,9 +38,8 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
 
   if (loading) {
     return (
-      <div className="mt-8 text-center text-gray-500">
-        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-        <p className="mt-2 text-sm">Loading rivalry data...</p>
+      <div className="mt-8">
+        <RivalsPanelSkeleton />
       </div>
     );
   }
@@ -127,6 +128,15 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
             )}
           </div>
         )}
+
+        {/* Team Rivalry Lookup */}
+        <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
+          <h2 className="text-xl font-bold text-amber-400">Team Rivalry Lookup</h2>
+          <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
+            Pick any team to see {player.firstName} {player.lastName}&apos;s shared-ice history vs its current roster
+          </p>
+          <TeamRivalryLookup player={player} />
+        </div>
 
         {/* Upcoming Matchups */}
         <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>

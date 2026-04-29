@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult, UpcomingGame, MatchupPlayer } from "@/types/versus";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
+import { UpcomingGamesSkeleton, MatchupTableSkeleton } from "./Skeleton";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T12:00:00");
@@ -107,12 +108,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
   }, [player.id, selectedGame?.opponentTeamId]);
 
   if (loadingGames) {
-    return (
-      <div className="text-center text-gray-500">
-        <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-        <p className="mt-2 text-sm">Loading schedule...</p>
-      </div>
-    );
+    return <UpcomingGamesSkeleton />;
   }
 
   if (error) {
@@ -187,9 +183,8 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
           )}
         </div>
       ) : loadingMatchups ? (
-        <div className="mt-6 text-center text-gray-500">
-          <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-          <p className="mt-2 text-sm">Loading matchup data...</p>
+        <div className="mt-6">
+          <MatchupTableSkeleton rows={6} />
         </div>
       ) : (
         <div className="mt-6 text-center text-sm text-gray-500">

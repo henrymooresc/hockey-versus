@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult } from "@/types/versus";
 import type { VersusSeasonStats, PlayerInfo, VersusResult } from "@/types/versus";
 import { VersusTable } from "./VersusTable";
+import { HeadToHeadSkeleton } from "./Skeleton";
 
 export function HeadToHeadComparison({
   playerA,
@@ -36,12 +37,7 @@ export function HeadToHeadComparison({
   }, [playerA.id, playerB.id, seasonIds]);
 
   if (loading) {
-    return (
-      <div className="mt-8 text-center text-gray-500">
-        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-        <p className="mt-2 text-sm">Loading head-to-head data...</p>
-      </div>
-    );
+    return <HeadToHeadSkeleton />;
   }
 
   if (error) {
