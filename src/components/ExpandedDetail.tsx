@@ -5,6 +5,7 @@ import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/ve
 import { PlayerBioCard } from "./PlayerBioCard";
 import { RivalryTrendChart } from "./RivalryTrendChart";
 import { MatchupRadarChart, type RadarCategory } from "./MatchupRadarChart";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 
 export type PlayerPosition = string | null;
@@ -189,16 +190,22 @@ export function SkaterExpandedDetail({
 
         {hasRadarData && (
           <div className="md:sticky md:top-2">
-            <MatchupRadarChart
-              categories={radarCategories}
-              playerName={playerName}
-              opponentName={oppShort}
-            />
+            <ErrorBoundary fallback={null}>
+              <MatchupRadarChart
+                categories={radarCategories}
+                playerName={playerName}
+                opponentName={oppShort}
+              />
+            </ErrorBoundary>
           </div>
         )}
       </div>
 
-      {history && history.length > 0 && <RivalryTrendChart history={history} />}
+      {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
+      )}
       {history === null && <LoadingSpinner />}
     </div>
   );
@@ -249,7 +256,11 @@ export function GoalieExpandedDetail({
         <DetailStatRow label="Goals" mine={stats.goalsFor} opp={oppStats.goalsFor} />
         <DetailStatRow label="Shots" mine={stats.shotsFor} opp={oppStats.shotsFor} />
 
-        {history && history.length > 0 && <RivalryTrendChart history={history} />}
+        {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
+      )}
         {history === null && <LoadingSpinner />}
       </div>
     );
@@ -319,7 +330,11 @@ export function GoalieExpandedDetail({
         </div>
       </div>
 
-      {history && history.length > 0 && <RivalryTrendChart history={history} />}
+      {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
+      )}
       {history === null && <LoadingSpinner />}
     </div>
   );

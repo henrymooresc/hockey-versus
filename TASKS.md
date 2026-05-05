@@ -5,7 +5,7 @@
 - [x] Show player team name and logo on all-time rivals player cards
 - [x] Add TOI and games played to stat detail cards
 - [x] Better loading states (skeletons) across all views
-- [ ] Add error boundaries for graceful degradation on component failures
+- [x] Add error boundaries for graceful degradation on component failures
 
 ## Data & Explanation
 - [x] Rivalry score tooltip/explanation — don't fully surface the formula and weighting to users
@@ -22,3 +22,4 @@
 - [x] Rivalry score leaderboard — top rivalries across the league
 - [ ] Per-game rivalry history expanded view / modal
 - [ ] Playoff game stats toggle
+- [x] Post-game breakdown page — for a single game, show how each pair of players interacted (shared TOI, head-to-head stats), compare those numbers to their season/all-time averages and prior history, and show the game's rivalry score plus how it shifted each pair's running average

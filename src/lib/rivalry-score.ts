@@ -21,10 +21,13 @@ export interface SkaterRivalryInput {
 
 export interface GoalieRivalryInput {
   toiSharedSeconds: number;
+  gamesShared: number;
   /** Skater's individual shots on this goalie */
   skaterShots: number;
   /** Skater's goals scored on this goalie */
   skaterGoals: number;
+  /** Skater's assists on goals scored on this goalie while sharing ice */
+  skaterAssists: number;
   winsA: number;
   winsB: number;
 }
@@ -52,6 +55,12 @@ const CATEGORY_WEIGHTS = {
   hits: 3,
   blocks: 2,
   faceoffs: 1.5,
+  shots: 1,
+};
+
+const GOALIE_CATEGORY_WEIGHTS = {
+  goals: 8,
+  assists: 4,
   shots: 1,
 };
 
@@ -89,21 +98,26 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
 
 export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
   if (input.toiSharedSeconds === 0) return 0;
+  if (input.gamesShared === 0) return 0;
   if (input.skaterShots === 0) return 0;
 
-  // Interactions are total shots faced
-  const interactions = input.skaterShots;
+  // Weighted volume of meaningful interactions, mirrored on the skater formula:
+  // every shot is a contest, every goal/assist while sharing ice is a beat
+  // against this goalie.
+  const weightedVolume =
+    GOALIE_CATEGORY_WEIGHTS.shots * input.skaterShots +
+    GOALIE_CATEGORY_WEIGHTS.goals * input.skaterGoals +
+    GOALIE_CATEGORY_WEIGHTS.assists * input.skaterAssists;
+  const avgWeightedVolume = weightedVolume / input.gamesShared;
 
-  const toiMinutes = input.toiSharedSeconds / 60;
-  const base = interactions / Math.sqrt(toiMinutes);
-
-  // Balance: goals scored vs saves made — a good rivalry has the skater
-  // beating the goalie sometimes but not always
+  // Balance: goals scored vs saves made (with a floor so a dominant goalie
+  // still gets credit for facing a high-volume shooter), plus team result.
   const saves = input.skaterShots - input.skaterGoals;
-  const evennessMultiplier = computeBalance([
+  const balance = computeBalance([
     [input.skaterGoals, saves],
     [input.winsA, input.winsB],
   ]);
+  const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return base * evennessMultiplier;
+  return avgWeightedVolume * multiplier;
 }

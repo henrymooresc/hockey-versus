@@ -146,16 +146,20 @@ export async function GET(request: NextRequest) {
         // Skater (B) shooting on Goalie (A)
         rivalryScore = computeGoalieRivalryScore({
           toiSharedSeconds: row.toi_shared_seconds,
+          gamesShared: row.games_shared,
           skaterShots: row.player_b_shots,
           skaterGoals: row.player_b_goals,
+          skaterAssists: row.player_b_assists,
           winsA: row.wins_a,
           winsB: row.wins_b,
         });
       } else if (bIsGoalie && !aIsGoalie) {
         rivalryScore = computeGoalieRivalryScore({
           toiSharedSeconds: row.toi_shared_seconds,
+          gamesShared: row.games_shared,
           skaterShots: row.player_a_shots,
           skaterGoals: row.player_a_goals,
+          skaterAssists: row.player_a_assists,
           winsA: row.wins_a,
           winsB: row.wins_b,
         });

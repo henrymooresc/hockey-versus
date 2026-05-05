@@ -314,8 +314,10 @@ export async function GET(
       const rivalryScore = isGoalie
         ? computeGoalieRivalryScore({
             toiSharedSeconds: totalOverlap,
+            gamesShared: 1,
             skaterShots: pShots,
             skaterGoals: pGoals,
+            skaterAssists: pAssists,
             winsA: winsPlayer,
             winsB: winsOpponent,
           })

@@ -74,8 +74,10 @@ export function mapAggRowToMatchup(row: AggRow): MatchupPlayer {
   const rivalryScore = isGoalie
     ? computeGoalieRivalryScore({
         toiSharedSeconds: row.toi_shared_seconds,
+        gamesShared: row.games_shared,
         skaterShots: stats.individualShots,
         skaterGoals: stats.goals,
+        skaterAssists: stats.assists,
         winsA: pick(isA, row.wins_a, row.wins_b),
         winsB: pick(isA, row.wins_b, row.wins_a),
       })

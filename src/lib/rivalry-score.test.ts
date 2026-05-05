@@ -92,14 +92,20 @@ describe("computeSkaterRivalryScore", () => {
 describe("computeGoalieRivalryScore", () => {
   const baseGoalieInput: GoalieRivalryInput = {
     toiSharedSeconds: 3600,
+    gamesShared: 6,
     skaterShots: 20,
     skaterGoals: 5,
+    skaterAssists: 4,
     winsA: 3,
     winsB: 3,
   };
 
   it("returns 0 when no shared TOI", () => {
     expect(computeGoalieRivalryScore({ ...baseGoalieInput, toiSharedSeconds: 0 })).toBe(0);
+  });
+
+  it("returns 0 when no shared games", () => {
+    expect(computeGoalieRivalryScore({ ...baseGoalieInput, gamesShared: 0 })).toBe(0);
   });
 
   it("returns 0 when no shots", () => {
@@ -124,5 +130,46 @@ describe("computeGoalieRivalryScore", () => {
     expect(computeGoalieRivalryScore(balanced)).toBeGreaterThan(
       computeGoalieRivalryScore(dominated)
     );
+  });
+
+  it("scores higher with more interactions per game", () => {
+    const highVolume: GoalieRivalryInput = {
+      ...baseGoalieInput,
+      skaterShots: 60,
+      skaterGoals: 15,
+    };
+    expect(computeGoalieRivalryScore(highVolume)).toBeGreaterThan(
+      computeGoalieRivalryScore(baseGoalieInput)
+    );
+  });
+
+  it("rewards assists on goals scored on this goalie", () => {
+    const withAssists = computeGoalieRivalryScore({ ...baseGoalieInput, skaterAssists: 10 });
+    const withoutAssists = computeGoalieRivalryScore({ ...baseGoalieInput, skaterAssists: 0 });
+    expect(withAssists).toBeGreaterThan(withoutAssists);
+  });
+
+  it("falls within the same order of magnitude as a comparable skater rivalry", () => {
+    // High-volume goalie matchup: 30 GP, 200 shots, 20 goals
+    const goalie = computeGoalieRivalryScore({
+      toiSharedSeconds: 36000,
+      gamesShared: 30,
+      skaterShots: 200,
+      skaterGoals: 20,
+      skaterAssists: 25,
+      winsA: 14,
+      winsB: 16,
+    });
+    // High-volume skater matchup at the same GP
+    const skater = computeSkaterRivalryScore({
+      ...baseSkaterInput,
+      gamesShared: 30,
+      playerAGoals: 12,
+      playerAAssists: 18,
+      playerBGoals: 12,
+      playerBAssists: 18,
+    });
+    // Goalie should be at least within half of skater (was ~1/3 in the old formula)
+    expect(goalie).toBeGreaterThan(skater * 0.5);
   });
 });
