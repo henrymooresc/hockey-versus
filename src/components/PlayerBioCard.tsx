@@ -64,14 +64,6 @@ export function PlayerBioCard({
             {matchup.firstName} {matchup.lastName}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            {matchup.teamLogoUrl && (
-              <span className="flex items-center justify-center rounded" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}>
-                <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
-              </span>
-            )}
-            <span className="text-xs font-semibold" style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}>
-              {matchup.teamAbbrev}
-            </span>
             {matchup.sweaterNumber && (
               <span className="text-xs text-gray-400">#{matchup.sweaterNumber}</span>
             )}
@@ -87,20 +79,51 @@ export function PlayerBioCard({
         </div>
       </div>
 
-      {standings && (
+      {standings ? (
         <div
-          className="mt-2 flex items-center justify-between rounded px-2 py-1 text-[10px]"
+          className="mt-2 flex items-center gap-3 rounded px-2 py-1 text-[10px]"
           style={{ backgroundColor: teamColors.primary + "15", borderLeft: `3px solid ${teamColors.primary}` }}
         >
-          <span className="text-gray-400">
-            <span className="font-bold text-white">{standings.points}</span> pts
+          <span
+            className="flex shrink-0 items-center gap-1"
+            title={matchup.teamName ?? matchup.teamAbbrev ?? undefined}
+          >
+            {matchup.teamLogoUrl && (
+              <span className="flex items-center justify-center rounded" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}>
+                <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
+              </span>
+            )}
+            {matchup.teamAbbrev && (
+              <span className="text-xs font-semibold" style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}>
+                {matchup.teamAbbrev}
+              </span>
+            )}
           </span>
-          <span className="text-gray-400">
-            {standings.wins}-{standings.losses}-{standings.otLosses}
+          <span className="flex flex-1 items-center justify-between">
+            <span className="text-gray-400">
+              <span className="font-bold text-white">{standings.points}</span> pts
+            </span>
+            <span className="text-gray-400">
+              {standings.wins}-{standings.losses}-{standings.otLosses}
+            </span>
+            <span className="text-gray-400">
+              L10: <span className="text-gray-300">{standings.l10Record}</span>
+            </span>
           </span>
-          <span className="text-gray-400">
-            L10: <span className="text-gray-300">{standings.l10Record}</span>
+        </div>
+      ) : (
+        <div
+          className="mt-2 flex items-center gap-2 rounded px-2 py-1 text-[10px]"
+          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderLeft: "3px solid rgba(156,163,175,0.5)" }}
+        >
+          <span
+            className="flex shrink-0 items-center justify-center rounded text-[11px] font-bold text-gray-500"
+            style={{ width: 18, height: 18, background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(156,163,175,0.35)" }}
+            title="Not on an active roster"
+          >
+            ?
           </span>
+          <span className="text-gray-500 italic">Not on an active roster</span>
         </div>
       )}
     </div>

@@ -87,6 +87,7 @@ export interface MatchupPlayer {
   sweaterNumber: number | null;
   birthDate: string | null;
   teamAbbrev: string | null;
+  teamName: string | null;
   teamLogoUrl: string | null;
   gamesShared: number;
   toiSharedSeconds: number;
