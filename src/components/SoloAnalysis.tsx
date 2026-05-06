@@ -46,12 +46,17 @@ export function SoloAnalysis({
   }, [seasonFilter, allSeasons]);
 
   useEffect(() => {
+    // Wait for the seasons list before firing in "current" mode — otherwise the
+    // first fetch goes out without a season filter and can race the filtered one.
+    if (seasonFilter === "current" && allSeasons.length === 0) return;
+
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
     if (seasonIds) params.set("seasons", seasonIds.join(","));
     params.set("gameType", gameTypeFilter);
-    fetch(`/api/players/${player.id}/rivals?${params}`)
+    fetch(`/api/players/${player.id}/rivals?${params}`, { signal: controller.signal })
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch rivals");
@@ -61,9 +66,15 @@ export function SoloAnalysis({
         setSkaterRivals(data.skaterRivals);
         setGoalieRivals(data.goalieRivals);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [player.id, seasonIds, gameTypeFilter]);
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setError(err.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [player.id, seasonIds, gameTypeFilter, seasonFilter, allSeasons.length]);
 
   if (loading) {
     return (
