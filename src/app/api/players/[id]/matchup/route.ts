@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { unwrapRows } from "@/lib/db-utils";
+import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, emptyMatchupStats, type AggRow } from "@/lib/matchup-mapper";
 import type { MatchupPlayer } from "@/types/versus";
 
@@ -26,6 +26,7 @@ export async function GET(
       request.nextUrl.searchParams.get("teamId") ?? "",
       10
     );
+    const gtFilter = parseGameTypeFilter(request.nextUrl.searchParams.get("gameType"));
     if (isNaN(teamId)) {
       return NextResponse.json(
         { error: "teamId query parameter required" },
@@ -68,6 +69,7 @@ export async function GET(
         WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
           AND same_team = false
           AND toi_shared_seconds > 0
+          ${gameTypeClause(gtFilter)}
         GROUP BY opponent_id, player_side
       )
       SELECT

@@ -81,7 +81,13 @@ function TeamPicker({
   );
 }
 
-export function TeamRivalryLookup({ player }: { player: PlayerSearchResult }) {
+export function TeamRivalryLookup({
+  player,
+  gameType = "regular",
+}: {
+  player: PlayerSearchResult;
+  gameType?: "regular" | "playoffs" | "both";
+}) {
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [matchups, setMatchups] = useState<MatchupPlayer[]>([]);
@@ -117,7 +123,7 @@ export function TeamRivalryLookup({ player }: { player: PlayerSearchResult }) {
     if (!selectedTeam) return;
     setLoadingMatchups(true);
     setMatchups([]);
-    fetch(`/api/players/${player.id}/matchup?teamId=${selectedTeam.id}`)
+    fetch(`/api/players/${player.id}/matchup?teamId=${selectedTeam.id}&gameType=${gameType}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch matchups");
@@ -126,7 +132,7 @@ export function TeamRivalryLookup({ player }: { player: PlayerSearchResult }) {
       .then((data) => setMatchups(data.matchups))
       .catch((err) => setError(err.message))
       .finally(() => setLoadingMatchups(false));
-  }, [player.id, selectedTeam?.id]);
+  }, [player.id, selectedTeam?.id, gameType]);
 
   if (error) {
     return (

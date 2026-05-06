@@ -147,6 +147,8 @@ export const versusStats = pgTable(
     seasonId: varchar("season_id", { length: 8 })
       .references(() => seasons.id)
       .notNull(),
+    /** NHL game_type: 2 = regular season, 3 = playoffs (preseason excluded) */
+    gameType: smallint("game_type").notNull().default(2),
     sameTeam: boolean("same_team").notNull(),
     gamesShared: smallint("games_shared").notNull().default(0),
     toiSharedSeconds: integer("toi_shared_seconds").notNull().default(0),
@@ -191,9 +193,10 @@ export const versusStats = pgTable(
     uniqueIndex("idx_versus_pair_season").on(
       table.playerAId,
       table.playerBId,
-      table.seasonId
+      table.seasonId,
+      table.gameType
     ),
-    index("idx_versus_player_a").on(table.playerAId, table.seasonId),
-    index("idx_versus_player_b").on(table.playerBId, table.seasonId),
+    index("idx_versus_player_a").on(table.playerAId, table.seasonId, table.gameType),
+    index("idx_versus_player_b").on(table.playerBId, table.seasonId, table.gameType),
   ]
 );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { PlayerSearchResult, MatchupPlayer } from "@/types/versus";
 import { UpcomingMatchups } from "./UpcomingMatchups";
 import { TeamRivalryLookup } from "./TeamRivalryLookup";
@@ -9,21 +9,49 @@ import { PositionTabs } from "./PositionTabs";
 import { RivalsPanelSkeleton } from "./Skeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 
-export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult; seasonIds: string[] | null }) {
+type SeasonFilter = "current" | "all";
+type GameTypeFilter = "regular" | "playoffs" | "both";
+
+interface SeasonMeta {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export function SoloAnalysis({
+  player,
+}: {
+  player: PlayerSearchResult;
+}) {
   const [skaterRivals, setSkaterRivals] = useState<MatchupPlayer[] | null>(null);
   const [goalieRivals, setGoalieRivals] = useState<MatchupPlayer[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
   const [minTOI, setMinTOI] = useState(900);
+  const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("current");
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
+  const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
+
+  useEffect(() => {
+    fetch("/api/seasons")
+      .then((r) => r.json())
+      .then((data) => setAllSeasons(data.seasons ?? []))
+      .catch(() => {});
+  }, []);
+
+  const seasonIds: string[] | null = useMemo(() => {
+    if (seasonFilter === "all" || allSeasons.length === 0) return null;
+    return [allSeasons[0].id];
+  }, [seasonFilter, allSeasons]);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
     if (seasonIds) params.set("seasons", seasonIds.join(","));
-    const query = params.toString() ? `?${params}` : "";
-    fetch(`/api/players/${player.id}/rivals${query}`)
+    params.set("gameType", gameTypeFilter);
+    fetch(`/api/players/${player.id}/rivals?${params}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch rivals");
@@ -35,7 +63,7 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [player.id, seasonIds]);
+  }, [player.id, seasonIds, gameTypeFilter]);
 
   if (loading) {
     return (
@@ -79,14 +107,14 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
         {(hasSkaterData || hasGoalieData) && (
           <ErrorBoundary label="All-Time Rivals">
             <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
-              <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
+              <div className="flex flex-wrap items-start justify-between gap-3" style={{ marginBottom: 20 }}>
                 <div>
                   <h2 className="text-xl font-bold text-blue-400">All-Time Rivals</h2>
                   <p className="text-sm text-gray-500">
                     Performance vs opponent players sharing ice time
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-gray-400">
                     <span className="uppercase tracking-wider text-[10px] text-gray-500">Min TOI (sec)</span>
                     <input
@@ -103,6 +131,47 @@ export function SoloAnalysis({ player, seasonIds }: { player: PlayerSearchResult
                     skaterCount={filteredSkaterRivals.length}
                     goalieCount={filteredGoalieRivals.length}
                   />
+                  <div className="flex rounded-lg border border-gray-700/60 bg-gray-800/60 p-0.5">
+                    <button
+                      onClick={() => setSeasonFilter("current")}
+                      className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
+                        seasonFilter === "current"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      Current Season
+                    </button>
+                    <button
+                      onClick={() => setSeasonFilter("all")}
+                      className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
+                        seasonFilter === "all"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      Last 10 Seasons
+                    </button>
+                  </div>
+                  <div className="flex rounded-lg border border-gray-700/60 bg-gray-800/60 p-0.5">
+                    {([
+                      { value: "regular", label: "Regular" },
+                      { value: "playoffs", label: "Playoffs" },
+                      { value: "both", label: "Both" },
+                    ] as const).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => setGameTypeFilter(value)}
+                        className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
+                          gameTypeFilter === value
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
               {activeTab === "skaters" ? (

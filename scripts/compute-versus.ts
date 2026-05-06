@@ -28,11 +28,13 @@ async function main() {
   const client = postgres(process.env.DATABASE_URL);
   const db = drizzle(client);
 
-  // Get games that have both shifts and events ingested, for target seasons
+  // Get games that have both shifts and events ingested, for target seasons.
+  // Only regular season (gameType=2) and playoffs (gameType=3) — skip preseason.
   const filtered = await db
     .select({
       id: games.id,
       seasonId: games.seasonId,
+      gameType: games.gameType,
       homeTeamId: games.homeTeamId,
       awayTeamId: games.awayTeamId,
       homeScore: games.homeScore,
@@ -43,7 +45,8 @@ async function main() {
       and(
         eq(games.shiftsIngested, true),
         eq(games.eventsIngested, true),
-        inArray(games.seasonId, targetSeasons)
+        inArray(games.seasonId, targetSeasons),
+        inArray(games.gameType, [2, 3])
       )
     );
 
@@ -59,10 +62,10 @@ async function main() {
 
   const progress = new Progress(filtered.length, "Computing versus");
 
-  // Accumulate stats per pair per season
+  // Accumulate stats per (pair, season, gameType)
   const accumulator = new Map<
     string,
-    PairStats & { seasonId: string; gamesShared: number; winsA: number; winsB: number }
+    PairStats & { seasonId: string; gameType: number; gamesShared: number; winsA: number; winsB: number }
   >();
 
   // Process in chunks to avoid loading all shifts+events into memory at once
@@ -131,9 +134,9 @@ async function main() {
               : game.awayTeamId
             : null;
 
-        // Accumulate into season-level stats
+        // Accumulate into (season, gameType)-level stats
         for (const [pairKey, stats] of pairStats) {
-          const accKey = `${pairKey}-${game.seasonId}`;
+          const accKey = `${pairKey}-${game.seasonId}-${game.gameType}`;
 
           const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
           const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
@@ -142,6 +145,7 @@ async function main() {
             accumulator.set(accKey, {
               ...stats,
               seasonId: game.seasonId,
+              gameType: game.gameType,
               gamesShared: 1,
               winsA: pairWinsA,
               winsB: pairWinsB,
@@ -198,6 +202,7 @@ async function main() {
       playerAId: row.playerAId,
       playerBId: row.playerBId,
       seasonId: row.seasonId,
+      gameType: row.gameType,
       sameTeam: row.sameTeam,
       gamesShared: row.gamesShared,
       toiSharedSeconds: row.toiSharedSeconds,
@@ -235,7 +240,7 @@ async function main() {
       .insert(versusStats)
       .values(batch)
       .onConflictDoUpdate({
-        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId],
+        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId, versusStats.gameType],
         set: {
           sameTeam: sql`excluded.same_team`,
           gamesShared: sql`excluded.games_shared`,

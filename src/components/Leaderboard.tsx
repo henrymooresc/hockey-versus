@@ -76,9 +76,11 @@ function HeaderRow() {
 }
 
 type SeasonFilter = "current" | "all";
+type GameTypeFilter = "regular" | "playoffs" | "both";
 
 export function Leaderboard() {
   const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("all");
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +98,7 @@ export function Leaderboard() {
     } else if (seasonFilter === "current") {
       return;
     }
+    params.set("gameType", gameTypeFilter);
     fetch(`/api/leaderboard?${params}`)
       .then(async (r) => {
         const data = await r.json();
@@ -104,11 +107,11 @@ export function Leaderboard() {
       })
       .then((data) => setEntries(data.leaderboard))
       .catch((err) => setError(err.message));
-  }, [seasonFilter, allSeasons]);
+  }, [seasonFilter, gameTypeFilter, allSeasons]);
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
           <button
             onClick={() => setSeasonFilter("current")}
@@ -126,6 +129,25 @@ export function Leaderboard() {
           >
             Last 10 Seasons
           </button>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
+          {([
+            { value: "regular", label: "Regular" },
+            { value: "playoffs", label: "Playoffs" },
+            { value: "both", label: "Both" },
+          ] as const).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setGameTypeFilter(value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+                gameTypeFilter === value
+                  ? "bg-amber-600 text-white shadow"
+                  : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

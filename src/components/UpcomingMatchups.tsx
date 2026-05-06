@@ -59,7 +59,13 @@ function GameSelector({
   );
 }
 
-export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
+export function UpcomingMatchups({
+  player,
+  gameType = "regular",
+}: {
+  player: PlayerSearchResult;
+  gameType?: "regular" | "playoffs" | "both";
+}) {
   const [games, setGames] = useState<UpcomingGame[]>([]);
   const [selectedGame, setSelectedGame] = useState<UpcomingGame | null>(null);
   const [matchups, setMatchups] = useState<MatchupPlayer[]>([]);
@@ -96,7 +102,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
 
     setLoadingMatchups(true);
     setActiveTab("skaters");
-    fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}`)
+    fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}&gameType=${gameType}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch matchups");
@@ -105,7 +111,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
       .then((data) => setMatchups(data.matchups))
       .catch((err) => setError(err.message))
       .finally(() => setLoadingMatchups(false));
-  }, [player.id, selectedGame?.opponentTeamId]);
+  }, [player.id, selectedGame?.opponentTeamId, gameType]);
 
   if (loadingGames) {
     return <UpcomingGamesSkeleton />;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { unwrapRows } from "@/lib/db-utils";
+import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { computeSkaterRivalryScore, computeGoalieRivalryScore } from "@/lib/rivalry-score";
 
 interface PairRow {
@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
   try {
     const seasonsParam = request.nextUrl.searchParams.get("seasons");
     const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
+    const gtFilter = parseGameTypeFilter(request.nextUrl.searchParams.get("gameType"));
     const limit = Math.min(
       parseInt(request.nextUrl.searchParams.get("limit") ?? "50", 10) || 50,
       200
@@ -107,6 +108,7 @@ export async function GET(request: NextRequest) {
         WHERE same_team = false
           AND toi_shared_seconds > 0
           ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
+          ${gameTypeClause(gtFilter)}
         GROUP BY player_a_id, player_b_id
         HAVING SUM(toi_shared_seconds) >= ${minToi}
         ORDER BY SUM(toi_shared_seconds) DESC
