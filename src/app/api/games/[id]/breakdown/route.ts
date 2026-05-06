@@ -230,6 +230,65 @@ export async function GET(
       return NextResponse.json({ error: "No shift data for this game" }, { status: 404 });
     }
 
+    // Compute full-game team stats from events (not just shared ice).
+    function emptyTeamStats() {
+      return { goals: 0, shots: 0, hits: 0, blocks: 0, penalties: 0, faceoffWins: 0 };
+    }
+    const teamStatsByTeamId = new Map<number, ReturnType<typeof emptyTeamStats>>();
+    function getTeamStats(teamId: number) {
+      let s = teamStatsByTeamId.get(teamId);
+      if (!s) {
+        s = emptyTeamStats();
+        teamStatsByTeamId.set(teamId, s);
+      }
+      return s;
+    }
+    const homeId = game.home_team_id;
+    const awayId = game.away_team_id;
+    const otherTeamOf = (id: number | null): number | null =>
+      id === homeId ? awayId : id === awayId ? homeId : null;
+
+    for (const e of events) {
+      if (e.teamId == null) continue;
+      switch (e.eventType) {
+        case "goal": {
+          const ts = getTeamStats(e.teamId);
+          ts.goals++;
+          ts.shots++; // a goal is a shot on goal
+          break;
+        }
+        case "shot": {
+          getTeamStats(e.teamId).shots++;
+          break;
+        }
+        case "blocked_shot": {
+          // event.teamId = shooter team; the BLOCK belongs to the other team
+          const blockerTeam = otherTeamOf(e.teamId);
+          if (blockerTeam != null) getTeamStats(blockerTeam).blocks++;
+          break;
+        }
+        case "missed_shot":
+          // doesn't reach the net; not counted as SOG, no team stat
+          break;
+        case "hit": {
+          getTeamStats(e.teamId).hits++;
+          break;
+        }
+        case "penalty": {
+          getTeamStats(e.teamId).penalties++;
+          break;
+        }
+        case "faceoff": {
+          getTeamStats(e.teamId).faceoffWins++;
+          break;
+        }
+      }
+    }
+    const teamStats = {
+      home: homeId != null ? (teamStatsByTeamId.get(homeId) ?? emptyTeamStats()) : emptyTeamStats(),
+      away: awayId != null ? (teamStatsByTeamId.get(awayId) ?? emptyTeamStats()) : emptyTeamStats(),
+    };
+
     // Compute per-pair stats for the game
     const pairMap = computeGameVersus(shifts, events);
 
@@ -241,6 +300,7 @@ export async function GET(
     if (crossTeamPairs.length === 0) {
       return NextResponse.json({
         game: shapeGame(game),
+        teamStats,
         pairs: [],
       });
     }
@@ -425,7 +485,7 @@ export async function GET(
 
     pairs.sort((a, b) => b.thisGame.rivalryScore - a.thisGame.rivalryScore);
 
-    return NextResponse.json({ game: shapeGame(game), pairs });
+    return NextResponse.json({ game: shapeGame(game), teamStats, pairs });
   } catch (err: unknown) {
     console.error("Game breakdown API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

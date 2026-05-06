@@ -58,8 +58,18 @@ interface GameInfo {
   away: { id: number | null; abbrev: string | null; name: string | null; logoUrl: string | null; score: number | null };
 }
 
+interface TeamStats {
+  goals: number;
+  shots: number;
+  hits: number;
+  blocks: number;
+  penalties: number;
+  faceoffWins: number;
+}
+
 interface BreakdownResponse {
   game: GameInfo;
+  teamStats?: { home: TeamStats; away: TeamStats };
   pairs: PairBreakdown[];
 }
 
@@ -204,7 +214,33 @@ function PairCard({ pair, rank }: { pair: PairBreakdown; rank: number }) {
   );
 }
 
-function GameHeader({ game }: { game: GameInfo }) {
+function TeamStatRow({
+  label,
+  home,
+  away,
+  higherIsBetter = true,
+}: {
+  label: string;
+  home: number;
+  away: number;
+  higherIsBetter?: boolean;
+}) {
+  const homeWins = higherIsBetter ? home > away : home < away;
+  const awayWins = higherIsBetter ? away > home : away < home;
+  return (
+    <div className="grid grid-cols-3 items-center py-1 text-sm">
+      <div className={`text-right font-mono font-semibold ${homeWins ? "text-green-400" : awayWins ? "text-red-400" : "text-gray-300"}`}>
+        {home}
+      </div>
+      <div className="text-center text-[10px] uppercase tracking-widest text-gray-500">{label}</div>
+      <div className={`text-left font-mono font-semibold ${awayWins ? "text-green-400" : homeWins ? "text-red-400" : "text-gray-300"}`}>
+        {away}
+      </div>
+    </div>
+  );
+}
+
+function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: TeamStats; away: TeamStats } }) {
   const homeColors = getTeamColors(game.home.abbrev);
   const awayColors = getTeamColors(game.away.abbrev);
   const homeWon = game.home.score != null && game.away.score != null && game.home.score > game.away.score;
@@ -247,6 +283,26 @@ function GameHeader({ game }: { game: GameInfo }) {
           </div>
         </div>
       </div>
+
+      {teamStats && (
+        <div className="mt-5 border-t border-gray-700/50 pt-4">
+          <div className="grid grid-cols-3 items-center pb-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            <div className="text-right" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
+              {game.home.abbrev}
+            </div>
+            <div />
+            <div className="text-left" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
+              {game.away.abbrev}
+            </div>
+          </div>
+          <TeamStatRow label="Goals" home={teamStats.home.goals} away={teamStats.away.goals} />
+          <TeamStatRow label="Shots" home={teamStats.home.shots} away={teamStats.away.shots} />
+          <TeamStatRow label="Hits" home={teamStats.home.hits} away={teamStats.away.hits} />
+          <TeamStatRow label="Blocks" home={teamStats.home.blocks} away={teamStats.away.blocks} />
+          <TeamStatRow label="Faceoff Wins" home={teamStats.home.faceoffWins} away={teamStats.away.faceoffWins} />
+          <TeamStatRow label="Penalties" home={teamStats.home.penalties} away={teamStats.away.penalties} higherIsBetter={false} />
+        </div>
+      )}
     </div>
   );
 }
@@ -468,7 +524,7 @@ export function GameBreakdown({ gameId }: { gameId: number }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <GameHeader game={data.game} />
+      <GameHeader game={data.game} teamStats={data.teamStats} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <PlayerListPicker
