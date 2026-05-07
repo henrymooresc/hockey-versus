@@ -2,6 +2,7 @@
 
 import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
+import { formatSecondsToHMS } from "@/lib/time-utils";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -76,6 +77,35 @@ export function PlayerBioCard({
           {age !== null && (
             <div className="text-[10px] text-gray-500 mt-0.5">Age {age}</div>
           )}
+        </div>
+
+        <div className="text-right shrink-0">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            Rivalry Score
+            <a
+              href="/about#rivalry-score"
+              title="What is Rivalry Score?"
+              className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 text-[8px] font-bold text-gray-400 hover:border-blue-400 hover:text-blue-400 transition-colors align-middle"
+            >
+              i
+            </a>
+          </div>
+          <div
+            className={`font-mono text-lg font-bold ${
+              matchup.rivalryScore > 0
+                ? "text-green-400"
+                : matchup.rivalryScore < 0
+                ? "text-red-400"
+                : "text-gray-400"
+            }`}
+          >
+            {matchup.rivalryScore.toFixed(2)}
+          </div>
+          <div className="text-[10px] text-gray-500">
+            <span className="font-mono text-gray-300">{matchup.gamesShared}</span> GP
+            <span className="mx-1 text-gray-700">·</span>
+            <span className="font-mono text-gray-300">{formatSecondsToHMS(matchup.toiSharedSeconds)}</span>
+          </div>
         </div>
       </div>
 

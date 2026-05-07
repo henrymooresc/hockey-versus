@@ -5,8 +5,8 @@ import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/ve
 import { PlayerBioCard } from "./PlayerBioCard";
 import { RivalryTrendChart } from "./RivalryTrendChart";
 import { MatchupRadarChart, type RadarCategory } from "./MatchupRadarChart";
+import { TeamHistoryTimeline } from "./TeamHistoryTimeline";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { formatSecondsToHMS } from "@/lib/time-utils";
 
 export type PlayerPosition = string | null;
 
@@ -62,40 +62,6 @@ function LoadingSpinner() {
   return (
     <div className="mt-2 text-center">
       <div className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-600 border-t-blue-400" />
-    </div>
-  );
-}
-
-function RivalryScoreBadge({ score }: { score: number }) {
-  return (
-    <div className="text-center py-1.5">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
-      <span className={`font-mono text-sm font-bold ${score > 0 ? "text-green-400" : score < 0 ? "text-red-400" : "text-gray-400"}`}>
-        {score.toFixed(2)}
-      </span>
-      <a
-        href="/about#rivalry-score"
-        title="What is Rivalry Score?"
-        className="ml-1.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 text-[8px] font-bold text-gray-400 hover:border-blue-400 hover:text-blue-400 transition-colors"
-      >
-        i
-      </a>
-    </div>
-  );
-}
-
-function SharedContextLine({ gamesShared, toiSharedSeconds }: { gamesShared: number; toiSharedSeconds: number }) {
-  return (
-    <div className="flex items-center justify-center gap-3 pb-1.5 text-[10px] text-gray-500">
-      <span>
-        <span className="font-bold uppercase tracking-widest">GP </span>
-        <span className="font-mono text-gray-300">{gamesShared}</span>
-      </span>
-      <span className="text-gray-700">|</span>
-      <span>
-        <span className="font-bold uppercase tracking-widest">TOI Together </span>
-        <span className="font-mono text-gray-300">{formatSecondsToHMS(toiSharedSeconds)}</span>
-      </span>
     </div>
   );
 }
@@ -158,12 +124,13 @@ export function SkaterExpandedDetail({
         <PlayerBioCard matchup={matchup} standings={teamStandings} />
       </div>
 
-      <ColumnHeaders playerName={playerName} opponentName={oppShort} />
-      <RivalryScoreBadge score={matchup.rivalryScore} />
-      <SharedContextLine gamesShared={matchup.gamesShared} toiSharedSeconds={matchup.toiSharedSeconds} />
+      <div className="pt-2 pb-1 text-center">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
         <div>
+          <ColumnHeaders playerName={playerName} opponentName={oppShort} />
           <DetailSectionLabel label="Scoring" />
           <DetailStatRow label="Goals" mine={stats.goals} opp={oppStats.goals} />
           <DetailStatRow label="Assists" mine={stats.assists} opp={oppStats.assists} />
@@ -207,6 +174,15 @@ export function SkaterExpandedDetail({
         </ErrorBoundary>
       )}
       {history === null && <LoadingSpinner />}
+
+      <ErrorBoundary fallback={null}>
+        <TeamHistoryTimeline
+          playerId={playerId}
+          opponentId={matchup.playerId}
+          playerLabel={playerName}
+          opponentLabel={oppShort}
+        />
+      </ErrorBoundary>
     </div>
   );
 }
@@ -238,9 +214,10 @@ export function GoalieExpandedDetail({
           <PlayerBioCard matchup={matchup} standings={teamStandings} />
         </div>
 
+        <div className="pt-2 pb-1 text-center">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+        </div>
         <ColumnHeaders playerName={playerName} opponentName={`${matchup.firstName[0]}. ${matchup.lastName}`} />
-        <RivalryScoreBadge score={matchup.rivalryScore} />
-        <SharedContextLine gamesShared={matchup.gamesShared} toiSharedSeconds={matchup.toiSharedSeconds} />
 
         <DetailSectionLabel label="Save Performance" />
         <DetailStatRow label="Shots Faced" mine={stats.individualShots} opp={oppStats.individualShots} />
@@ -262,6 +239,15 @@ export function GoalieExpandedDetail({
         </ErrorBoundary>
       )}
         {history === null && <LoadingSpinner />}
+
+        <ErrorBoundary fallback={null}>
+          <TeamHistoryTimeline
+            playerId={playerId}
+            opponentId={matchup.playerId}
+            playerLabel={playerName}
+            opponentLabel={`${matchup.firstName[0]}. ${matchup.lastName}`}
+          />
+        </ErrorBoundary>
       </div>
     );
   }
@@ -278,8 +264,9 @@ export function GoalieExpandedDetail({
         <PlayerBioCard matchup={matchup} standings={teamStandings} />
       </div>
 
-      <RivalryScoreBadge score={matchup.rivalryScore} />
-      <SharedContextLine gamesShared={matchup.gamesShared} toiSharedSeconds={matchup.toiSharedSeconds} />
+      <div className="pt-2 pb-2 text-center">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-gray-700/50 bg-gray-800/40 p-3">
           <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{playerName}</div>
@@ -336,6 +323,15 @@ export function GoalieExpandedDetail({
         </ErrorBoundary>
       )}
       {history === null && <LoadingSpinner />}
+
+      <ErrorBoundary fallback={null}>
+        <TeamHistoryTimeline
+          playerId={playerId}
+          opponentId={matchup.playerId}
+          playerLabel={playerName}
+          opponentLabel={`${matchup.firstName[0]}. ${matchup.lastName}`}
+        />
+      </ErrorBoundary>
     </div>
   );
 }

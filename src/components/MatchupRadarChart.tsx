@@ -40,9 +40,6 @@ export function MatchupRadarChart({
 
   return (
     <div className="mt-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
-        Stat Comparison
-      </div>
       <div style={{ width: "100%", height: 280 }}>
         <ResponsiveContainer>
           <RadarChart data={data} outerRadius="72%" margin={{ top: 8, right: 24, bottom: 8, left: 24 }}>

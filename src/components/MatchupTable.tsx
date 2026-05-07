@@ -62,9 +62,9 @@ function getSortValue(m: MatchupPlayer, key: SortKey, mode: ColumnMode): number 
     : getSkaterSortValue(m, key as SkaterSortKey | CenterSortKey);
 }
 
-const SKATER_ROW_GRID = "30px 1fr 40px 32px 58px 40px 40px 40px 40px 40px";
-const CENTER_ROW_GRID = "30px 1fr 40px 32px 58px 40px 40px 40px 40px 40px 40px";
-const GOALIE_ROW_GRID = "30px 1fr 40px 32px 58px 60px 40px 40px 40px";
+const SKATER_ROW_GRID = "30px 1fr 32px 58px 40px 40px 40px 40px 40px 40px";
+const CENTER_ROW_GRID = "30px 1fr 32px 58px 40px 40px 40px 40px 40px 40px 40px";
+const GOALIE_ROW_GRID = "30px 1fr 32px 58px 60px 40px 40px 40px 40px";
 
 function DiffCell({ diff }: { diff: number }) {
   const label = diff > 0 ? `+${diff}` : `${diff}`;
@@ -107,7 +107,6 @@ function foPct(wins: number, oppWins: number): string {
 type HeaderColumn = { label: string; key: SortKey };
 
 const SKATER_HEADER_COLUMNS: HeaderColumn[] = [
-  { label: "RIV", key: "rivalry" },
   { label: "GP", key: "games" },
   { label: "TOI", key: "toi" },
   { label: "PTS", key: "points" },
@@ -115,10 +114,10 @@ const SKATER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "HT", key: "hits" },
   { label: "BLK", key: "blocks" },
   { label: "PIM", key: "pim" },
+  { label: "RIV", key: "rivalry" },
 ];
 
 const CENTER_HEADER_COLUMNS: HeaderColumn[] = [
-  { label: "RIV", key: "rivalry" },
   { label: "GP", key: "games" },
   { label: "TOI", key: "toi" },
   { label: "PTS", key: "points" },
@@ -127,16 +126,17 @@ const CENTER_HEADER_COLUMNS: HeaderColumn[] = [
   { label: "BLK", key: "blocks" },
   { label: "PIM", key: "pim" },
   { label: "FO%", key: "foPct" },
+  { label: "RIV", key: "rivalry" },
 ];
 
 const GOALIE_HEADER_COLUMNS: HeaderColumn[] = [
-  { label: "RIV", key: "rivalry" },
   { label: "GP", key: "games" },
   { label: "TOI", key: "toi" },
   { label: "SV%", key: "savePct" },
   { label: "G", key: "goals" },
   { label: "A", key: "assists" },
   { label: "SOG", key: "shots" },
+  { label: "RIV", key: "rivalry" },
 ];
 
 function StatHeader({
@@ -271,7 +271,6 @@ function MatchupRow({
         {hasHistory ? (
           mode === "goalie" ? (
             <>
-              <RivalryScoreCell score={matchup.rivalryScore} />
               <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
               <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
               <GoalieStatValue
@@ -281,10 +280,10 @@ function MatchupRow({
               <GoalieStatValue value={matchup.stats.goals} className={matchup.stats.goals > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.assists} className={matchup.stats.assists > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.individualShots} />
+              <RivalryScoreCell score={matchup.rivalryScore} />
             </>
           ) : (
             <>
-              <RivalryScoreCell score={matchup.rivalryScore} />
               <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
               <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
               <DiffCell diff={matchup.stats.points - matchup.oppStats.points} />
@@ -298,6 +297,7 @@ function MatchupRow({
                   className="text-gray-300"
                 />
               )}
+              <RivalryScoreCell score={matchup.rivalryScore} />
             </>
           )
         ) : (
