@@ -9,12 +9,12 @@ import { HeadToHeadSkeleton } from "./Skeleton";
 export function HeadToHeadComparison({
   playerA,
   playerB,
-  seasonIds,
+  seasonIds = null,
   gameType = "regular",
 }: {
   playerA: PlayerSearchResult;
   playerB: PlayerSearchResult;
-  seasonIds: string[] | null;
+  seasonIds?: string[] | null;
   gameType?: "regular" | "playoffs" | "both";
 }) {
   const [data, setData] = useState<VersusResult | null>(null);
