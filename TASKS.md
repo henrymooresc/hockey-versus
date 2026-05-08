@@ -7,7 +7,7 @@
 - [x] Better loading states (skeletons) across all views
 - [x] Add error boundaries for graceful degradation on component failures
 - [x] Remove head-to-head pages/functionality; replace with a player-search filter inside the All-Time Rivals section
-- [ ] Remove the Team Rivalry Lookup panel; replace with a team filter inside the All-Time Rivals section
+- [x] Remove the Team Rivalry Lookup panel; replace with a team filter inside the All-Time Rivals section
 - [ ] Fix "Show More" buttons so they expand the list inline instead of shrinking the panel into a scroll container
 
 ## Refactor

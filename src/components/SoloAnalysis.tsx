@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { PlayerSearchResult, MatchupPlayer } from "@/types/versus";
 import { UpcomingMatchups } from "./UpcomingMatchups";
-import { TeamRivalryLookup } from "./TeamRivalryLookup";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
 import { RivalsPanelSkeleton } from "./Skeleton";
@@ -33,6 +32,7 @@ export function SoloAnalysis({
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
   const [nameQuery, setNameQuery] = useState("");
+  const [teamFilter, setTeamFilter] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/seasons")
@@ -84,12 +84,29 @@ export function SoloAnalysis({
     r.firstName.toLowerCase().includes(q) ||
     r.lastName.toLowerCase().includes(q) ||
     `${r.firstName} ${r.lastName}`.toLowerCase().includes(q);
+  const matchesTeam = (r: MatchupPlayer) =>
+    teamFilter === "" || r.teamAbbrev === teamFilter;
   const filteredSkaterRivals = allSkaterRivals
     .filter((r) => r.toiSharedSeconds >= minTOI)
-    .filter(matchesName);
+    .filter(matchesName)
+    .filter(matchesTeam);
   const filteredGoalieRivals = (goalieRivals ?? [])
     .filter((r) => r.toiSharedSeconds >= minTOI)
-    .filter(matchesName);
+    .filter(matchesName)
+    .filter(matchesTeam);
+
+  // Build team list from current rivals (only teams with at least one match)
+  const teamOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of [...allSkaterRivals, ...(goalieRivals ?? [])]) {
+      if (r.teamAbbrev && !seen.has(r.teamAbbrev)) {
+        seen.set(r.teamAbbrev, r.teamName ?? r.teamAbbrev);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([abbrev, name]) => ({ abbrev, name }))
+      .sort((a, b) => a.abbrev.localeCompare(b.abbrev));
+  }, [allSkaterRivals, goalieRivals]);
 
   const hasAnyData = !loading && !error && (allSkaterRivals.length > 0 || (goalieRivals?.length ?? 0) > 0);
 
@@ -131,6 +148,19 @@ export function SoloAnalysis({
                     </button>
                   )}
                 </div>
+                <select
+                  value={teamFilter}
+                  onChange={(e) => setTeamFilter(e.target.value)}
+                  className="rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none"
+                  title="Filter by team"
+                >
+                  <option value="">All teams</option>
+                  {teamOptions.map((t) => (
+                    <option key={t.abbrev} value={t.abbrev}>
+                      {t.abbrev} · {t.name}
+                    </option>
+                  ))}
+                </select>
                 <label className="flex items-center gap-1.5 text-xs text-gray-400">
                   <span className="uppercase tracking-wider text-[10px] text-gray-500">Min TOI (sec)</span>
                   <input
@@ -223,17 +253,6 @@ export function SoloAnalysis({
                 playerId={player.id}
               />
             )}
-          </div>
-        </ErrorBoundary>
-
-        {/* Team Rivalry Lookup */}
-        <ErrorBoundary label="Team Rivalry Lookup">
-          <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
-            <h2 className="text-xl font-bold text-amber-400">Team Rivalry Lookup</h2>
-            <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
-              Pick any team to see {player.firstName} {player.lastName}&apos;s shared-ice history vs its current roster
-            </p>
-            <TeamRivalryLookup player={player} />
           </div>
         </ErrorBoundary>
 
