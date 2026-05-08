@@ -32,6 +32,7 @@ export function SoloAnalysis({
   const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("current");
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
+  const [nameQuery, setNameQuery] = useState("");
 
   useEffect(() => {
     fetch("/api/seasons")
@@ -77,8 +78,18 @@ export function SoloAnalysis({
   }, [player.id, seasonIds, gameTypeFilter, seasonFilter, allSeasons.length]);
 
   const allSkaterRivals = skaterRivals ?? [];
-  const filteredSkaterRivals = allSkaterRivals.filter((r) => r.toiSharedSeconds >= minTOI);
-  const filteredGoalieRivals = (goalieRivals ?? []).filter((r) => r.toiSharedSeconds >= minTOI);
+  const q = nameQuery.trim().toLowerCase();
+  const matchesName = (r: MatchupPlayer) =>
+    q === "" ||
+    r.firstName.toLowerCase().includes(q) ||
+    r.lastName.toLowerCase().includes(q) ||
+    `${r.firstName} ${r.lastName}`.toLowerCase().includes(q);
+  const filteredSkaterRivals = allSkaterRivals
+    .filter((r) => r.toiSharedSeconds >= minTOI)
+    .filter(matchesName);
+  const filteredGoalieRivals = (goalieRivals ?? [])
+    .filter((r) => r.toiSharedSeconds >= minTOI)
+    .filter(matchesName);
 
   const hasAnyData = !loading && !error && (allSkaterRivals.length > 0 || (goalieRivals?.length ?? 0) > 0);
 
@@ -102,6 +113,24 @@ export function SoloAnalysis({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={nameQuery}
+                    onChange={(e) => setNameQuery(e.target.value)}
+                    placeholder="Filter by name…"
+                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                  />
+                  {nameQuery && (
+                    <button
+                      onClick={() => setNameQuery("")}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-white"
+                      title="Clear"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
                 <label className="flex items-center gap-1.5 text-xs text-gray-400">
                   <span className="uppercase tracking-wider text-[10px] text-gray-500">Min TOI (sec)</span>
                   <input

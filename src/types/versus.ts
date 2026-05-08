@@ -10,39 +10,6 @@ export interface PlayerInfo {
   sweaterNumber: number | null;
 }
 
-export interface VersusSeasonStats {
-  seasonId: string;
-  sameTeam: boolean;
-  gamesShared: number;
-  toiSharedSeconds: number;
-  winsA: number;
-  winsB: number;
-  playerA: VersusPlayerSeasonStats;
-  playerB: VersusPlayerSeasonStats;
-}
-
-export interface VersusPlayerSeasonStats {
-  teamId: number | null;
-  goalsFor: number;
-  goalsAgainst: number;
-  shotsFor: number;
-  shotsAgainst: number;
-  hits: number;
-  blocks: number;
-  penalties: number;
-  faceoffWins: number;
-  individualGoals: number;
-  individualAssists: number;
-  individualShots: number;
-}
-
-export interface VersusResult {
-  playerA: PlayerInfo;
-  playerB: PlayerInfo;
-  seasons: VersusSeasonStats[];
-  totals: VersusSeasonStats;
-}
-
 export interface PlayerSearchResult {
   id: number;
   firstName: string;
