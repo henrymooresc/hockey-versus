@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { versusStats, players, teams } from "@/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { parseGameTypeFilter } from "@/lib/db-utils";
 import type {
   VersusSeasonStats,
   VersusPlayerSeasonStats,
@@ -69,6 +70,38 @@ function emptyPlayerStats(): VersusPlayerSeasonStats {
   };
 }
 
+function mergeVersusRows(a: VersusRow, b: VersusRow): VersusRow {
+  return {
+    ...a,
+    gamesShared: a.gamesShared + b.gamesShared,
+    toiSharedSeconds: a.toiSharedSeconds + b.toiSharedSeconds,
+    winsA: a.winsA + b.winsA,
+    winsB: a.winsB + b.winsB,
+    goalsForA: a.goalsForA + b.goalsForA,
+    goalsAgainstA: a.goalsAgainstA + b.goalsAgainstA,
+    goalsForB: a.goalsForB + b.goalsForB,
+    goalsAgainstB: a.goalsAgainstB + b.goalsAgainstB,
+    shotsForA: a.shotsForA + b.shotsForA,
+    shotsAgainstA: a.shotsAgainstA + b.shotsAgainstA,
+    shotsForB: a.shotsForB + b.shotsForB,
+    shotsAgainstB: a.shotsAgainstB + b.shotsAgainstB,
+    hitsByA: a.hitsByA + b.hitsByA,
+    hitsByB: a.hitsByB + b.hitsByB,
+    blocksByA: a.blocksByA + b.blocksByA,
+    blocksByB: a.blocksByB + b.blocksByB,
+    penaltiesByA: a.penaltiesByA + b.penaltiesByA,
+    penaltiesByB: a.penaltiesByB + b.penaltiesByB,
+    faceoffWinsA: a.faceoffWinsA + b.faceoffWinsA,
+    faceoffWinsB: a.faceoffWinsB + b.faceoffWinsB,
+    playerAGoals: a.playerAGoals + b.playerAGoals,
+    playerAAssists: a.playerAAssists + b.playerAAssists,
+    playerAShots: a.playerAShots + b.playerAShots,
+    playerBGoals: a.playerBGoals + b.playerBGoals,
+    playerBAssists: a.playerBAssists + b.playerBAssists,
+    playerBShots: a.playerBShots + b.playerBShots,
+  };
+}
+
 function addPlayerStats(
   a: VersusPlayerSeasonStats,
   b: VersusPlayerSeasonStats
@@ -94,6 +127,7 @@ export async function GET(request: NextRequest) {
   let playerAId = parseInt(params.get("playerA") ?? "", 10);
   let playerBId = parseInt(params.get("playerB") ?? "", 10);
   const seasonsParam = params.get("seasons");
+  const gtFilter = parseGameTypeFilter(params.get("gameType"));
 
   if (isNaN(playerAId) || isNaN(playerBId)) {
     return NextResponse.json({ error: "Invalid player IDs" }, { status: 400 });
@@ -122,11 +156,32 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const rows = await db
+  if (gtFilter === "regular") {
+    conditions.push(eq(versusStats.gameType, 2));
+  } else if (gtFilter === "playoffs") {
+    conditions.push(eq(versusStats.gameType, 3));
+  }
+
+  const rawRows = await db
     .select()
     .from(versusStats)
     .where(and(...conditions))
     .orderBy(versusStats.seasonId);
+
+  // When "both" is selected, multiple rows per season may exist (regular + playoffs).
+  // Merge them into a single per-season entry for stable downstream rendering.
+  const bySeason = new Map<string, VersusRow>();
+  for (const r of rawRows) {
+    const existing = bySeason.get(r.seasonId);
+    if (!existing) {
+      bySeason.set(r.seasonId, { ...r });
+    } else {
+      bySeason.set(r.seasonId, mergeVersusRows(existing, r));
+    }
+  }
+  const rows = Array.from(bySeason.values()).sort((a, b) =>
+    a.seasonId.localeCompare(b.seasonId)
+  );
 
   const [playerAInfo, playerBInfo] = await Promise.all([
     getPlayerInfo(playerAId),

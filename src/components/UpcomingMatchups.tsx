@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult, UpcomingGame, MatchupPlayer } from "@/types/versus";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
+import { UpcomingGamesSkeleton, MatchupTableSkeleton } from "./Skeleton";
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T12:00:00");
@@ -58,7 +59,13 @@ function GameSelector({
   );
 }
 
-export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
+export function UpcomingMatchups({
+  player,
+  gameType = "regular",
+}: {
+  player: PlayerSearchResult;
+  gameType?: "regular" | "playoffs" | "both";
+}) {
   const [games, setGames] = useState<UpcomingGame[]>([]);
   const [selectedGame, setSelectedGame] = useState<UpcomingGame | null>(null);
   const [matchups, setMatchups] = useState<MatchupPlayer[]>([]);
@@ -95,7 +102,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
 
     setLoadingMatchups(true);
     setActiveTab("skaters");
-    fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}`)
+    fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}&gameType=${gameType}`)
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch matchups");
@@ -104,15 +111,10 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
       .then((data) => setMatchups(data.matchups))
       .catch((err) => setError(err.message))
       .finally(() => setLoadingMatchups(false));
-  }, [player.id, selectedGame?.opponentTeamId]);
+  }, [player.id, selectedGame?.opponentTeamId, gameType]);
 
   if (loadingGames) {
-    return (
-      <div className="text-center text-gray-500">
-        <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-        <p className="mt-2 text-sm">Loading schedule...</p>
-      </div>
-    );
+    return <UpcomingGamesSkeleton />;
   }
 
   if (error) {
@@ -187,9 +189,8 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
           )}
         </div>
       ) : loadingMatchups ? (
-        <div className="mt-6 text-center text-gray-500">
-          <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-          <p className="mt-2 text-sm">Loading matchup data...</p>
+        <div className="mt-6">
+          <MatchupTableSkeleton rows={6} />
         </div>
       ) : (
         <div className="mt-6 text-center text-sm text-gray-500">

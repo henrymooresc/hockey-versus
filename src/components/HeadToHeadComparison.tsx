@@ -4,15 +4,18 @@ import { useState, useEffect } from "react";
 import type { PlayerSearchResult } from "@/types/versus";
 import type { VersusSeasonStats, PlayerInfo, VersusResult } from "@/types/versus";
 import { VersusTable } from "./VersusTable";
+import { HeadToHeadSkeleton } from "./Skeleton";
 
 export function HeadToHeadComparison({
   playerA,
   playerB,
-  seasonIds,
+  seasonIds = null,
+  gameType = "regular",
 }: {
   playerA: PlayerSearchResult;
   playerB: PlayerSearchResult;
-  seasonIds: string[] | null;
+  seasonIds?: string[] | null;
+  gameType?: "regular" | "playoffs" | "both";
 }) {
   const [data, setData] = useState<VersusResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +27,7 @@ export function HeadToHeadComparison({
     setData(null);
     const params = new URLSearchParams({ playerA: String(playerA.id), playerB: String(playerB.id) });
     if (seasonIds) params.set("seasons", seasonIds.join(","));
+    params.set("gameType", gameType);
     fetch(`/api/versus?${params}`)
       .then(async (r) => {
         const json = await r.json();
@@ -33,15 +37,10 @@ export function HeadToHeadComparison({
       .then((result) => setData(result))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [playerA.id, playerB.id, seasonIds]);
+  }, [playerA.id, playerB.id, seasonIds, gameType]);
 
   if (loading) {
-    return (
-      <div className="mt-8 text-center text-gray-500">
-        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
-        <p className="mt-2 text-sm">Loading head-to-head data...</p>
-      </div>
-    );
+    return <HeadToHeadSkeleton />;
   }
 
   if (error) {

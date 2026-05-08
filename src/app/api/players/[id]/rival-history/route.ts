@@ -60,6 +60,9 @@ export async function GET(
       request.nextUrl.searchParams.get("opponentId") ?? "",
       10
     );
+    const gameTypeRaw = request.nextUrl.searchParams.get("gameType");
+    const gameTypeFilter: "regular" | "playoffs" | "both" =
+      gameTypeRaw === "playoffs" ? "playoffs" : gameTypeRaw === "both" ? "both" : "regular";
 
     if (isNaN(playerId) || isNaN(opponentId)) {
       return NextResponse.json(
@@ -80,6 +83,11 @@ export async function GET(
     const isGoalie = unwrapRows<{ position: string | null }>(playerRows)[0]?.position === "G";
 
     // 1. Find all games across all seasons where both players have shifts on opposing teams
+    const gameTypeWhere =
+      gameTypeFilter === "regular" ? sql`AND g.game_type = 2`
+      : gameTypeFilter === "playoffs" ? sql`AND g.game_type = 3`
+      : sql`AND g.game_type IN (2, 3)`;
+
     const gameRows = await db.execute(sql`
       SELECT DISTINCT g.id AS game_id, g.season_id, g.game_date,
              g.home_team_id, g.away_team_id,
@@ -91,6 +99,7 @@ export async function GET(
         (s1.team_id = g.home_team_id AND s2.team_id = g.away_team_id)
         OR (s1.team_id = g.away_team_id AND s2.team_id = g.home_team_id)
       )
+      ${gameTypeWhere}
       ORDER BY g.game_date ASC
     `);
     const gamesArray = unwrapRows<GameInfo>(gameRows);
@@ -314,8 +323,10 @@ export async function GET(
       const rivalryScore = isGoalie
         ? computeGoalieRivalryScore({
             toiSharedSeconds: totalOverlap,
+            gamesShared: 1,
             skaterShots: pShots,
             skaterGoals: pGoals,
+            skaterAssists: pAssists,
             winsA: winsPlayer,
             winsB: winsOpponent,
           })

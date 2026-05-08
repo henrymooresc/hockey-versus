@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { unwrapRows } from "@/lib/db-utils";
+import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, type AggRow } from "@/lib/matchup-mapper";
 
 /**
@@ -23,6 +23,7 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const seasonsParam = searchParams.get("seasons");
   const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
+  const gtFilter = parseGameTypeFilter(searchParams.get("gameType"));
 
   const rows = await db.execute(sql`
     WITH aggregated AS (
@@ -60,6 +61,7 @@ export async function GET(
         AND same_team = false
         AND toi_shared_seconds > 0
         ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
+        ${gameTypeClause(gtFilter)}
       GROUP BY opponent_id, player_side
     )
     SELECT

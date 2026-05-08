@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
 import { PlayerBioCard } from "./PlayerBioCard";
 import { RivalryTrendChart } from "./RivalryTrendChart";
+import { MatchupRadarChart, type RadarCategory } from "./MatchupRadarChart";
+import { TeamHistoryTimeline } from "./TeamHistoryTimeline";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export type PlayerPosition = string | null;
 
@@ -63,17 +66,6 @@ function LoadingSpinner() {
   );
 }
 
-function RivalryScoreBadge({ score }: { score: number }) {
-  return (
-    <div className="text-center py-1.5">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Rivalry Score </span>
-      <span className={`font-mono text-sm font-bold ${score > 0 ? "text-green-400" : score < 0 ? "text-red-400" : "text-gray-400"}`}>
-        {score.toFixed(2)}
-      </span>
-    </div>
-  );
-}
-
 function useRivalHistory(playerId: number, opponentId: number): RivalGameHistory[] | null {
   const [history, setHistory] = useState<RivalGameHistory[] | null>(null);
   useEffect(() => {
@@ -111,6 +103,20 @@ export function SkaterExpandedDetail({
   const { stats, oppStats } = matchup;
   const history = useRivalHistory(playerId, matchup.playerId);
   const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
+  const oppShort = `${matchup.firstName[0]}. ${matchup.lastName}`;
+
+  const radarCategories: RadarCategory[] = [
+    { key: "goals", label: "Goals", mine: stats.goals, opp: oppStats.goals },
+    { key: "assists", label: "Assists", mine: stats.assists, opp: oppStats.assists },
+    { key: "shots", label: "Shots", mine: stats.individualShots, opp: oppStats.individualShots },
+    { key: "hits", label: "Hits", mine: stats.hits, opp: oppStats.hits },
+    { key: "blocks", label: "Blocks", mine: stats.blocks, opp: oppStats.blocks },
+    { key: "penalties", label: "PIM", mine: stats.penalties, opp: oppStats.penalties, higherIsBetter: false },
+  ];
+  if (showFaceoffs) {
+    radarCategories.push({ key: "fo", label: "FO Wins", mine: stats.faceoffWins, opp: oppStats.faceoffWins });
+  }
+  const hasRadarData = radarCategories.some((c) => c.mine > 0 || c.opp > 0);
 
   return (
     <div className="px-2 pb-3">
@@ -118,34 +124,65 @@ export function SkaterExpandedDetail({
         <PlayerBioCard matchup={matchup} standings={teamStandings} />
       </div>
 
-      <ColumnHeaders playerName={playerName} opponentName={`${matchup.firstName[0]}. ${matchup.lastName}`} />
-      <RivalryScoreBadge score={matchup.rivalryScore} />
+      <div className="pt-2 pb-1 text-center">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+      </div>
 
-      <DetailSectionLabel label="Scoring" />
-      <DetailStatRow label="Goals" mine={stats.goals} opp={oppStats.goals} />
-      <DetailStatRow label="Assists" mine={stats.assists} opp={oppStats.assists} />
-      <DetailStatRow label="Points" mine={stats.points} opp={oppStats.points} />
-      <DetailStatRow label="Shots" mine={stats.individualShots} opp={oppStats.individualShots} />
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        <div>
+          <ColumnHeaders playerName={playerName} opponentName={oppShort} />
+          <DetailSectionLabel label="Scoring" />
+          <DetailStatRow label="Goals" mine={stats.goals} opp={oppStats.goals} />
+          <DetailStatRow label="Assists" mine={stats.assists} opp={oppStats.assists} />
+          <DetailStatRow label="Points" mine={stats.points} opp={oppStats.points} />
+          <DetailStatRow label="Shots" mine={stats.individualShots} opp={oppStats.individualShots} />
 
-      <DetailSectionLabel label="Physical" />
-      <DetailStatRow label="Hits" mine={stats.hits} opp={oppStats.hits} />
-      <DetailStatRow label="Blocks" mine={stats.blocks} opp={oppStats.blocks} />
-      <DetailStatRow label="Penalties" mine={stats.penalties} opp={oppStats.penalties} higherIsBetter={false} />
+          <DetailSectionLabel label="Physical" />
+          <DetailStatRow label="Hits" mine={stats.hits} opp={oppStats.hits} />
+          <DetailStatRow label="Blocks" mine={stats.blocks} opp={oppStats.blocks} />
+          <DetailStatRow label="Penalties" mine={stats.penalties} opp={oppStats.penalties} higherIsBetter={false} />
 
-      {showFaceoffs && (
-        <>
-          <DetailSectionLabel label="Faceoffs" />
-          <DetailStatRow label="FO Wins" mine={stats.faceoffWins} opp={oppStats.faceoffWins} />
-          <DetailStatRow
-            label="FO%"
-            mine={foPct(stats.faceoffWins, oppStats.faceoffWins)}
-            opp={foPct(oppStats.faceoffWins, stats.faceoffWins)}
-          />
-        </>
+          {showFaceoffs && (
+            <>
+              <DetailSectionLabel label="Faceoffs" />
+              <DetailStatRow label="FO Wins" mine={stats.faceoffWins} opp={oppStats.faceoffWins} />
+              <DetailStatRow
+                label="FO%"
+                mine={foPct(stats.faceoffWins, oppStats.faceoffWins)}
+                opp={foPct(oppStats.faceoffWins, stats.faceoffWins)}
+              />
+            </>
+          )}
+        </div>
+
+        {hasRadarData && (
+          <div className="md:sticky md:top-2">
+            <ErrorBoundary fallback={null}>
+              <MatchupRadarChart
+                categories={radarCategories}
+                playerName={playerName}
+                opponentName={oppShort}
+              />
+            </ErrorBoundary>
+          </div>
+        )}
+      </div>
+
+      {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
       )}
-
-      {history && history.length > 0 && <RivalryTrendChart history={history} />}
       {history === null && <LoadingSpinner />}
+
+      <ErrorBoundary fallback={null}>
+        <TeamHistoryTimeline
+          playerId={playerId}
+          opponentId={matchup.playerId}
+          playerLabel={playerName}
+          opponentLabel={oppShort}
+        />
+      </ErrorBoundary>
     </div>
   );
 }
@@ -177,8 +214,10 @@ export function GoalieExpandedDetail({
           <PlayerBioCard matchup={matchup} standings={teamStandings} />
         </div>
 
+        <div className="pt-2 pb-1 text-center">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+        </div>
         <ColumnHeaders playerName={playerName} opponentName={`${matchup.firstName[0]}. ${matchup.lastName}`} />
-        <RivalryScoreBadge score={matchup.rivalryScore} />
 
         <DetailSectionLabel label="Save Performance" />
         <DetailStatRow label="Shots Faced" mine={stats.individualShots} opp={oppStats.individualShots} />
@@ -194,8 +233,21 @@ export function GoalieExpandedDetail({
         <DetailStatRow label="Goals" mine={stats.goalsFor} opp={oppStats.goalsFor} />
         <DetailStatRow label="Shots" mine={stats.shotsFor} opp={oppStats.shotsFor} />
 
-        {history && history.length > 0 && <RivalryTrendChart history={history} />}
+        {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
+      )}
         {history === null && <LoadingSpinner />}
+
+        <ErrorBoundary fallback={null}>
+          <TeamHistoryTimeline
+            playerId={playerId}
+            opponentId={matchup.playerId}
+            playerLabel={playerName}
+            opponentLabel={`${matchup.firstName[0]}. ${matchup.lastName}`}
+          />
+        </ErrorBoundary>
       </div>
     );
   }
@@ -212,7 +264,9 @@ export function GoalieExpandedDetail({
         <PlayerBioCard matchup={matchup} standings={teamStandings} />
       </div>
 
-      <RivalryScoreBadge score={matchup.rivalryScore} />
+      <div className="pt-2 pb-2 text-center">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-gray-700/50 bg-gray-800/40 p-3">
           <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{playerName}</div>
@@ -263,8 +317,21 @@ export function GoalieExpandedDetail({
         </div>
       </div>
 
-      {history && history.length > 0 && <RivalryTrendChart history={history} />}
+      {history && history.length > 0 && (
+        <ErrorBoundary fallback={null}>
+          <RivalryTrendChart history={history} />
+        </ErrorBoundary>
+      )}
       {history === null && <LoadingSpinner />}
+
+      <ErrorBoundary fallback={null}>
+        <TeamHistoryTimeline
+          playerId={playerId}
+          opponentId={matchup.playerId}
+          playerLabel={playerName}
+          opponentLabel={`${matchup.firstName[0]}. ${matchup.lastName}`}
+        />
+      </ErrorBoundary>
     </div>
   );
 }
