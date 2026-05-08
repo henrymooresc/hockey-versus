@@ -339,11 +339,12 @@ export function PositionGroup({
   playerId?: number;
 }) {
   const defaultSort: SortKey = "rivalry";
-  const [showAll, setShowAll] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(defaultVisible);
   const [sortKey, setSortKey] = useState<SortKey>(defaultSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const standings = useStandings();
+  const SHOW_MORE_STEP = 25;
 
   if (matchups.length === 0) return null;
 
@@ -358,8 +359,11 @@ export function PositionGroup({
     return sortDir === "desc" ? diff : -diff;
   });
 
-  const visible = collapsible && !showAll ? sorted.slice(0, defaultVisible) : sorted;
-  const hasMore = collapsible && matchups.length > defaultVisible;
+  const cap = collapsible ? Math.min(visibleCount, sorted.length) : sorted.length;
+  const visible = sorted.slice(0, cap);
+  const hasMore = collapsible && cap < sorted.length;
+  const canCollapse = collapsible && cap > defaultVisible;
+  const remaining = sorted.length - cap;
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -376,7 +380,7 @@ export function PositionGroup({
         {label}
       </h4>
       <StatHeader sortKey={sortKey} sortDir={sortDir} onSort={handleSort} columns={columns} gridTemplate={gridTemplate} />
-      <div className={`flex flex-col gap-3 ${showAll ? "max-h-[600px] overflow-y-auto" : ""}`}>
+      <div className="flex flex-col gap-3">
         {visible.map((m) => (
           <MatchupRow
             key={m.playerId}
@@ -391,16 +395,25 @@ export function PositionGroup({
           />
         ))}
       </div>
-      {hasMore && (
-        <button
-          onClick={() => setShowAll((v) => !v)}
-          style={{ marginTop: 10 }}
-          className="w-full rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
-        >
-          {showAll
-            ? "Show less"
-            : `Show ${matchups.length - defaultVisible} more`}
-        </button>
+      {(hasMore || canCollapse) && (
+        <div className="mt-2.5 flex gap-2">
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount((c) => c + SHOW_MORE_STEP)}
+              className="flex-1 rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Show {Math.min(SHOW_MORE_STEP, remaining)} more
+            </button>
+          )}
+          {canCollapse && (
+            <button
+              onClick={() => setVisibleCount(defaultVisible)}
+              className="rounded-lg border border-gray-700/50 bg-gray-800/40 px-4 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Show less
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
