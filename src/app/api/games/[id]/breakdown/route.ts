@@ -402,7 +402,11 @@ export async function GET(
           careerToi = career.toi_shared_seconds;
           careerAvgToiPerGame = career.toi_shared_seconds / career.games_shared;
 
-          // Career rivalry score (aggregated, treats whole career like one big sample)
+          // Career rivalry score, normalized to a per-game figure so it's
+          // comparable to thisGame's score (which is always a single game).
+          // computeSkaterRivalryScore already averages internally; goalie
+          // scores intentionally accumulate over the career (see
+          // rivalry-score.ts), so divide that one down to per-game here.
           careerAggScore = isGoalieMatchup
             ? computeGoalieRivalryScore({
                 toiSharedSeconds: career.toi_shared_seconds,
@@ -412,7 +416,7 @@ export async function GET(
                 skaterAssists: aIsGoalie ? career.player_b_assists : career.player_a_assists,
                 winsA: career.wins_a,
                 winsB: career.wins_b,
-              })
+              }) / career.games_shared
             : computeSkaterRivalryScore({
                 toiSharedSeconds: career.toi_shared_seconds,
                 gamesShared: career.games_shared,
