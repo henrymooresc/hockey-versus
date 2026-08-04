@@ -39,7 +39,8 @@ yarn-error.log*
 next-env.d.ts
 
 # drizzle
-/drizzle/meta
+# NOTE: drizzle/meta is tracked on purpose. `drizzle-kit migrate` reads
+# meta/_journal.json, so a fresh clone cannot set up the database without it.
 
 # Claude
 /.claude
