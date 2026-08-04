@@ -96,6 +96,41 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   return avgWeightedVolume * multiplier;
 }
 
+export interface PairRivalryInput extends SkaterRivalryInput {
+  positionA: string | null;
+  positionB: string | null;
+}
+
+/**
+ * Picks the right formula for a pair and returns its rivalry score.
+ *
+ * Every caller must use this rather than the two formulas below. A second
+ * dispatch site lets the leaderboard and the rivals list drift apart, which
+ * shows the same pair two different scores.
+ */
+export function computePairRivalryScore(input: PairRivalryInput): number {
+  const aIsGoalie = input.positionA === "G";
+  const bIsGoalie = input.positionB === "G";
+
+  // Two goalies never share the ice, so there is no rivalry to score.
+  if (aIsGoalie && bIsGoalie) return 0;
+
+  if (aIsGoalie || bIsGoalie) {
+    const skaterIsA = bIsGoalie;
+    return computeGoalieRivalryScore({
+      toiSharedSeconds: input.toiSharedSeconds,
+      gamesShared: input.gamesShared,
+      skaterShots: skaterIsA ? input.playerAShots : input.playerBShots,
+      skaterGoals: skaterIsA ? input.playerAGoals : input.playerBGoals,
+      skaterAssists: skaterIsA ? input.playerAAssists : input.playerBAssists,
+      winsA: input.winsA,
+      winsB: input.winsB,
+    });
+  }
+
+  return computeSkaterRivalryScore(input);
+}
+
 // Tunes the magnitude of the goalie score so it sits in roughly the same range
 // as the skater score. Lower = scores stay smaller; raise if goalies look
 // underweighted on the leaderboard.

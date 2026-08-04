@@ -215,7 +215,7 @@ export function Leaderboard() {
     setExpandedKey(null);
     const params = new URLSearchParams({ limit: "50" });
     if (seasonFilter === "current" && allSeasons.length > 0) {
-      params.set("seasons", allSeasons[0].id);
+      params.set("season", allSeasons[0].id);
     } else if (seasonFilter === "current") {
       return;
     }

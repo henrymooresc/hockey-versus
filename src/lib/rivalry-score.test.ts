@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeSkaterRivalryScore,
   computeGoalieRivalryScore,
+  computePairRivalryScore,
   type SkaterRivalryInput,
   type GoalieRivalryInput,
 } from "./rivalry-score";
@@ -171,5 +172,89 @@ describe("computeGoalieRivalryScore", () => {
     });
     // Goalie should be at least within half of skater (was ~1/3 in the old formula)
     expect(goalie).toBeGreaterThan(skater * 0.5);
+  });
+});
+
+describe("computePairRivalryScore", () => {
+  it("uses the skater formula when neither player is a goalie", () => {
+    const score = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: "C",
+      positionB: "D",
+    });
+    expect(score).toBe(computeSkaterRivalryScore(baseSkaterInput));
+  });
+
+  it("treats a null position as a skater", () => {
+    const score = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: null,
+      positionB: null,
+    });
+    expect(score).toBe(computeSkaterRivalryScore(baseSkaterInput));
+  });
+
+  it("returns 0 when both players are goalies", () => {
+    const score = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: "G",
+      positionB: "G",
+    });
+    expect(score).toBe(0);
+  });
+
+  it("scores player B as the shooter when player A is the goalie", () => {
+    const score = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: "G",
+      positionB: "R",
+    });
+    expect(score).toBe(
+      computeGoalieRivalryScore({
+        toiSharedSeconds: baseSkaterInput.toiSharedSeconds,
+        gamesShared: baseSkaterInput.gamesShared,
+        skaterShots: baseSkaterInput.playerBShots,
+        skaterGoals: baseSkaterInput.playerBGoals,
+        skaterAssists: baseSkaterInput.playerBAssists,
+        winsA: baseSkaterInput.winsA,
+        winsB: baseSkaterInput.winsB,
+      })
+    );
+  });
+
+  it("scores player A as the shooter when player B is the goalie", () => {
+    const score = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: "L",
+      positionB: "G",
+    });
+    expect(score).toBe(
+      computeGoalieRivalryScore({
+        toiSharedSeconds: baseSkaterInput.toiSharedSeconds,
+        gamesShared: baseSkaterInput.gamesShared,
+        skaterShots: baseSkaterInput.playerAShots,
+        skaterGoals: baseSkaterInput.playerAGoals,
+        skaterAssists: baseSkaterInput.playerAAssists,
+        winsA: baseSkaterInput.winsA,
+        winsB: baseSkaterInput.winsB,
+      })
+    );
+  });
+
+  it("gives the same score whichever side the goalie sits on", () => {
+    const goalieIsA = computePairRivalryScore({
+      ...baseSkaterInput,
+      positionA: "G",
+      positionB: "C",
+    });
+    const goalieIsB = computePairRivalryScore({
+      ...baseSkaterInput,
+      playerAShots: baseSkaterInput.playerBShots,
+      playerAGoals: baseSkaterInput.playerBGoals,
+      playerAAssists: baseSkaterInput.playerBAssists,
+      positionA: "C",
+      positionB: "G",
+    });
+    expect(goalieIsB).toBeCloseTo(goalieIsA, 10);
   });
 });

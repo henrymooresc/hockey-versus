@@ -1,5 +1,5 @@
 import type { MatchupPlayer, MatchupPlayerStats } from "@/types/versus";
-import { computeSkaterRivalryScore, computeGoalieRivalryScore } from "@/lib/rivalry-score";
+import { computePairRivalryScore } from "@/lib/rivalry-score";
 
 export interface AggRow {
   opponent_id: number;
@@ -72,45 +72,29 @@ export function mapAggRowToMatchup(
   const isA = row.player_side === "A";
   const stats = buildStats(row, isA);
   const oppStats = buildStats(row, !isA);
-  const opponentIsGoalie = row.position === "G";
-  const requesterIsGoalie = requestingPlayerPosition === "G";
-
-  let rivalryScore: number;
-  if (opponentIsGoalie && requesterIsGoalie) {
-    rivalryScore = 0;
-  } else if (opponentIsGoalie || requesterIsGoalie) {
-    const skaterStats = opponentIsGoalie ? stats : oppStats;
-    rivalryScore = computeGoalieRivalryScore({
-      toiSharedSeconds: row.toi_shared_seconds,
-      gamesShared: row.games_shared,
-      skaterShots: skaterStats.individualShots,
-      skaterGoals: skaterStats.goals,
-      skaterAssists: skaterStats.assists,
-      winsA: pick(isA, row.wins_a, row.wins_b),
-      winsB: pick(isA, row.wins_b, row.wins_a),
-    });
-  } else {
-    rivalryScore = computeSkaterRivalryScore({
-      toiSharedSeconds: row.toi_shared_seconds,
-      gamesShared: row.games_shared,
-      hitsByA: stats.hits,
-      hitsByB: oppStats.hits,
-      blocksByA: stats.blocks,
-      blocksByB: oppStats.blocks,
-      penaltiesByA: stats.penalties,
-      penaltiesByB: oppStats.penalties,
-      faceoffWinsA: stats.faceoffWins,
-      faceoffWinsB: oppStats.faceoffWins,
-      playerAGoals: stats.goals,
-      playerAAssists: stats.assists,
-      playerAShots: stats.individualShots,
-      playerBGoals: oppStats.goals,
-      playerBAssists: oppStats.assists,
-      playerBShots: oppStats.individualShots,
-      winsA: pick(isA, row.wins_a, row.wins_b),
-      winsB: pick(isA, row.wins_b, row.wins_a),
-    });
-  }
+  // Side A is the requesting player, side B is the opponent.
+  const rivalryScore = computePairRivalryScore({
+    positionA: requestingPlayerPosition,
+    positionB: row.position,
+    toiSharedSeconds: row.toi_shared_seconds,
+    gamesShared: row.games_shared,
+    hitsByA: stats.hits,
+    hitsByB: oppStats.hits,
+    blocksByA: stats.blocks,
+    blocksByB: oppStats.blocks,
+    penaltiesByA: stats.penalties,
+    penaltiesByB: oppStats.penalties,
+    faceoffWinsA: stats.faceoffWins,
+    faceoffWinsB: oppStats.faceoffWins,
+    playerAGoals: stats.goals,
+    playerAAssists: stats.assists,
+    playerAShots: stats.individualShots,
+    playerBGoals: oppStats.goals,
+    playerBAssists: oppStats.assists,
+    playerBShots: oppStats.individualShots,
+    winsA: pick(isA, row.wins_a, row.wins_b),
+    winsB: pick(isA, row.wins_b, row.wins_a),
+  });
 
   return {
     playerId: row.opponent_id,

@@ -12,6 +12,7 @@ import {
   real,
   uniqueIndex,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const teams = pgTable("teams", {
@@ -198,5 +199,63 @@ export const versusStats = pgTable(
     ),
     index("idx_versus_player_a").on(table.playerAId, table.seasonId, table.gameType),
     index("idx_versus_player_b").on(table.playerBId, table.seasonId, table.gameType),
+  ]
+);
+
+/**
+ * Derived from `shifts` + `games` by `npm run compute:versus`.
+ *
+ * Counting a player's games straight from `shifts` needs a sequential scan of
+ * 10M+ rows, which the player search cannot afford on every keystroke.
+ */
+export const playerSeasonTotals = pgTable(
+  "player_season_totals",
+  {
+    playerId: integer("player_id")
+      .references(() => players.id)
+      .notNull(),
+    seasonId: varchar("season_id", { length: 8 })
+      .references(() => seasons.id)
+      .notNull(),
+    /** NHL game_type: 2 = regular season, 3 = playoffs */
+    gameType: smallint("game_type").notNull(),
+    gamesPlayed: smallint("games_played").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.playerId, table.seasonId, table.gameType] }),
+    index("idx_pst_season").on(table.seasonId, table.gameType),
+  ]
+);
+
+/**
+ * Derived from `versus_stats` by `npm run compute:versus`.
+ *
+ * Ranking on demand means summing 2.6M rows and scoring 260k+ pairs per
+ * request. The scores come from `computePairRivalryScore`, so this table and
+ * the rivals list always agree.
+ *
+ * Only player IDs live here. Names, teams and headshots join at read time, so
+ * a trade shows up immediately without a rebuild.
+ */
+export const leaderboardEntries = pgTable(
+  "leaderboard_entries",
+  {
+    /** A season id, or "ALL" for every season combined. */
+    seasonScope: varchar("season_scope", { length: 8 }).notNull(),
+    /** "regular", "playoffs" or "both". */
+    gameTypeScope: varchar("game_type_scope", { length: 8 }).notNull(),
+    rank: smallint("rank").notNull(),
+    playerAId: integer("player_a_id")
+      .references(() => players.id)
+      .notNull(),
+    playerBId: integer("player_b_id")
+      .references(() => players.id)
+      .notNull(),
+    rivalryScore: real("rivalry_score").notNull(),
+    gamesShared: integer("games_shared").notNull(),
+    toiSharedSeconds: integer("toi_shared_seconds").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.seasonScope, table.gameTypeScope, table.rank] }),
   ]
 );
