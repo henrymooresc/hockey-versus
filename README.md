@@ -26,8 +26,18 @@ npm run ingest:seasons   # games & teams
 npm run ingest:players   # player info
 npm run ingest:shifts    # shift chart data
 npm run ingest:events    # play-by-play events
-npm run compute:versus   # head-to-head stats
+npm run compute:versus   # head-to-head stats + derived tables
 ```
+
+`compute:versus` also rebuilds the two tables that the site reads directly:
+
+- `player_season_totals` — games played per player, per season. The player
+  search reads it instead of scanning 10M shift rows.
+- `leaderboard_entries` — the ranked leaderboard for each season scope and
+  game type.
+
+Run `compute:versus` after every ingestion. The site serves stale rankings
+until you do.
 
 ## Development
 
