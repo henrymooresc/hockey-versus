@@ -77,8 +77,9 @@ export async function GET(request: NextRequest) {
       parseInt(request.nextUrl.searchParams.get("limit") ?? "50", 10) || 50,
       200
     );
-    // Pull a wider candidate pool, then re-rank by computed rivalry score.
-    const candidatePool = Math.max(limit * 6, 300);
+    // Score every pair above the noise floor, then rank by rivalry score.
+    // (Pre-filtering by TOI rank is wrong: the score is per-game, so
+    // high-intensity, low-TOI pairs can outscore high-TOI ones.)
     const minToi = 1800; // 30 minutes shared ice — filters noise
 
     const rows = await db.execute(sql`
@@ -111,8 +112,6 @@ export async function GET(request: NextRequest) {
           ${gameTypeClause(gtFilter)}
         GROUP BY player_a_id, player_b_id
         HAVING SUM(toi_shared_seconds) >= ${minToi}
-        ORDER BY SUM(toi_shared_seconds) DESC
-        LIMIT ${candidatePool}
       )
       SELECT
         a.*,

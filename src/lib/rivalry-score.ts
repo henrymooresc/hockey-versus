@@ -96,19 +96,25 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   return avgWeightedVolume * multiplier;
 }
 
+// Tunes the magnitude of the goalie score so it sits in roughly the same range
+// as the skater score. Lower = scores stay smaller; raise if goalies look
+// underweighted on the leaderboard.
+const GOALIE_VOLUME_SCALE = 1 / 6;
+
 export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
   if (input.toiSharedSeconds === 0) return 0;
   if (input.gamesShared === 0) return 0;
   if (input.skaterShots === 0) return 0;
 
-  // Weighted volume of meaningful interactions, mirrored on the skater formula:
-  // every shot is a contest, every goal/assist while sharing ice is a beat
-  // against this goalie.
+  // Weighted volume of meaningful interactions: every shot is a contest, every
+  // goal/assist while sharing ice is a beat against this goalie. Unlike the
+  // skater formula (which is per-game so intensity isn't drowned out by long
+  // careers), goalie rivalries accumulate — a long history of shots faced is
+  // exactly what makes a goalie/shooter rivalry meaningful. So we use totals.
   const weightedVolume =
     GOALIE_CATEGORY_WEIGHTS.shots * input.skaterShots +
     GOALIE_CATEGORY_WEIGHTS.goals * input.skaterGoals +
     GOALIE_CATEGORY_WEIGHTS.assists * input.skaterAssists;
-  const avgWeightedVolume = weightedVolume / input.gamesShared;
 
   // Balance: goals scored vs saves made (with a floor so a dominant goalie
   // still gets credit for facing a high-volume shooter), plus team result.
@@ -119,5 +125,5 @@ export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
   ]);
   const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return avgWeightedVolume * multiplier;
+  return weightedVolume * GOALIE_VOLUME_SCALE * multiplier;
 }

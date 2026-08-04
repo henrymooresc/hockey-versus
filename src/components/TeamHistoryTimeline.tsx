@@ -95,8 +95,7 @@ export function TeamHistoryTimeline({
   const requesterTeams = aIsRequester ? data.playerA.teams : data.playerB.teams;
   const opponentTeams = aIsRequester ? data.playerB.teams : data.playerA.teams;
 
-  // Only render when at least one player spans multiple teams during this rivalry.
-  if (requesterTeams.length <= 1 && opponentTeams.length <= 1) return null;
+  if (requesterTeams.length === 0 && opponentTeams.length === 0) return null;
 
   return (
     <div className="mt-3 rounded-lg border border-gray-700/40 bg-gray-900/40 px-3 py-2">

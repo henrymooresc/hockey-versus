@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import type { LeaderboardEntry } from "@/app/api/leaderboard/route";
+import type { MatchupPlayer } from "@/types/versus";
 import { Skeleton } from "./Skeleton";
+import { SkaterExpandedDetail, GoalieExpandedDetail } from "./ExpandedDetail";
+import { useStandings } from "@/hooks/useStandings";
 
 interface SeasonMeta { id: string; startDate: string | null; endDate: string | null; }
 
@@ -41,20 +44,133 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
   );
 }
 
-function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
+function LeaderboardRow({
+  entry,
+  rank,
+  expanded,
+  onToggle,
+  seasonsParam,
+  gameTypeParam,
+}: {
+  entry: LeaderboardEntry;
+  rank: number;
+  expanded: boolean;
+  onToggle: () => void;
+  seasonsParam: string | null;
+  gameTypeParam: string;
+}) {
+  const teamColorsA = getTeamColors(entry.playerA.teamAbbrev);
   return (
     <div
-      className="grid items-center gap-3 rounded-lg border border-gray-700/40 bg-gray-800/40 hover:bg-gray-800 transition-colors"
-      style={{ gridTemplateColumns: "36px 1fr 80px 1fr 70px 60px 80px", padding: "10px 14px" }}
+      className={`rounded-lg border transition-colors ${
+        expanded ? "bg-gray-800/80" : "border-gray-700/40 bg-gray-800/40 hover:bg-gray-800"
+      }`}
+      style={expanded ? { borderColor: teamColorsA.primary + "60" } : undefined}
     >
-      <div className="text-center font-mono text-sm font-bold text-gray-500">{rank}</div>
-      <PlayerSide player={entry.playerA} align="right" />
-      <div className="text-center text-[10px] uppercase tracking-widest text-gray-600">vs</div>
-      <PlayerSide player={entry.playerB} align="left" />
-      <div className="text-right font-mono text-sm font-bold text-amber-400">{entry.rivalryScore.toFixed(2)}</div>
-      <div className="text-right font-mono text-xs text-gray-400">{entry.gamesShared}</div>
-      <div className="text-right font-mono text-xs text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
+      <div
+        className="grid items-center gap-3 cursor-pointer"
+        style={{ gridTemplateColumns: "36px 1fr 80px 1fr 70px 60px 80px", padding: "10px 14px" }}
+        onClick={onToggle}
+      >
+        <div className="text-center font-mono text-sm font-bold text-gray-500">{rank}</div>
+        <PlayerSide player={entry.playerA} align="right" />
+        <div className="text-center text-[10px] uppercase tracking-widest text-gray-600">vs</div>
+        <PlayerSide player={entry.playerB} align="left" />
+        <div className="text-right font-mono text-sm font-bold text-amber-400">{entry.rivalryScore.toFixed(2)}</div>
+        <div className="text-right font-mono text-xs text-gray-400">{entry.gamesShared}</div>
+        <div className="text-right font-mono text-xs text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
+      </div>
+      {expanded && (
+        <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
+          <ExpandedPair entry={entry} seasonsParam={seasonsParam} gameTypeParam={gameTypeParam} />
+        </div>
+      )}
     </div>
+  );
+}
+
+function ExpandedPair({
+  entry,
+  seasonsParam,
+  gameTypeParam,
+}: {
+  entry: LeaderboardEntry;
+  seasonsParam: string | null;
+  gameTypeParam: string;
+}) {
+  const [matchup, setMatchup] = useState<MatchupPlayer | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const standings = useStandings();
+
+  // Pick the skater as the "requesting" player when paired with a goalie,
+  // so the expanded view renders as skater-vs-goalie. Otherwise use playerA.
+  const aIsGoalie = entry.playerA.position === "G";
+  const bIsGoalie = entry.playerB.position === "G";
+  const requesting = !aIsGoalie && bIsGoalie ? entry.playerA
+    : aIsGoalie && !bIsGoalie ? entry.playerB
+    : entry.playerA;
+  const opponent = requesting.id === entry.playerA.id ? entry.playerB : entry.playerA;
+
+  useEffect(() => {
+    setMatchup(null);
+    setError(null);
+    const params = new URLSearchParams({
+      opponentId: String(opponent.id),
+      gameType: gameTypeParam,
+    });
+    if (seasonsParam) params.set("seasons", seasonsParam);
+    fetch(`/api/players/${requesting.id}/rivals?${params}`)
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Failed to load matchup");
+        return data;
+      })
+      .then((data) => {
+        const all: MatchupPlayer[] = [...(data.skaterRivals ?? []), ...(data.goalieRivals ?? [])];
+        const found = all.find((m) => m.playerId === opponent.id) ?? null;
+        if (!found) {
+          setError("No matchup data");
+          return;
+        }
+        setMatchup(found);
+      })
+      .catch((err) => setError(err.message));
+  }, [requesting.id, opponent.id, seasonsParam, gameTypeParam]);
+
+  if (error) {
+    return <div className="px-4 py-3 text-center text-sm text-red-400">{error}</div>;
+  }
+  if (!matchup) {
+    return (
+      <div className="px-4 py-4 text-center">
+        <div className="inline-block h-3 w-3 animate-spin rounded-full border border-gray-600 border-t-blue-400" />
+      </div>
+    );
+  }
+
+  const requestingName = `${requesting.firstName} ${requesting.lastName}`;
+  const opponentIsGoalie = opponent.position === "G";
+  const requestingIsGoalie = requesting.position === "G";
+
+  if (opponentIsGoalie || requestingIsGoalie) {
+    return (
+      <GoalieExpandedDetail
+        matchup={matchup}
+        playerPosition={requesting.position}
+        playerName={requestingName}
+        playerId={requesting.id}
+        standings={standings}
+      />
+    );
+  }
+  return (
+    <SkaterExpandedDetail
+      matchup={matchup}
+      showFaceoffs={requesting.position === "C"}
+      playerName={requestingName}
+      playerId={requesting.id}
+      standings={standings}
+    />
   );
 }
 
@@ -84,14 +200,19 @@ export function Leaderboard() {
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/seasons").then((r) => r.json()).then((d) => setAllSeasons(d.seasons ?? [])).catch(() => {});
   }, []);
 
+  const seasonsParam =
+    seasonFilter === "current" && allSeasons.length > 0 ? allSeasons[0].id : null;
+
   useEffect(() => {
     setEntries(null);
     setError(null);
+    setExpandedKey(null);
     const params = new URLSearchParams({ limit: "50" });
     if (seasonFilter === "current" && allSeasons.length > 0) {
       params.set("seasons", allSeasons[0].id);
@@ -166,13 +287,20 @@ export function Leaderboard() {
         <>
           <HeaderRow />
           <div className="flex flex-col gap-2">
-            {entries.map((entry, i) => (
-              <LeaderboardRow
-                key={`${entry.playerA.id}-${entry.playerB.id}`}
-                entry={entry}
-                rank={i + 1}
-              />
-            ))}
+            {entries.map((entry, i) => {
+              const key = `${entry.playerA.id}-${entry.playerB.id}`;
+              return (
+                <LeaderboardRow
+                  key={key}
+                  entry={entry}
+                  rank={i + 1}
+                  expanded={expandedKey === key}
+                  onToggle={() => setExpandedKey(expandedKey === key ? null : key)}
+                  seasonsParam={seasonsParam}
+                  gameTypeParam={gameTypeFilter}
+                />
+              );
+            })}
           </div>
         </>
       )}

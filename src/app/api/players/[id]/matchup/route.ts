@@ -34,6 +34,12 @@ export async function GET(
       );
     }
 
+    const playerRows = await db.execute(sql`
+      SELECT position FROM players WHERE id = ${playerId}
+    `);
+    const requestingPosition =
+      unwrapRows<{ position: string | null }>(playerRows)[0]?.position ?? null;
+
     const rows = await db.execute(sql`
       WITH aggregated AS (
         SELECT
@@ -90,7 +96,9 @@ export async function GET(
       ORDER BY a.toi_shared_seconds DESC
     `);
 
-    const matchups = unwrapRows<AggRow>(rows).map(mapAggRowToMatchup);
+    const matchups = unwrapRows<AggRow>(rows).map((row) =>
+      mapAggRowToMatchup(row, requestingPosition)
+    );
 
     // Also return opponent roster players with no versus data
     const matchupPlayerIds = new Set(matchups.map((m) => m.playerId));

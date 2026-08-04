@@ -24,6 +24,17 @@ export async function GET(
   const seasonsParam = searchParams.get("seasons");
   const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
   const gtFilter = parseGameTypeFilter(searchParams.get("gameType"));
+  const opponentIdParam = searchParams.get("opponentId");
+  const opponentId = opponentIdParam ? parseInt(opponentIdParam, 10) : null;
+  if (opponentIdParam && (opponentId === null || isNaN(opponentId))) {
+    return NextResponse.json({ error: "Invalid opponentId" }, { status: 400 });
+  }
+
+  const playerRows = await db.execute(sql`
+    SELECT position FROM players WHERE id = ${playerId}
+  `);
+  const requestingPosition =
+    unwrapRows<{ position: string | null }>(playerRows)[0]?.position ?? null;
 
   const rows = await db.execute(sql`
     WITH aggregated AS (
@@ -60,6 +71,7 @@ export async function GET(
       WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
         AND same_team = false
         AND toi_shared_seconds > 0
+        ${opponentId !== null ? sql`AND (player_a_id = ${opponentId} OR player_b_id = ${opponentId})` : sql``}
         ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
         ${gameTypeClause(gtFilter)}
       GROUP BY opponent_id, player_side
@@ -81,7 +93,9 @@ export async function GET(
     ORDER BY a.toi_shared_seconds DESC
   `);
 
-  const opponents = unwrapRows<AggRow>(rows).map(mapAggRowToMatchup);
+  const opponents = unwrapRows<AggRow>(rows).map((row) =>
+    mapAggRowToMatchup(row, requestingPosition)
+  );
 
   const skaterRivals = opponents.filter((o) => o.position !== "G");
   const goalieRivals = opponents.filter((o) => o.position === "G");
