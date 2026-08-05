@@ -64,9 +64,16 @@ const GOALIE_CATEGORY_WEIGHTS = {
   shots: 1,
 };
 
-export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
-  if (input.toiSharedSeconds === 0) return 0;
-  if (input.gamesShared === 0) return 0;
+/**
+ * Splits the skater score into its two parts, so the raw and the regressed
+ * forms below can share one definition of volume and balance.
+ * Returns null when the pair never shared the ice.
+ */
+function skaterVolumeAndBalance(
+  input: SkaterRivalryInput
+): { weightedVolume: number; multiplier: number } | null {
+  if (input.toiSharedSeconds === 0) return null;
+  if (input.gamesShared === 0) return null;
 
   const ptsA = input.playerAGoals + input.playerAAssists;
   const ptsB = input.playerBGoals + input.playerBAssists;
@@ -78,8 +85,6 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
     CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
     CATEGORY_WEIGHTS.faceoffs * (input.faceoffWinsA + input.faceoffWinsB) +
     CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
-
-  const avgWeightedVolume = weightedVolume / input.gamesShared;
 
   const categories: [number, number][] = [
     [ptsA, ptsB],
@@ -93,7 +98,77 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
   const balance = computeBalance(categories);
   const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return avgWeightedVolume * multiplier;
+  return { weightedVolume, multiplier };
+}
+
+/**
+ * Raw per-game intensity, with no correction for sample size.
+ *
+ * Use this only to describe a known set of games, such as one game in the
+ * post-game breakdown or a point on the rivalry trend chart. To rank pairs
+ * against each other, call `computePairRivalryScore` instead.
+ */
+export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
+  const parts = skaterVolumeAndBalance(input);
+  if (!parts) return 0;
+  return (parts.weightedVolume / input.gamesShared) * parts.multiplier;
+}
+
+/**
+ * League mean weighted volume per game for skater pairs, measured over all 10
+ * seasons of regular-season data above the 1800-second noise floor. The pooled
+ * mean was 5.663 and the unweighted mean 5.640.
+ *
+ * Re-derive this after a large data change. Sum the weighted categories per
+ * pair, divide the total by total shared games.
+ */
+const PRIOR_VOLUME_PER_GAME = 5.65;
+
+/**
+ * The same figure for goalie pairs, measured the same way. The pooled mean was
+ * 5.472 and the unweighted mean 5.345.
+ *
+ * That it lands so close to the skater figure is the point: both formulas
+ * describe interactions per game, so their scores belong on one scale.
+ */
+const GOALIE_PRIOR_VOLUME_PER_GAME = 5.47;
+
+/**
+ * Games of league-average play credited to every pair before its own record
+ * carries more weight than the prior. Roughly three seasons of head-to-head
+ * meetings. A pair below this count is a small sample.
+ *
+ * One figure covers both formulas, because the NHL schedule decides how often
+ * any two players meet, whatever their positions.
+ */
+export const PRIOR_GAMES = 10;
+
+/**
+ * True when the prior still outweighs the pair's own record.
+ * The UI marks these rows so a short history is visible in the ranking.
+ */
+export function isSmallSample(gamesShared: number): boolean {
+  return gamesShared < PRIOR_GAMES;
+}
+
+/**
+ * Per-game intensity pulled toward the league mean, by an amount that falls as
+ * shared games rise.
+ *
+ * Pairs with one or two shared games score about twice the league mean, which
+ * is noise rather than intensity. Without this correction a two-game sample
+ * outranks a decade-long rivalry. Genuinely intense short histories still rank
+ * highly; they just need more than a couple of games to prove it.
+ */
+function computeRegressedSkaterScore(input: SkaterRivalryInput): number {
+  const parts = skaterVolumeAndBalance(input);
+  if (!parts) return 0;
+
+  const regressedAverage =
+    (parts.weightedVolume + PRIOR_GAMES * PRIOR_VOLUME_PER_GAME) /
+    (input.gamesShared + PRIOR_GAMES);
+
+  return regressedAverage * parts.multiplier;
 }
 
 export interface PairRivalryInput extends SkaterRivalryInput {
@@ -102,11 +177,14 @@ export interface PairRivalryInput extends SkaterRivalryInput {
 }
 
 /**
- * Picks the right formula for a pair and returns its rivalry score.
+ * Picks the right formula for a pair and returns its ranking score.
  *
- * Every caller must use this rather than the two formulas below. A second
+ * Every ranking caller must use this rather than the formulas below. A second
  * dispatch site lets the leaderboard and the rivals list drift apart, which
  * shows the same pair two different scores.
+ *
+ * Both formulas regress toward their league mean, so a short history cannot
+ * outrank a long one on noise alone.
  */
 export function computePairRivalryScore(input: PairRivalryInput): number {
   const aIsGoalie = input.positionA === "G";
@@ -117,7 +195,7 @@ export function computePairRivalryScore(input: PairRivalryInput): number {
 
   if (aIsGoalie || bIsGoalie) {
     const skaterIsA = bIsGoalie;
-    return computeGoalieRivalryScore({
+    return computeRegressedGoalieScore({
       toiSharedSeconds: input.toiSharedSeconds,
       gamesShared: input.gamesShared,
       skaterShots: skaterIsA ? input.playerAShots : input.playerBShots,
@@ -128,24 +206,22 @@ export function computePairRivalryScore(input: PairRivalryInput): number {
     });
   }
 
-  return computeSkaterRivalryScore(input);
+  return computeRegressedSkaterScore(input);
 }
 
-// Tunes the magnitude of the goalie score so it sits in roughly the same range
-// as the skater score. Lower = scores stay smaller; raise if goalies look
-// underweighted on the leaderboard.
-const GOALIE_VOLUME_SCALE = 1 / 6;
-
-export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
-  if (input.toiSharedSeconds === 0) return 0;
-  if (input.gamesShared === 0) return 0;
-  if (input.skaterShots === 0) return 0;
+/**
+ * Splits the goalie score into its two parts, mirroring the skater helper.
+ * Returns null when there is no contest to measure.
+ */
+function goalieVolumeAndBalance(
+  input: GoalieRivalryInput
+): { weightedVolume: number; multiplier: number } | null {
+  if (input.toiSharedSeconds === 0) return null;
+  if (input.gamesShared === 0) return null;
+  if (input.skaterShots === 0) return null;
 
   // Weighted volume of meaningful interactions: every shot is a contest, every
-  // goal/assist while sharing ice is a beat against this goalie. Unlike the
-  // skater formula (which is per-game so intensity isn't drowned out by long
-  // careers), goalie rivalries accumulate — a long history of shots faced is
-  // exactly what makes a goalie/shooter rivalry meaningful. So we use totals.
+  // goal or assist while sharing ice is a beat against this goalie.
   const weightedVolume =
     GOALIE_CATEGORY_WEIGHTS.shots * input.skaterShots +
     GOALIE_CATEGORY_WEIGHTS.goals * input.skaterGoals +
@@ -160,5 +236,37 @@ export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
   ]);
   const multiplier = BALANCE_FLOOR + (1 - BALANCE_FLOOR) * balance;
 
-  return weightedVolume * GOALIE_VOLUME_SCALE * multiplier;
+  return { weightedVolume, multiplier };
+}
+
+/**
+ * Raw per-game intensity for a shooter against a goalie, with no correction
+ * for sample size. The skater counterpart is `computeSkaterRivalryScore`, and
+ * the same rule applies: use this to describe a known set of games, and use
+ * `computePairRivalryScore` to rank pairs against each other.
+ */
+export function computeGoalieRivalryScore(input: GoalieRivalryInput): number {
+  const parts = goalieVolumeAndBalance(input);
+  if (!parts) return 0;
+  return (parts.weightedVolume / input.gamesShared) * parts.multiplier;
+}
+
+/**
+ * The goalie counterpart to `computeRegressedSkaterScore`.
+ *
+ * Goalie means hold steady across sample sizes, because shots are frequent and
+ * predictable. The tail does not: pairs with one to three shared games reach
+ * almost double the per-game maximum of long histories, and a leaderboard shows
+ * exactly that tail. Regression handles it without letting scores grow forever
+ * with career length.
+ */
+function computeRegressedGoalieScore(input: GoalieRivalryInput): number {
+  const parts = goalieVolumeAndBalance(input);
+  if (!parts) return 0;
+
+  const regressedAverage =
+    (parts.weightedVolume + PRIOR_GAMES * GOALIE_PRIOR_VOLUME_PER_GAME) /
+    (input.gamesShared + PRIOR_GAMES);
+
+  return regressedAverage * parts.multiplier;
 }
