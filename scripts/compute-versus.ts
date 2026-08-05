@@ -58,6 +58,17 @@ const LEADERBOARD_SIZE = 200;
 /** Shared ice time below this is noise, not a rivalry. */
 const LEADERBOARD_MIN_TOI = 1800;
 const GAME_TYPE_SCOPES = ["regular", "playoffs", "both"] as const;
+const PAIR_KINDS = ["skater", "goalie"] as const;
+type PairKind = (typeof PAIR_KINDS)[number];
+
+/** Shape of one scored pair, before it gets a rank. */
+const scoredTemplate: {
+  playerAId: number;
+  playerBId: number;
+  rivalryScore: number;
+  gamesShared: number;
+  toiSharedSeconds: number;
+}[] = [];
 
 interface LeaderboardPairRow extends SkaterRivalryInput {
   player_a_id: number;
@@ -132,8 +143,21 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
         HAVING SUM(v.toi_shared_seconds) >= ${LEADERBOARD_MIN_TOI}
       `);
 
-      const scored = unwrapRows<LeaderboardPairRow>(pairRows)
-        .map((row) => ({
+      // Skater and goalie pairs rank separately. The goalie formula measures a
+      // different contest and does not share a scale with the skater one, so a
+      // combined board buries whichever side scores lower.
+      const byKind: Record<PairKind, typeof scoredTemplate> = {
+        skater: [],
+        goalie: [],
+      };
+
+      for (const row of unwrapRows<LeaderboardPairRow>(pairRows)) {
+        const aIsGoalie = row.position_a === "G";
+        const bIsGoalie = row.position_b === "G";
+        // Two goalies never share the ice, so there is no contest to rank.
+        if (aIsGoalie && bIsGoalie) continue;
+
+        byKind[aIsGoalie || bIsGoalie ? "goalie" : "skater"].push({
           playerAId: row.player_a_id,
           playerBId: row.player_b_id,
           rivalryScore: computePairRivalryScore({
@@ -143,13 +167,17 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
           }),
           gamesShared: row.gamesShared,
           toiSharedSeconds: row.toiSharedSeconds,
-        }))
-        .sort((a, b) => b.rivalryScore - a.rivalryScore)
-        .slice(0, LEADERBOARD_SIZE);
+        });
+      }
 
-      scored.forEach((entry, i) => {
-        rows.push({ seasonScope, gameTypeScope, rank: i + 1, ...entry });
-      });
+      for (const pairKind of PAIR_KINDS) {
+        byKind[pairKind]
+          .sort((a, b) => b.rivalryScore - a.rivalryScore)
+          .slice(0, LEADERBOARD_SIZE)
+          .forEach((entry, i) => {
+            rows.push({ seasonScope, gameTypeScope, pairKind, rank: i + 1, ...entry });
+          });
+      }
     }
   }
 
@@ -163,7 +191,7 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
 
   console.log(
     `Done! ${rows.length} rows across ${seasonScopes.length} season scopes ` +
-      `in ${((Date.now() - started) / 1000).toFixed(1)}s.`
+      `and ${PAIR_KINDS.length} pair kinds in ${((Date.now() - started) / 1000).toFixed(1)}s.`
   );
 }
 

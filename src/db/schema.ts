@@ -234,6 +234,10 @@ export const playerSeasonTotals = pgTable(
  * request. The scores come from `computePairRivalryScore`, so this table and
  * the rivals list always agree.
  *
+ * Skater and goalie pairs rank on separate boards. The two formulas measure
+ * different contests and do not share a scale, so one combined board buries
+ * whichever side scores lower.
+ *
  * Only player IDs live here. Names, teams and headshots join at read time, so
  * a trade shows up immediately without a rebuild.
  */
@@ -244,6 +248,8 @@ export const leaderboardEntries = pgTable(
     seasonScope: varchar("season_scope", { length: 8 }).notNull(),
     /** "regular", "playoffs" or "both". */
     gameTypeScope: varchar("game_type_scope", { length: 8 }).notNull(),
+    /** "skater" for skater against skater, "goalie" for shooter against goalie. */
+    pairKind: varchar("pair_kind", { length: 8 }).notNull(),
     rank: smallint("rank").notNull(),
     playerAId: integer("player_a_id")
       .references(() => players.id)
@@ -256,6 +262,8 @@ export const leaderboardEntries = pgTable(
     toiSharedSeconds: integer("toi_shared_seconds").notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.seasonScope, table.gameTypeScope, table.rank] }),
+    primaryKey({
+      columns: [table.seasonScope, table.gameTypeScope, table.pairKind, table.rank],
+    }),
   ]
 );
