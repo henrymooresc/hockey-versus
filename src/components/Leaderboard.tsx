@@ -7,6 +7,7 @@ import type { LeaderboardEntry } from "@/app/api/leaderboard/route";
 import type { MatchupPlayer } from "@/types/versus";
 import { Skeleton } from "./Skeleton";
 import { SkaterExpandedDetail, GoalieExpandedDetail } from "./ExpandedDetail";
+import { SmallSampleMark } from "./SmallSampleMark";
 import { useStandings } from "@/hooks/useStandings";
 
 interface SeasonMeta { id: string; startDate: string | null; endDate: string | null; }
@@ -44,6 +45,22 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
   );
 }
 
+/**
+ * Left-to-right display order for a pair.
+ *
+ * With a goalie in the pair the skater goes first, because the expanded card
+ * reads as shooter against goalie. The row header and the card must call this
+ * same helper, or the card shows each player's stats under the other name.
+ */
+function orderPair(entry: LeaderboardEntry) {
+  const aIsGoalie = entry.playerA.position === "G";
+  const bIsGoalie = entry.playerB.position === "G";
+  if (aIsGoalie && !bIsGoalie) {
+    return { left: entry.playerB, right: entry.playerA };
+  }
+  return { left: entry.playerA, right: entry.playerB };
+}
+
 function LeaderboardRow({
   entry,
   rank,
@@ -59,7 +76,8 @@ function LeaderboardRow({
   seasonsParam: string | null;
   gameTypeParam: string;
 }) {
-  const teamColorsA = getTeamColors(entry.playerA.teamAbbrev);
+  const { left, right } = orderPair(entry);
+  const teamColorsA = getTeamColors(left.teamAbbrev);
   return (
     <div
       className={`rounded-lg border transition-colors ${
@@ -73,10 +91,13 @@ function LeaderboardRow({
         onClick={onToggle}
       >
         <div className="text-center font-mono text-sm font-bold text-gray-500">{rank}</div>
-        <PlayerSide player={entry.playerA} align="right" />
+        <PlayerSide player={left} align="right" />
         <div className="text-center text-[10px] uppercase tracking-widest text-gray-600">vs</div>
-        <PlayerSide player={entry.playerB} align="left" />
-        <div className="text-right font-mono text-sm font-bold text-amber-400">{entry.rivalryScore.toFixed(2)}</div>
+        <PlayerSide player={right} align="left" />
+        <div className="text-right font-mono text-sm font-bold text-amber-400">
+          {entry.rivalryScore.toFixed(2)}
+          <SmallSampleMark gamesShared={entry.gamesShared} />
+        </div>
         <div className="text-right font-mono text-xs text-gray-400">{entry.gamesShared}</div>
         <div className="text-right font-mono text-xs text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
       </div>
@@ -102,14 +123,8 @@ function ExpandedPair({
   const [error, setError] = useState<string | null>(null);
   const standings = useStandings();
 
-  // Pick the skater as the "requesting" player when paired with a goalie,
-  // so the expanded view renders as skater-vs-goalie. Otherwise use playerA.
-  const aIsGoalie = entry.playerA.position === "G";
-  const bIsGoalie = entry.playerB.position === "G";
-  const requesting = !aIsGoalie && bIsGoalie ? entry.playerA
-    : aIsGoalie && !bIsGoalie ? entry.playerB
-    : entry.playerA;
-  const opponent = requesting.id === entry.playerA.id ? entry.playerB : entry.playerA;
+  // Same order the row header shows, so a player's stats stay under their name.
+  const { left: requesting, right: opponent } = orderPair(entry);
 
   useEffect(() => {
     setMatchup(null);
@@ -148,7 +163,6 @@ function ExpandedPair({
     );
   }
 
-  const requestingName = `${requesting.firstName} ${requesting.lastName}`;
   const opponentIsGoalie = opponent.position === "G";
   const requestingIsGoalie = requesting.position === "G";
 
@@ -157,7 +171,7 @@ function ExpandedPair({
       <GoalieExpandedDetail
         matchup={matchup}
         playerPosition={requesting.position}
-        playerName={requestingName}
+        player={requesting}
         playerId={requesting.id}
         standings={standings}
       />
@@ -167,7 +181,7 @@ function ExpandedPair({
     <SkaterExpandedDetail
       matchup={matchup}
       showFaceoffs={requesting.position === "C"}
-      playerName={requestingName}
+      player={requesting}
       playerId={requesting.id}
       standings={standings}
     />
@@ -193,10 +207,12 @@ function HeaderRow() {
 
 type SeasonFilter = "current" | "all";
 type GameTypeFilter = "regular" | "playoffs" | "both";
+type PairKind = "skater" | "goalie";
 
 export function Leaderboard() {
   const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("all");
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
+  const [pairKind, setPairKind] = useState<PairKind>("skater");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +236,7 @@ export function Leaderboard() {
       return;
     }
     params.set("gameType", gameTypeFilter);
+    params.set("kind", pairKind);
     fetch(`/api/leaderboard?${params}`)
       .then(async (r) => {
         const data = await r.json();
@@ -228,11 +245,27 @@ export function Leaderboard() {
       })
       .then((data) => setEntries(data.leaderboard))
       .catch((err) => setError(err.message));
-  }, [seasonFilter, gameTypeFilter, allSeasons]);
+  }, [seasonFilter, gameTypeFilter, pairKind, allSeasons]);
 
   return (
     <div className="w-full">
       <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
+          {([
+            { value: "skater", label: "Skater Rivalries" },
+            { value: "goalie", label: "Shooter vs Goalie" },
+          ] as const).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setPairKind(value)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+                pairKind === value ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
           <button
             onClick={() => setSeasonFilter("current")}

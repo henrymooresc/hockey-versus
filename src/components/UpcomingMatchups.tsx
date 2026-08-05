@@ -1,10 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { PlayerSearchResult, UpcomingGame, MatchupPlayer } from "@/types/versus";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
+import {
+  ToggleGroup,
+  SEASON_OPTIONS,
+  GAME_TYPE_OPTIONS,
+  type SeasonFilter,
+  type GameTypeFilter,
+} from "./ToggleGroup";
 import { UpcomingGamesSkeleton, MatchupTableSkeleton } from "./Skeleton";
+
+interface SeasonMeta {
+  id: string;
+  startDate: string | null;
+  endDate: string | null;
+}
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr + "T12:00:00");
@@ -59,13 +72,7 @@ function GameSelector({
   );
 }
 
-export function UpcomingMatchups({
-  player,
-  gameType = "regular",
-}: {
-  player: PlayerSearchResult;
-  gameType?: "regular" | "playoffs" | "both";
-}) {
+export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
   const [games, setGames] = useState<UpcomingGame[]>([]);
   const [selectedGame, setSelectedGame] = useState<UpcomingGame | null>(null);
   const [matchups, setMatchups] = useState<MatchupPlayer[]>([]);
@@ -73,6 +80,21 @@ export function UpcomingMatchups({
   const [loadingMatchups, setLoadingMatchups] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
+  const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("current");
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
+  const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
+
+  useEffect(() => {
+    fetch("/api/seasons")
+      .then((r) => r.json())
+      .then((data) => setAllSeasons(data.seasons ?? []))
+      .catch(() => {});
+  }, []);
+
+  const seasonIds: string[] | null = useMemo(() => {
+    if (seasonFilter === "all" || allSeasons.length === 0) return null;
+    return [allSeasons[0].id];
+  }, [seasonFilter, allSeasons]);
 
   useEffect(() => {
     setLoadingGames(true);
@@ -99,19 +121,34 @@ export function UpcomingMatchups({
 
   useEffect(() => {
     if (!selectedGame) return;
+    // Wait for the seasons list in "current" mode, so the first fetch does not
+    // race an unfiltered one.
+    if (seasonFilter === "current" && allSeasons.length === 0) return;
 
+    const controller = new AbortController();
     setLoadingMatchups(true);
     setActiveTab("skaters");
-    fetch(`/api/players/${player.id}/matchup?teamId=${selectedGame.opponentTeamId}&gameType=${gameType}`)
+    const params = new URLSearchParams({
+      teamId: String(selectedGame.opponentTeamId),
+      gameType: gameTypeFilter,
+    });
+    if (seasonIds) params.set("seasons", seasonIds.join(","));
+    fetch(`/api/players/${player.id}/matchup?${params}`, { signal: controller.signal })
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "Failed to fetch matchups");
         return data;
       })
       .then((data) => setMatchups(data.matchups))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoadingMatchups(false));
-  }, [player.id, selectedGame?.opponentTeamId, gameType]);
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setError(err.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingMatchups(false);
+      });
+    return () => controller.abort();
+  }, [player.id, selectedGame?.opponentTeamId, gameTypeFilter, seasonIds, seasonFilter, allSeasons.length]);
 
   if (loadingGames) {
     return <UpcomingGamesSkeleton />;
@@ -143,7 +180,6 @@ export function UpcomingMatchups({
   const allSkaters = [...skaters, ...unknown];
 
   const withHistory = matchups.filter((m) => m.gamesShared > 0);
-  const playerName = `${player.firstName[0]}. ${player.lastName}`;
 
   return (
     <div>
@@ -155,16 +191,30 @@ export function UpcomingMatchups({
 
       {matchups.length > 0 ? (
         <div style={{ marginTop: 28 }} className={`transition-opacity duration-200 ${loadingMatchups ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 20 }}>
+          <div className="flex flex-wrap items-center justify-between gap-3" style={{ marginBottom: 20 }}>
             <div className="text-xs text-gray-600">
               {withHistory.length} of {matchups.length} players with shared history
             </div>
-            <PositionTabs
-              active={activeTab}
-              onChange={setActiveTab}
-              skaterCount={allSkaters.length}
-              goalieCount={goalies.length}
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <PositionTabs
+                active={activeTab}
+                onChange={setActiveTab}
+                skaterCount={allSkaters.length}
+                goalieCount={goalies.length}
+              />
+              <ToggleGroup
+                options={SEASON_OPTIONS}
+                active={seasonFilter}
+                onChange={setSeasonFilter}
+                label="Season range"
+              />
+              <ToggleGroup
+                options={GAME_TYPE_OPTIONS}
+                active={gameTypeFilter}
+                onChange={setGameTypeFilter}
+                label="Game type"
+              />
+            </div>
           </div>
 
           {activeTab === "skaters" ? (
@@ -174,7 +224,7 @@ export function UpcomingMatchups({
               collapsible
               mode={player.position === "C" ? "center" : "skater"}
               playerPosition={player.position}
-              playerName={playerName}
+              player={player}
               playerId={player.id}
             />
           ) : (
@@ -183,7 +233,7 @@ export function UpcomingMatchups({
               matchups={goalies}
               mode="goalie"
               playerPosition={player.position}
-              playerName={playerName}
+              player={player}
               playerId={player.id}
             />
           )}

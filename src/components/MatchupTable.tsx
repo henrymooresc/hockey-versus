@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
+import type { BioPlayer, MatchupPlayer, StandingsEntry } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
+import { SmallSampleMark } from "./SmallSampleMark";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -83,12 +84,13 @@ function GoalieStatValue({ value, className }: { value: string | number; classNa
   );
 }
 
-function RivalryScoreCell({ score }: { score: number }) {
+function RivalryScoreCell({ score, gamesShared }: { score: number; gamesShared: number }) {
   return (
     <div className="flex items-center justify-center font-mono text-[11px]">
       <span className={score > 0 ? "text-green-400 font-bold" : score < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
         {score.toFixed(1)}
       </span>
+      <SmallSampleMark gamesShared={gamesShared} />
     </div>
   );
 }
@@ -188,7 +190,7 @@ function MatchupRow({
   expanded,
   onToggle,
   playerPosition,
-  playerName,
+  player,
   playerId,
   standings,
 }: {
@@ -197,7 +199,7 @@ function MatchupRow({
   expanded: boolean;
   onToggle: () => void;
   playerPosition: PlayerPosition;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
 }) {
@@ -280,7 +282,7 @@ function MatchupRow({
               <GoalieStatValue value={matchup.stats.goals} className={matchup.stats.goals > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.assists} className={matchup.stats.assists > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.individualShots} />
-              <RivalryScoreCell score={matchup.rivalryScore} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} />
             </>
           ) : (
             <>
@@ -297,7 +299,7 @@ function MatchupRow({
                   className="text-gray-300"
                 />
               )}
-              <RivalryScoreCell score={matchup.rivalryScore} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} />
             </>
           )
         ) : (
@@ -309,9 +311,9 @@ function MatchupRow({
       {expanded && hasHistory && (
         <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
           {mode === "goalie" ? (
-            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} playerName={playerName} playerId={playerId} standings={standings} />
+            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} player={player} playerId={playerId} standings={standings} />
           ) : (
-            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} playerName={playerName} playerId={playerId} standings={standings} />
+            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} player={player} playerId={playerId} standings={standings} />
           )}
         </div>
       )}
@@ -326,7 +328,7 @@ export function PositionGroup({
   defaultVisible = 6,
   mode = "skater",
   playerPosition = null,
-  playerName = "",
+  player,
   playerId = 0,
 }: {
   label: string;
@@ -335,7 +337,7 @@ export function PositionGroup({
   defaultVisible?: number;
   mode?: ColumnMode;
   playerPosition?: PlayerPosition;
-  playerName?: string;
+  player: BioPlayer;
   playerId?: number;
 }) {
   const defaultSort: SortKey = "rivalry";
@@ -389,7 +391,7 @@ export function PositionGroup({
             expanded={expandedId === m.playerId}
             onToggle={() => setExpandedId(expandedId === m.playerId ? null : m.playerId)}
             playerPosition={playerPosition}
-            playerName={playerName}
+            player={player}
             playerId={playerId}
             standings={standings}
           />

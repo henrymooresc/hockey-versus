@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
+import type { BioPlayer, MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
 import { PlayerBioCard } from "./PlayerBioCard";
 import { RivalryTrendChart } from "./RivalryTrendChart";
 import { MatchupRadarChart, type RadarCategory } from "./MatchupRadarChart";
@@ -90,19 +90,19 @@ function ColumnHeaders({ playerName, opponentName }: { playerName: string; oppon
 export function SkaterExpandedDetail({
   matchup,
   showFaceoffs,
-  playerName,
+  player,
   playerId,
   standings,
 }: {
   matchup: MatchupPlayer;
   showFaceoffs: boolean;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
 }) {
   const { stats, oppStats } = matchup;
   const history = useRivalHistory(playerId, matchup.playerId);
-  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
   const oppShort = `${matchup.firstName[0]}. ${matchup.lastName}`;
 
   const radarCategories: RadarCategory[] = [
@@ -121,7 +121,14 @@ export function SkaterExpandedDetail({
   return (
     <div className="px-2 pb-3">
       <div className="mb-3">
-        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+        <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+          />
       </div>
 
       <div className="pt-2 pb-1 text-center">
@@ -190,20 +197,20 @@ export function SkaterExpandedDetail({
 export function GoalieExpandedDetail({
   matchup,
   playerPosition,
-  playerName,
+  player,
   playerId,
   standings,
 }: {
   matchup: MatchupPlayer;
   playerPosition: PlayerPosition;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
 }) {
   const { stats, oppStats } = matchup;
   const isPlayerGoalie = playerPosition === "G";
   const history = useRivalHistory(playerId, matchup.playerId);
-  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
 
   if (isPlayerGoalie) {
     const mySaves = stats.individualShots - stats.goals;
@@ -211,7 +218,14 @@ export function GoalieExpandedDetail({
     return (
       <div className="px-2 pb-3">
         <div className="mb-3">
-          <PlayerBioCard matchup={matchup} standings={teamStandings} />
+          <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+          />
         </div>
 
         <div className="pt-2 pb-1 text-center">
@@ -261,7 +275,14 @@ export function GoalieExpandedDetail({
   return (
     <div className="px-2 pb-3">
       <div className="mb-3">
-        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+        <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+          />
       </div>
 
       <div className="pt-2 pb-2 text-center">

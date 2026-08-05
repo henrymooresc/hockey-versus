@@ -5,11 +5,15 @@ import type { PlayerSearchResult, MatchupPlayer } from "@/types/versus";
 import { UpcomingMatchups } from "./UpcomingMatchups";
 import { PositionGroup } from "./MatchupTable";
 import { PositionTabs } from "./PositionTabs";
+import {
+  ToggleGroup,
+  SEASON_OPTIONS,
+  GAME_TYPE_OPTIONS,
+  type SeasonFilter,
+  type GameTypeFilter,
+} from "./ToggleGroup";
 import { RivalsPanelSkeleton } from "./Skeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
-
-type SeasonFilter = "current" | "all";
-type GameTypeFilter = "regular" | "playoffs" | "both";
 
 interface SeasonMeta {
   id: string;
@@ -110,7 +114,6 @@ export function SoloAnalysis({
 
   const hasAnyData = !loading && !error && (allSkaterRivals.length > 0 || (goalieRivals?.length ?? 0) > 0);
 
-  const playerName = `${player.firstName[0]}. ${player.lastName}`;
 
   return (
     <div className="mt-8">
@@ -177,47 +180,18 @@ export function SoloAnalysis({
                   skaterCount={filteredSkaterRivals.length}
                   goalieCount={filteredGoalieRivals.length}
                 />
-                <div className="flex rounded-lg border border-gray-700/60 bg-gray-800/60 p-0.5">
-                  <button
-                    onClick={() => setSeasonFilter("current")}
-                    className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
-                      seasonFilter === "current"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-gray-400 hover:text-gray-200"
-                    }`}
-                  >
-                    Current Season
-                  </button>
-                  <button
-                    onClick={() => setSeasonFilter("all")}
-                    className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
-                      seasonFilter === "all"
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-gray-400 hover:text-gray-200"
-                    }`}
-                  >
-                    Last 10 Seasons
-                  </button>
-                </div>
-                <div className="flex rounded-lg border border-gray-700/60 bg-gray-800/60 p-0.5">
-                  {([
-                    { value: "regular", label: "Regular" },
-                    { value: "playoffs", label: "Playoffs" },
-                    { value: "both", label: "Both" },
-                  ] as const).map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => setGameTypeFilter(value)}
-                      className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
-                        gameTypeFilter === value
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-gray-400 hover:text-gray-200"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <ToggleGroup
+                  options={SEASON_OPTIONS}
+                  active={seasonFilter}
+                  onChange={setSeasonFilter}
+                  label="Season range"
+                />
+                <ToggleGroup
+                  options={GAME_TYPE_OPTIONS}
+                  active={gameTypeFilter}
+                  onChange={setGameTypeFilter}
+                  label="Game type"
+                />
               </div>
             </div>
             {loading ? (
@@ -238,7 +212,7 @@ export function SoloAnalysis({
                 defaultVisible={10}
                 mode={player.position === "C" ? "center" : "skater"}
                 playerPosition={player.position}
-                playerName={playerName}
+                player={player}
                 playerId={player.id}
               />
             ) : (
@@ -249,7 +223,7 @@ export function SoloAnalysis({
                 defaultVisible={10}
                 mode="goalie"
                 playerPosition={player.position}
-                playerName={playerName}
+                player={player}
                 playerId={player.id}
               />
             )}

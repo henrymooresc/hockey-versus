@@ -1,8 +1,9 @@
 "use client";
 
-import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
+import type { BioPlayer, StandingsEntry } from "@/types/versus";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { formatSecondsToHMS } from "@/lib/time-utils";
+import { SmallSampleMark } from "./SmallSampleMark";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -24,138 +25,204 @@ function computeAge(birthDate: string | null): number | null {
   return age;
 }
 
+/** One player's headshot, name, number, position and age. */
+function PlayerIdentity({ player, align }: { player: BioPlayer; align: "left" | "right" }) {
+  const teamColors = getTeamColors(player.teamAbbrev);
+  const age = computeAge(player.birthDate);
+  const isRight = align === "right";
+
+  return (
+    <div className={`flex min-w-0 items-center gap-3 ${isRight ? "flex-row-reverse text-right" : ""}`}>
+      {player.headshotUrl ? (
+        <img
+          src={player.headshotUrl}
+          alt={`${player.firstName} ${player.lastName}`}
+          className="rounded-lg object-cover shrink-0"
+          style={{
+            width: 64,
+            height: 64,
+            minWidth: 64,
+            maxWidth: 64,
+            boxShadow: `0 0 12px ${teamColors.primary}30`,
+            border: `2px solid ${teamColors.primary}80`,
+          }}
+        />
+      ) : (
+        <div
+          className="rounded-lg bg-gray-700 shrink-0"
+          style={{ width: 64, height: 64, border: `2px solid ${teamColors.primary}80` }}
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-bold text-white">
+          {player.firstName} {player.lastName}
+        </div>
+        <div className={`mt-0.5 flex items-center gap-2 ${isRight ? "justify-end" : ""}`}>
+          {player.sweaterNumber && (
+            <span className="text-xs text-gray-400">#{player.sweaterNumber}</span>
+          )}
+          {player.position && (
+            <span className={`text-xs ${positionColor(player.position)}`}>{player.position}</span>
+          )}
+        </div>
+        {age !== null && <div className="mt-0.5 text-[10px] text-gray-500">Age {age}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** One player's team and current standings, or a note that they have no team. */
+function TeamStrip({
+  player,
+  standings,
+  align,
+}: {
+  player: BioPlayer;
+  standings: StandingsEntry | null;
+  align: "left" | "right";
+}) {
+  const teamColors = getTeamColors(player.teamAbbrev);
+  const isRight = align === "right";
+  const border = isRight
+    ? { borderRight: `3px solid ${teamColors.primary}` }
+    : { borderLeft: `3px solid ${teamColors.primary}` };
+
+  if (!standings) {
+    return (
+      <div
+        className={`flex items-center gap-2 rounded px-2 py-1 text-[10px] ${isRight ? "flex-row-reverse" : ""}`}
+        style={{
+          backgroundColor: "rgba(255,255,255,0.04)",
+          ...(isRight
+            ? { borderRight: "3px solid rgba(156,163,175,0.5)" }
+            : { borderLeft: "3px solid rgba(156,163,175,0.5)" }),
+        }}
+      >
+        <span
+          className="flex shrink-0 items-center justify-center rounded text-[11px] font-bold text-gray-500"
+          style={{
+            width: 18,
+            height: 18,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px dashed rgba(156,163,175,0.35)",
+          }}
+          title="Not on an active roster"
+        >
+          ?
+        </span>
+        <span className="italic text-gray-500">Not on an active roster</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`flex items-center gap-3 rounded px-2 py-1 text-[10px] ${isRight ? "flex-row-reverse" : ""}`}
+      style={{ backgroundColor: teamColors.primary + "15", ...border }}
+    >
+      <span
+        className="flex shrink-0 items-center gap-1"
+        title={player.teamName ?? player.teamAbbrev ?? undefined}
+      >
+        {player.teamLogoUrl && (
+          <span
+            className="flex items-center justify-center rounded"
+            style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}
+          >
+            <img src={player.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
+          </span>
+        )}
+        {player.teamAbbrev && (
+          <span
+            className="text-xs font-semibold"
+            style={{ color: getTeamDisplayColor(player.teamAbbrev) }}
+          >
+            {player.teamAbbrev}
+          </span>
+        )}
+      </span>
+      <span className={`flex flex-1 items-center justify-between ${isRight ? "flex-row-reverse" : ""}`}>
+        <span className="text-gray-400">
+          <span className="font-bold text-white">{standings.points}</span> pts
+        </span>
+        <span className="text-gray-400">
+          {standings.wins}-{standings.losses}-{standings.otLosses}
+        </span>
+        <span className="text-gray-400">
+          L10: <span className="text-gray-300">{standings.l10Record}</span>
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Header of an expanded matchup: both players, with the shared rivalry figures
+ * between them.
+ *
+ * The rivalry score belongs to the pair rather than to either player, so it
+ * sits in the middle. `player` goes on the left and `opponent` on the right,
+ * matching the stat comparison columns below.
+ */
 export function PlayerBioCard({
-  matchup,
+  player,
+  opponent,
+  rivalryScore,
+  gamesShared,
+  toiSharedSeconds,
   standings,
 }: {
-  matchup: MatchupPlayer;
-  standings: StandingsEntry | null;
+  player: BioPlayer;
+  opponent: BioPlayer;
+  rivalryScore: number;
+  gamesShared: number;
+  toiSharedSeconds: number;
+  standings: Map<string, StandingsEntry>;
 }) {
-  const teamColors = getTeamColors(matchup.teamAbbrev);
-  const age = computeAge(matchup.birthDate);
+  const teamColors = getTeamColors(opponent.teamAbbrev);
+  const lookup = (p: BioPlayer) => (p.teamAbbrev ? standings.get(p.teamAbbrev) ?? null : null);
 
   return (
     <div
       className="rounded-lg border bg-gray-800/60 p-3"
       style={{ borderColor: teamColors.primary + "60" }}
     >
-      <div className="flex items-center gap-3">
-        {matchup.headshotUrl ? (
-          <img
-            src={matchup.headshotUrl}
-            alt={`${matchup.firstName} ${matchup.lastName}`}
-            className="rounded-lg object-cover shrink-0"
-            style={{
-              width: 64,
-              height: 64,
-              minWidth: 64,
-              maxWidth: 64,
-              boxShadow: `0 0 12px ${teamColors.primary}30`,
-              border: `2px solid ${teamColors.primary}80`,
-            }}
-          />
-        ) : (
-          <div
-            className="rounded-lg bg-gray-700"
-            style={{ width: 64, height: 64, border: `2px solid ${teamColors.primary}80` }}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-white">
-            {matchup.firstName} {matchup.lastName}
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            {matchup.sweaterNumber && (
-              <span className="text-xs text-gray-400">#{matchup.sweaterNumber}</span>
-            )}
-            {matchup.position && (
-              <span className={`text-xs ${positionColor(matchup.position)}`}>
-                {matchup.position}
-              </span>
-            )}
-          </div>
-          {age !== null && (
-            <div className="text-[10px] text-gray-500 mt-0.5">Age {age}</div>
-          )}
-        </div>
+      <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+        <PlayerIdentity player={player} align="left" />
 
-        <div className="text-right shrink-0">
+        <div className="shrink-0 text-center">
           <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
             Rivalry Score
             <a
               href="/about#rivalry-score"
               title="What is Rivalry Score?"
-              className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 text-[8px] font-bold text-gray-400 hover:border-blue-400 hover:text-blue-400 transition-colors align-middle"
+              className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 align-middle text-[8px] font-bold text-gray-400 transition-colors hover:border-blue-400 hover:text-blue-400"
             >
               i
             </a>
           </div>
           <div
             className={`font-mono text-lg font-bold ${
-              matchup.rivalryScore > 0
-                ? "text-green-400"
-                : matchup.rivalryScore < 0
-                ? "text-red-400"
-                : "text-gray-400"
+              rivalryScore > 0 ? "text-green-400" : rivalryScore < 0 ? "text-red-400" : "text-gray-400"
             }`}
           >
-            {matchup.rivalryScore.toFixed(2)}
+            {rivalryScore.toFixed(2)}
+            <SmallSampleMark gamesShared={gamesShared} />
           </div>
           <div className="text-[10px] text-gray-500">
-            <span className="font-mono text-gray-300">{matchup.gamesShared}</span> GP
+            <span className="font-mono text-gray-300">{gamesShared}</span> GP
             <span className="mx-1 text-gray-700">·</span>
-            <span className="font-mono text-gray-300">{formatSecondsToHMS(matchup.toiSharedSeconds)}</span>
+            <span className="font-mono text-gray-300">{formatSecondsToHMS(toiSharedSeconds)}</span>
           </div>
         </div>
+
+        <PlayerIdentity player={opponent} align="right" />
       </div>
 
-      {standings ? (
-        <div
-          className="mt-2 flex items-center gap-3 rounded px-2 py-1 text-[10px]"
-          style={{ backgroundColor: teamColors.primary + "15", borderLeft: `3px solid ${teamColors.primary}` }}
-        >
-          <span
-            className="flex shrink-0 items-center gap-1"
-            title={matchup.teamName ?? matchup.teamAbbrev ?? undefined}
-          >
-            {matchup.teamLogoUrl && (
-              <span className="flex items-center justify-center rounded" style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}>
-                <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
-              </span>
-            )}
-            {matchup.teamAbbrev && (
-              <span className="text-xs font-semibold" style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}>
-                {matchup.teamAbbrev}
-              </span>
-            )}
-          </span>
-          <span className="flex flex-1 items-center justify-between">
-            <span className="text-gray-400">
-              <span className="font-bold text-white">{standings.points}</span> pts
-            </span>
-            <span className="text-gray-400">
-              {standings.wins}-{standings.losses}-{standings.otLosses}
-            </span>
-            <span className="text-gray-400">
-              L10: <span className="text-gray-300">{standings.l10Record}</span>
-            </span>
-          </span>
-        </div>
-      ) : (
-        <div
-          className="mt-2 flex items-center gap-2 rounded px-2 py-1 text-[10px]"
-          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderLeft: "3px solid rgba(156,163,175,0.5)" }}
-        >
-          <span
-            className="flex shrink-0 items-center justify-center rounded text-[11px] font-bold text-gray-500"
-            style={{ width: 18, height: 18, background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(156,163,175,0.35)" }}
-            title="Not on an active roster"
-          >
-            ?
-          </span>
-          <span className="text-gray-500 italic">Not on an active roster</span>
-        </div>
-      )}
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        <TeamStrip player={player} standings={lookup(player)} align="left" />
+        <TeamStrip player={opponent} standings={lookup(opponent)} align="right" />
+      </div>
     </div>
   );
 }
