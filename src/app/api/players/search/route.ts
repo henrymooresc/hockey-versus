@@ -69,6 +69,8 @@ export async function GET(request: NextRequest) {
         lastName: players.lastName,
         position: players.position,
         headshotUrl: players.headshotUrl,
+        sweaterNumber: players.sweaterNumber,
+        birthDate: players.birthDate,
         teamAbbrev: teams.abbrev,
         teamName: teams.name,
         teamLogoUrl: teams.logoUrl,

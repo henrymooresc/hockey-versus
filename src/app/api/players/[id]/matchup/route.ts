@@ -9,7 +9,8 @@ import type { MatchupPlayer } from "@/types/versus";
  * Returns aggregated versus stats for a player against all players
  * on a given opponent team's current roster.
  *
- * GET /api/players/{id}/matchup?teamId={opponentTeamId}
+ * GET /api/players/{id}/matchup?teamId={opponentTeamId}&seasons={a,b}&gameType={t}
+ * Omit `seasons` for every season combined.
  */
 export async function GET(
   request: NextRequest,
@@ -27,6 +28,8 @@ export async function GET(
       10
     );
     const gtFilter = parseGameTypeFilter(request.nextUrl.searchParams.get("gameType"));
+    const seasonsParam = request.nextUrl.searchParams.get("seasons");
+    const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
     if (isNaN(teamId)) {
       return NextResponse.json(
         { error: "teamId query parameter required" },
@@ -75,6 +78,7 @@ export async function GET(
         WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
           AND same_team = false
           AND toi_shared_seconds > 0
+          ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
           ${gameTypeClause(gtFilter)}
         GROUP BY opponent_id, player_side
       )

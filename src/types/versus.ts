@@ -16,6 +16,26 @@ export interface PlayerSearchResult {
   lastName: string;
   position: string | null;
   headshotUrl: string | null;
+  sweaterNumber: number | null;
+  birthDate: string | null;
+  teamAbbrev: string | null;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+}
+
+/**
+ * Everything a player needs to appear in a bio card.
+ *
+ * `MatchupPlayer`, `PlayerSearchResult` and the leaderboard player shape all
+ * satisfy this, so any of them can sit on either side of a matchup.
+ */
+export interface BioPlayer {
+  firstName: string;
+  lastName: string;
+  position: string | null;
+  headshotUrl: string | null;
+  sweaterNumber: number | null;
+  birthDate: string | null;
   teamAbbrev: string | null;
   teamName: string | null;
   teamLogoUrl: string | null;

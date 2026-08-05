@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter } from "@/lib/db-utils";
+import type { BioPlayer } from "@/types/versus";
 
 interface EntryRow {
   player_a_id: number;
@@ -13,6 +14,8 @@ interface EntryRow {
   a_last_name: string;
   a_position: string | null;
   a_headshot_url: string | null;
+  a_sweater_number: number | null;
+  a_birth_date: string | null;
   a_team_abbrev: string | null;
   a_team_name: string | null;
   a_team_logo_url: string | null;
@@ -20,6 +23,8 @@ interface EntryRow {
   b_last_name: string;
   b_position: string | null;
   b_headshot_url: string | null;
+  b_sweater_number: number | null;
+  b_birth_date: string | null;
   b_team_abbrev: string | null;
   b_team_name: string | null;
   b_team_logo_url: string | null;
@@ -27,26 +32,8 @@ interface EntryRow {
 }
 
 export interface LeaderboardEntry {
-  playerA: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    position: string | null;
-    headshotUrl: string | null;
-    teamAbbrev: string | null;
-    teamName: string | null;
-    teamLogoUrl: string | null;
-  };
-  playerB: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    position: string | null;
-    headshotUrl: string | null;
-    teamAbbrev: string | null;
-    teamName: string | null;
-    teamLogoUrl: string | null;
-  };
+  playerA: BioPlayer & { id: number };
+  playerB: BioPlayer & { id: number };
   rivalryScore: number;
   gamesShared: number;
   toiSharedSeconds: number;
@@ -58,7 +45,11 @@ export interface LeaderboardEntry {
  * `npm run compute:versus` builds that table. Player and team details join
  * here rather than at build time, so a trade shows up without a rebuild.
  *
- * GET /api/leaderboard?season={id}&gameType={regular|playoffs|both}&limit={n}
+ * Skater and goalie pairs rank on separate boards, because the two formulas
+ * measure different contests and do not share a scale.
+ *
+ * GET /api/leaderboard?season={id}&gameType={regular|playoffs|both}
+ *                     &kind={skater|goalie}&limit={n}
  * Omit `season` for every season combined.
  */
 export async function GET(request: NextRequest) {
@@ -67,6 +58,8 @@ export async function GET(request: NextRequest) {
     const gameTypeScope = parseGameTypeFilter(
       request.nextUrl.searchParams.get("gameType")
     );
+    const pairKind =
+      request.nextUrl.searchParams.get("kind") === "goalie" ? "goalie" : "skater";
     const limit = Math.min(
       parseInt(request.nextUrl.searchParams.get("limit") ?? "50", 10) || 50,
       200
@@ -83,6 +76,8 @@ export async function GET(request: NextRequest) {
         pa.last_name AS a_last_name,
         pa.position AS a_position,
         pa.headshot_url AS a_headshot_url,
+        pa.sweater_number AS a_sweater_number,
+        pa.birth_date AS a_birth_date,
         ta.abbrev AS a_team_abbrev,
         ta.name AS a_team_name,
         ta.logo_url AS a_team_logo_url,
@@ -90,6 +85,8 @@ export async function GET(request: NextRequest) {
         pb.last_name AS b_last_name,
         pb.position AS b_position,
         pb.headshot_url AS b_headshot_url,
+        pb.sweater_number AS b_sweater_number,
+        pb.birth_date AS b_birth_date,
         tb.abbrev AS b_team_abbrev,
         tb.name AS b_team_name,
         tb.logo_url AS b_team_logo_url
@@ -100,6 +97,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN teams tb ON tb.id = pb.current_team_id
       WHERE e.season_scope = ${seasonScope}
         AND e.game_type_scope = ${gameTypeScope}
+        AND e.pair_kind = ${pairKind}
       ORDER BY e.rank
       LIMIT ${limit}
     `);
@@ -111,6 +109,8 @@ export async function GET(request: NextRequest) {
         lastName: row.a_last_name,
         position: row.a_position,
         headshotUrl: row.a_headshot_url,
+        sweaterNumber: row.a_sweater_number,
+        birthDate: row.a_birth_date,
         teamAbbrev: row.a_team_abbrev,
         teamName: row.a_team_name,
         teamLogoUrl: row.a_team_logo_url,
@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
         lastName: row.b_last_name,
         position: row.b_position,
         headshotUrl: row.b_headshot_url,
+        sweaterNumber: row.b_sweater_number,
+        birthDate: row.b_birth_date,
         teamAbbrev: row.b_team_abbrev,
         teamName: row.b_team_name,
         teamLogoUrl: row.b_team_logo_url,
