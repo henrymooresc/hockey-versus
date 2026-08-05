@@ -25,8 +25,12 @@ deploy needs the full 3.4GB database, not just the derived tables.
 - [ ] Fix the missed-game bug in `scripts/ingest-seasons.ts:111` — the cutoff compares `game.gameDate` against `lastGamesIngestedAt`, a wall-clock timestamp. Games that finish after their first scan are skipped forever. This is why the 2025-26 playoffs are absent.
 - [x] ~~Backfill the missing games~~ — not needed. The local database is a pre-launch test copy. A fresh host gets a full re-ingest instead.
 - [ ] Remove the `versus_stats.rivalry_score` column — no API route reads it, and `compute-versus.ts:235` writes a skater score for goalie pairs. Every route recomputes the score from the raw sums.
-- [ ] Add a minimum sample size to the All-Time Rivals list — a 2-game, 25-minute sample currently outranks a 10-year rivalry. The leaderboard uses a 1800-second floor; the rivals list has none.
-- [ ] Pass the season filter to `/api/players/[id]/matchup` — the route ignores `seasons`, so Upcoming Matchups always shows all-time data while the toggle says otherwise.
+- [x] Correct small samples in the rankings — skater pairs now regress toward the league mean (5.65 weighted volume per game) with a 10-game prior. Pairs with 1-3 shared games scored twice the league mean before, which was noise. A `*` marks any score built on fewer than 10 shared games.
+- [x] Pass the season filter to `/api/players/[id]/matchup` — the route ignored `seasons`, so Upcoming Matchups always showed all-time data.
+- [x] Split the leaderboard into a skater board and a shooter-versus-goalie board. The two formulas measure different contests, so one combined board buried every skater pair.
+- [x] Move the goalie score back to per-game and regress it, and delete `GOALIE_VOLUME_SCALE`. Goalie scores no longer grow with career length, and the hand-tuned `1/6` constant is gone.
+- [ ] Decide whether the two boards should share a scale — skater scores run about twice goalie scores at every rank. The cause is the balance term, not the volume term. For a goalie pair, `1 - |goals - saves| / shots` reduces exactly to `2 x shooting percentage`, which real hockey caps near 0.20. Skater categories are near-symmetric and approach 1.0. Split boards make this cosmetic, so fix it only if the two ever need to merge.
+- [ ] Consider spreading the goalie board out — its top 50 spans 8.13 to 9.78, a 20% range, against 14.26 to 19.61 for skaters. That compression lets 14 small samples reach the top 50, where the skater board admits none.
 
 ## Infrastructure
 
@@ -45,7 +49,8 @@ deploy needs the full 3.4GB database, not just the derived tables.
 - [x] Remove head-to-head pages/functionality; replace with a player-search filter inside the All-Time Rivals section
 - [x] Remove the Team Rivalry Lookup panel; replace with a team filter inside the All-Time Rivals section
 - [x] Fix "Show More" buttons so they expand the list inline instead of shrinking the panel into a scroll container
-- [ ] Make leaderboard cards clickable to open an expanded view (same shape as the All-Time Rivals expanded detail card)
+- [x] Make leaderboard cards clickable to open an expanded view (same shape as the All-Time Rivals expanded detail card)
+- [x] Show both players in the expanded bio card. It profiled only the opponent, so the player you started from disappeared.
 - [ ] Improve post-game breakdown — add per-pair visualizations (e.g. radar, shared-TOI sparkline) and tighten up the layout
 
 ## Refactor
