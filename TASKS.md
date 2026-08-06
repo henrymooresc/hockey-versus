@@ -9,8 +9,12 @@ Do these in order. Each item stops the site from feeling finished.
 - [x] Repair the migration ledger — squashed the 7 migrations into `0000_baseline.sql` and recorded it as applied. `drizzle-kit migrate` and `drizzle-kit check` both run clean now.
 - [x] Fix `/api/leaderboard` speed — added the `leaderboard_entries` table, filled by `compute:versus` for 11 season scopes x 3 game types. Endpoint went from 3.5s to 7ms.
 - [x] Commit `drizzle/meta/` — removed the `.gitignore` rule that excluded it.
-- [ ] Fix `npm run lint` — `next lint` no longer exists in Next 16, and ESLint is not installed. Install `eslint` + `eslint-config-next`, add `eslint.config.mjs`, and change the script to `eslint .`.
-- [ ] Add the lint step to `.github/workflows/ci.yml` — CI runs only `tsc` and `vitest` today.
+- [x] Fix `npm run lint` — installed ESLint 9 and `eslint-config-next` 16, added `eslint.config.mjs`, and pointed the script at `eslint .`. `eslint-config-next` ships flat config, so no `FlatCompat` shim is needed.
+- [x] Add the lint step to `.github/workflows/ci.yml`. It fails on errors only, since 32 warnings are known debt.
+- [ ] Clear the 32 lint warnings, then tighten CI to `eslint . --max-warnings 0`:
+    - 22 `@next/next/no-img-element`. Every NHL headshot and team logo is a plain `<img>`. Switching to `next/image` needs sizing work on each one.
+    - 8 `react-hooks/set-state-in-effect`. Each data panel resets state and fetches inside one effect, which costs an extra render. Fixing it means restructuring fetching in eight components, so the rule is set to `warn` rather than silenced.
+    - 2 `react-hooks/exhaustive-deps`. Both are deliberate: `SoloAnalysis` depends on `allSeasons.length` rather than the array, and `UpcomingMatchups` on `selectedGame?.opponentTeamId` rather than the whole game.
 
 ## Deferred — Public Launch
 
@@ -40,7 +44,7 @@ deploy needs the full 3.4GB database, not just the derived tables.
 - [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
 - [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:240` — slow responses can overwrite newer ones.
 - [ ] Add a `try/catch` to `/api/players/search` — it is the only route without one.
-- [ ] Delete the stray `C:/Program Files/Git/home/...` directory in the repo root. A Windows path leaked into a `mkdir` call.
+- [x] Delete the stray `C:/Program Files/Git/home/...` directory in the repo root. A Windows path leaked into a `mkdir` call. It held no files and git never tracked it.
 
 ## UI Enhancements
 - [x] Season toggle — switch between current/last season and last 10 seasons on all views
