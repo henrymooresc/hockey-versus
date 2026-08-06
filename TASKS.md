@@ -22,8 +22,10 @@ deploy needs the full 3.4GB database, not just the derived tables.
 
 ## Data Correctness
 
-- [ ] Fix the missed-game bug in `scripts/ingest-seasons.ts:111` — the cutoff compares `game.gameDate` against `lastGamesIngestedAt`, a wall-clock timestamp. Games that finish after their first scan are skipped forever. This is why the 2025-26 playoffs are absent.
+- [x] Fix the missed-game bug in both ingestion scripts. They compared a game date against the wall-clock time of the last run, so a game that was not final on its first scan was skipped forever. Both now resume from a per-game `players_scanned` flag. Recovered 88 games: the 6 regular-season games of 2026-04-16 and all 82 playoffs of 2025-26.
+- [x] Repair the schema drift that stopped ingestion entirely. `seasons.last_games_ingested_at` and `last_players_scanned_at` were declared in `schema.ts` but never existed in the database, so both scripts crashed on their first query. Removed rather than added, since they were the broken mechanism.
 - [x] ~~Backfill the missing games~~ — not needed. The local database is a pre-launch test copy. A fresh host gets a full re-ingest instead.
+- [ ] Run `ingest:shifts`, `ingest:events` and `compute:versus` for the 88 recovered games, or leave them until the re-ingest. They stay invisible to the site until then, because every query requires both progress flags.
 - [ ] Remove the `versus_stats.rivalry_score` column — no API route reads it, and `compute-versus.ts:235` writes a skater score for goalie pairs. Every route recomputes the score from the raw sums.
 - [x] Correct small samples in the rankings — skater pairs now regress toward the league mean (5.65 weighted volume per game) with a 10-game prior. Pairs with 1-3 shared games scored twice the league mean before, which was noise. A `*` marks any score built on fewer than 10 shared games.
 - [x] Pass the season filter to `/api/players/[id]/matchup` — the route ignored `seasons`, so Upcoming Matchups always showed all-time data.
