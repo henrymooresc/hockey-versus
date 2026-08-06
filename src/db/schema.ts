@@ -46,8 +46,6 @@ export const seasons = pgTable("seasons", {
   startDate: date("start_date"),
   endDate: date("end_date"),
   ingested: boolean("ingested").default(false).notNull(),
-  lastGamesIngestedAt: timestamp("last_games_ingested_at"),
-  lastPlayersScannedAt: timestamp("last_players_scanned_at"),
 });
 
 export const games = pgTable(
@@ -63,6 +61,14 @@ export const games = pgTable(
     awayTeamId: integer("away_team_id").references(() => teams.id),
     homeScore: smallint("home_score"),
     awayScore: smallint("away_score"),
+    /**
+     * Progress flags. Each records work that finished for this game, so a
+     * re-run resumes from what completed rather than from when a script last
+     * ran. A per-season timestamp cannot express that: a game that was not
+     * final on its first scan ends up older than the next cutoff, and gets
+     * skipped forever.
+     */
+    playersScanned: boolean("players_scanned").default(false).notNull(),
     shiftsIngested: boolean("shifts_ingested").default(false).notNull(),
     eventsIngested: boolean("events_ingested").default(false).notNull(),
   },

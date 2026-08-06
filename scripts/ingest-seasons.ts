@@ -8,7 +8,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, inArray } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { seasons, games, teams } from "../src/db/schema";
 import { getStandings, getClubSeasonSchedule, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
@@ -37,14 +37,7 @@ async function main() {
       .onConflictDoNothing();
   }
 
-  // 2. Load last-ingested timestamps so we can skip already-known games
-  const seasonRows = await db
-    .select({ id: seasons.id, lastGamesIngestedAt: seasons.lastGamesIngestedAt })
-    .from(seasons)
-    .where(inArray(seasons.id, seasonIds));
-  const lastIngestedAt = new Map(seasonRows.map((s) => [s.id, s.lastGamesIngestedAt]));
-
-  // 3. Get team metadata (name, logo) from standings, keyed by abbrev
+  // 2. Get team metadata (name, logo) from standings, keyed by abbrev
   console.log("Fetching team list from standings...");
   const standings = await getStandings();
   const standingsMap = new Map(
@@ -55,8 +48,13 @@ async function main() {
   );
   const abbrevList = Array.from(standingsMap.keys());
 
-  // 4. For each season, fetch schedule from each team to discover game IDs
+  // 3. For each season, fetch schedule from each team to discover game IDs
   //    and collect team IDs (standings doesn't provide them, but schedule does)
+  //
+  //    Every run reads the full season. The club-schedule endpoint returns it
+  //    whole either way, so skipping known games saved no API calls. It only
+  //    skipped inserts, and it dropped any game that was not yet final on an
+  //    earlier run.
   const allGameIds = new Set<number>();
   const gameRows: Map<
     number,
@@ -74,12 +72,7 @@ async function main() {
   const teamById = new Map<number, { id: number; abbrev: string; name: string; logoUrl: string | null }>();
 
   for (const sid of seasonIds) {
-    const cutoff = lastIngestedAt.get(sid) ?? null;
-    console.log(
-      cutoff
-        ? `\nDiscovering games for season ${sid} since ${cutoff.toISOString().slice(0, 10)}...`
-        : `\nDiscovering all games for season ${sid} (first run)...`
-    );
+    console.log(`\nDiscovering games for season ${sid}...`);
     const progress = new Progress(abbrevList.length, `Season ${sid}`);
 
     for (let i = 0; i < abbrevList.length; i += CONCURRENCY) {
@@ -107,8 +100,6 @@ async function main() {
           if (game.gameType !== 2 && game.gameType !== 3) continue;
           // Only include completed games
           if (game.gameState !== "OFF" && game.gameState !== "FINAL") continue;
-          // Skip games we already know about
-          if (cutoff && new Date(game.gameDate) <= cutoff) continue;
 
           // Collect team IDs from game data
           for (const side of [game.homeTeam, game.awayTeam]) {
@@ -143,35 +134,48 @@ async function main() {
     }
   }
 
-  // 4b. Insert teams now that we have their IDs from schedule data
+  // 3b. Insert teams now that we have their IDs from schedule data
   const teamList = Array.from(teamById.values());
   if (teamList.length > 0) {
     await db.insert(teams).values(teamList).onConflictDoNothing();
   }
   console.log(`\nInserted/updated ${teamList.length} teams`);
 
-  // 5. Batch insert new games
-  const newGameCount = gameRows.size;
-  console.log(`\nInserting ${newGameCount} new game(s)...`);
+  // 4. Upsert games.
+  //    Scores and dates refresh on every run, so a game first seen while it was
+  //    still provisional corrects itself later. The progress flags stay
+  //    untouched, or a re-run would discard completed shift and event work.
+  const gameCount = gameRows.size;
+  console.log(`\nUpserting ${gameCount} game(s)...`);
   const gameValues = Array.from(gameRows.values());
   const BATCH_SIZE = 500;
 
   for (let i = 0; i < gameValues.length; i += BATCH_SIZE) {
     const batch = gameValues.slice(i, i + BATCH_SIZE);
-    await db.insert(games).values(batch).onConflictDoNothing();
+    await db
+      .insert(games)
+      .values(batch)
+      .onConflictDoUpdate({
+        target: games.id,
+        set: {
+          seasonId: sql`excluded.season_id`,
+          gameType: sql`excluded.game_type`,
+          gameDate: sql`excluded.game_date`,
+          homeTeamId: sql`excluded.home_team_id`,
+          awayTeamId: sql`excluded.away_team_id`,
+          homeScore: sql`excluded.home_score`,
+          awayScore: sql`excluded.away_score`,
+        },
+      });
   }
 
-  // 6. Mark seasons as ingested and record timestamp
-  const now = new Date();
+  // 5. Mark seasons as ingested
   for (const sid of seasonIds) {
-    await db
-      .update(seasons)
-      .set({ ingested: true, lastGamesIngestedAt: now })
-      .where(eq(seasons.id, sid));
+    await db.update(seasons).set({ ingested: true }).where(eq(seasons.id, sid));
   }
 
   console.log(
-    `\nDone! Discovered ${newGameCount} new game(s) across ${seasonIds.length} season(s).`
+    `\nDone! Upserted ${gameCount} game(s) across ${seasonIds.length} season(s).`
   );
   await client.end();
 }

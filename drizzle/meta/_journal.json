@@ -15,6 +15,13 @@
       "when": 1785875718042,
       "tag": "0001_split_leaderboard_by_pair_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786031774089,
+      "tag": "0002_resume_ingestion_per_game",
+      "breakpoints": true
     }
   ]
 }
