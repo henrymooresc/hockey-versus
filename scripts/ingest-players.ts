@@ -9,8 +9,9 @@ import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
-import { games, players, seasons } from "../src/db/schema";
+import { games, players } from "../src/db/schema";
 import { getBoxscore, getPlayerLanding, setFetchImpl } from "../src/lib/nhl-api";
+import type { BoxscoreResponse } from "../src/types/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
@@ -20,7 +21,7 @@ setFetchImpl(rateLimitedFetch);
 const targetSeasons = parseTargetSeasons();
 const CONCURRENCY = 5;
 
-function extractPlayersFromBoxscore(boxscore: any): Set<number> {
+function extractPlayersFromBoxscore(boxscore: BoxscoreResponse): Set<number> {
   const playerIds = new Set<number>();
   const stats = boxscore.playerByGameStats;
   if (!stats) return playerIds;

@@ -241,8 +241,6 @@ function TeamStatRow({
 }
 
 function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: TeamStats; away: TeamStats } }) {
-  const homeColors = getTeamColors(game.home.abbrev);
-  const awayColors = getTeamColors(game.away.abbrev);
   const homeWon = game.home.score != null && game.away.score != null && game.home.score > game.away.score;
   const awayWon = game.home.score != null && game.away.score != null && game.away.score > game.home.score;
 

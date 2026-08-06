@@ -62,13 +62,13 @@ const PAIR_KINDS = ["skater", "goalie"] as const;
 type PairKind = (typeof PAIR_KINDS)[number];
 
 /** Shape of one scored pair, before it gets a rank. */
-const scoredTemplate: {
+interface ScoredPair {
   playerAId: number;
   playerBId: number;
   rivalryScore: number;
   gamesShared: number;
   toiSharedSeconds: number;
-}[] = [];
+}
 
 interface LeaderboardPairRow extends SkaterRivalryInput {
   player_a_id: number;
@@ -146,7 +146,7 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
       // Skater and goalie pairs rank separately. The goalie formula measures a
       // different contest and does not share a scale with the skater one, so a
       // combined board buries whichever side scores lower.
-      const byKind: Record<PairKind, typeof scoredTemplate> = {
+      const byKind: Record<PairKind, ScoredPair[]> = {
         skater: [],
         goalie: [],
       };

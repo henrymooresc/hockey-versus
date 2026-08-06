@@ -11,6 +11,8 @@ const DIVISIONS: Record<string, string[]> = {
   Pacific:      ["ANA", "CGY", "EDM", "LAK", "SJS", "SEA", "VAN", "VGK"],
 };
 
+const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
+
 function abbrevToDivision(abbrev: string): string {
   for (const [division, abbrevs] of Object.entries(DIVISIONS)) {
     if (abbrevs.includes(abbrev)) return division;
@@ -165,7 +167,6 @@ function PlayerList({
 }) {
   const filtered = results;
 
-  const divisionOrder = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
 
   const divisionMap = useMemo(() => {
     // Group by team
@@ -184,7 +185,7 @@ function PlayerList({
 
     // Group teams by division
     const map = new Map<string, Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>>();
-    for (const div of divisionOrder) map.set(div, new Map());
+    for (const div of DIVISION_ORDER) map.set(div, new Map());
 
     for (const [abbrev, group] of teamMap.entries()) {
       const div = abbrevToDivision(abbrev);
@@ -201,7 +202,7 @@ function PlayerList({
       ) : filtered.length === 0 ? (
         <li className="px-5 py-4 text-sm text-gray-500">No players found</li>
       ) : (
-        divisionOrder
+        DIVISION_ORDER
           .filter((div) => divisionMap.get(div)!.size > 0)
           .map((div) => (
             <DivisionSection

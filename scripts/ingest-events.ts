@@ -49,7 +49,7 @@ function normalizeEvent(play: Play) {
   let player1Id: number | null = null;
   let player2Id: number | null = null;
   let player3Id: number | null = null;
-  let teamId: number | null = d?.eventOwnerTeamId ?? null;
+  const teamId: number | null = d?.eventOwnerTeamId ?? null;
 
   switch (eventType) {
     case "goal":
@@ -79,7 +79,7 @@ function normalizeEvent(play: Play) {
       break;
     case "giveaway":
     case "takeaway":
-      player1Id = d?.playerId ?? (d as any)?.playerId ?? null;
+      player1Id = d?.playerId ?? null;
       break;
   }
 
