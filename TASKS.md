@@ -11,6 +11,7 @@ Do these in order. Each item stops the site from feeling finished.
 - [x] Commit `drizzle/meta/` — removed the `.gitignore` rule that excluded it.
 - [x] Fix `npm run lint` — installed ESLint 9 and `eslint-config-next` 16, added `eslint.config.mjs`, and pointed the script at `eslint .`. `eslint-config-next` ships flat config, so no `FlatCompat` shim is needed.
 - [x] Add the lint step to `.github/workflows/ci.yml`. It fails on errors only, since 32 warnings are known debt.
+- [x] Build in CI. It ran lint, types and tests but never built, so a build-only break would have reached deploy. The build needs a placeholder `DATABASE_URL` because `next build` imports every route module; no query runs, so no secret is needed.
 - [ ] Clear the 32 lint warnings, then tighten CI to `eslint . --max-warnings 0`:
     - 22 `@next/next/no-img-element`. Every NHL headshot and team logo is a plain `<img>`. Switching to `next/image` needs sizing work on each one.
     - 8 `react-hooks/set-state-in-effect`. Each data panel resets state and fetches inside one effect, which costs an extra render. Fixing it means restructuring fetching in eight components, so the rule is set to `warn` rather than silenced.
@@ -42,8 +43,8 @@ deploy needs the full 3.4GB database, not just the derived tables.
 
 - [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season
 - [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
-- [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:240` — slow responses can overwrite newer ones.
-- [ ] Add a `try/catch` to `/api/players/search` — it is the only route without one.
+- [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:241` — slow responses can overwrite newer ones. `SoloAnalysis` and `UpcomingMatchups` already do this; the homepage search still does not.
+- [x] Add a `try/catch` to `/api/players/search` — done during the speed rewrite.
 - [x] Delete the stray `C:/Program Files/Git/home/...` directory in the repo root. A Windows path leaked into a `mkdir` call. It held no files and git never tracked it.
 
 ## UI Enhancements
