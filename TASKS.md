@@ -20,7 +20,8 @@ Do these in order. Each item stops the site from feeling finished.
 ## Deferred — Public Launch
 
 Hosting is on hold. The app queries `shifts` and `game_events` live, so a public
-deploy needs the full 3.4GB database, not just the derived tables.
+deploy needs the whole database, not just the derived tables. That is now
+**1.8GB**, down from 3.4GB, which widens the choice of host.
 
 - [ ] Choose a database host and load the data.
 - [ ] Deploy the Next.js app and point `DATABASE_URL` at the hosted database.
@@ -39,8 +40,33 @@ deploy needs the full 3.4GB database, not just the derived tables.
 - [ ] Decide whether the two boards should share a scale — skater scores run about twice goalie scores at every rank. The cause is the balance term, not the volume term. For a goalie pair, `1 - |goals - saves| / shots` reduces exactly to `2 x shooting percentage`, which real hockey caps near 0.20. Skater categories are near-symmetric and approach 1.0. Split boards make this cosmetic, so fix it only if the two ever need to merge.
 - [ ] Consider spreading the goalie board out — its top 50 spans 8.13 to 9.78, a 20% range, against 14.26 to 19.61 for skaters. That compression lets 14 small samples reach the top 50, where the skater board admits none.
 
+## Using the extracted event fields
+
+`game_events` now carries the useful parts of the NHL play-by-play `details`
+object as typed columns. Nothing scores on them yet. Each item below says what
+to change and what to watch for.
+
+- [ ] **Weight penalties by severity in the rivalry score.** `computeSkaterRivalryScore` counts every penalty the same, so a fight and a 2-minute hooking are equal. `penalty_minutes` holds 2, 4, 5, 10 or 15, and `penalty_desc_key` names the infraction — there are 5,830 fights across the 10 seasons, which is the strongest rivalry signal in the data.
+    - Where: `scripts/compute-versus.ts` aggregates penalties into `penaltiesByA`/`penaltiesByB`. Add a parallel weighted sum, for example minutes rather than a count, and use it in `CATEGORY_WEIGHTS.penalties`.
+    - Watch for: the league mean per game is measured at 5.65 for skaters and 5.47 for goalies, and both are hard-coded in `rivalry-score.ts` as regression priors. Changing what a penalty contributes shifts those means, so re-derive them with the SQL in the `PRIOR_VOLUME_PER_GAME` comment and re-run `compute:versus`.
+
+- [ ] **Attribute shots to the goalie who actually faced them.** The goalie score currently infers the matchup from shared ice time. `goalie_in_net_id` states it directly and covers 1,128,095 of 1,136,064 shots and goals.
+    - Where: `src/lib/versus-engine.ts` builds goalie pairs from shift overlap. Use the column instead, and the pairing becomes exact rather than inferred.
+    - Watch for: this mainly changes empty-net and pulled-goalie situations, where a goalie is off the ice but the old logic still paired them. Expect small score movements, not a rewrite. Re-run `compute:versus` and re-check the goalie board.
+
+- [ ] **Shot quality from `shot_type` and coordinates.** `shot_type` gives wrist, slap, snap, tip-in and so on. `x_coord`/`y_coord` span -100..100 and -42..42, so distance and angle from the net are simple arithmetic, and `zone_code` gives O, D or N.
+    - Uses: shot maps and heat maps on the expanded detail cards, a danger-zone weighting for shots in the rivalry score, or zone-start context.
+
+- [ ] **Game state from the running score.** `home_score`/`away_score` sit on goals and `home_sog`/`away_sog` on shots, so any event can be placed in a close game or a blowout. A hit at 5-0 means less than a hit at 3-3, and the score currently cannot tell them apart.
+
+- [ ] **`reason` on missed and blocked shots** — wide-of-net, hit-crossbar, and so on. Useful for separating near misses from wild ones.
+
 ## Infrastructure
 
+- [ ] Speed up `/api/players/[id]/team-history` — it takes about 760ms, and roughly 300ms of that is a full scan of all 9.8M shift rows. Every index on `shifts` leads with `game_id`, so a bare `player_id IN (...)` filter cannot use one.
+    - Fix without a new index: the final aggregate already joins `shared_games`, which holds only ~400 rows. Drive the join from there so each lookup uses `idx_shifts_game_player` on `(game_id, player_id)`, instead of scanning `shifts` and joining afterwards.
+    - Avoid adding an index on `shifts(player_id)`. It would work, but costs over 100MB, against a table we just shrank.
+    - The four `EXISTS` subqueries above it also scan all 13,187 games each; worth restructuring at the same time.
 - [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season
 - [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
 - [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:241` — slow responses can overwrite newer ones. `SoloAnalysis` and `UpcomingMatchups` already do this; the homepage search still does not.
@@ -80,3 +106,15 @@ deploy needs the full 3.4GB database, not just the derived tables.
 - [x] Playoff game stats toggle
 - [x] Post-game breakdown page — for a single game, show how each pair of players interacted (shared TOI, head-to-head stats), compare those numbers to their season/all-time averages and prior history, and show the game's rivalry score plus how it shifted each pair's running average
 - [x] Team history flowchart on rivalry pairs — when two players have faced each other while on multiple different teams (e.g. Player B was traded mid-rivalry), show a team-logo timeline for each player tracing the teams they played for during their shared games. Helps surface long-running rivalries that span trades.
+
+## Database size
+
+Measured 2026-08-07. Total went from 3433MB to 1812MB, a 47% cut, while
+gaining 13 queryable columns.
+
+- [x] Replace `game_events.details_json` with typed columns. The blob cost 643MB, and most of that was the key names stored again on every one of 3.4M rows. Nothing read it.
+- [x] Drop the serial primary keys on `shifts`, `game_events` and `versus_stats` — 400MB of index that no foreign key referenced. Each table has a natural unique key.
+- [x] Drop `idx_shifts_game_period` (342MB) and `idx_events_type` (24MB). Neither was scanned while exercising every route.
+- [x] Drop `shifts.shift_number` — written by ingestion, never read.
+- [x] Add `uq_game_events_game_event`, declared in the schema but never applied. Without it `onConflictDoNothing` had nothing to conflict against, and a re-run of `ingest-events` had already inserted 492 duplicate events. Those are deleted and `compute:versus` has been re-run.
+- [ ] ~~Query shifts and events from the NHL API instead of storing them~~ — investigated and rejected. Latency is fine for one game (about 160ms for both endpoints in parallel), but only the post-game breakdown reads a single game. `rival-history` needs up to 40 games and `team-history` needs many more, so the tables have to stay. It would have cost 150ms and a hard dependency on NHL uptime to save nothing.
