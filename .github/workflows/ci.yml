@@ -8,7 +8,7 @@ on:
 
 jobs:
   ci:
-    name: Lint, Type Check & Test
+    name: Lint, Type Check, Test & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,15 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # The suite covers pure functions only and opens no connection.
       - name: Test
         run: npm test
+
+      # `next build` imports every route module to collect page data, and
+      # src/db throws when DATABASE_URL is missing. Nothing here runs a query,
+      # so a placeholder is enough. Should a page ever read the database at
+      # build time, this fails loudly rather than reaching for a real one.
+      - name: Build
+        run: npm run build
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
