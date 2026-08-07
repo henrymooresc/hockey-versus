@@ -1,0 +1,1 @@
+CREATE INDEX "idx_shifts_player_game" ON "shifts" USING btree ("player_id","game_id","team_id");

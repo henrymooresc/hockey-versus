@@ -96,7 +96,18 @@ export const shifts = pgTable(
     endSeconds: smallint("end_seconds").notNull(),
   },
   (table) => [
+    /** Per-game lookups: the post-game breakdown and compute:versus. */
     index("idx_shifts_game_player").on(table.gameId, table.playerId),
+    /**
+     * Per-player lookups, for team-history. Covering: team_id rides along so
+     * the scan never touches the heap. Without it that route scanned all 9.8M
+     * rows, because every other index leads with game_id.
+     */
+    index("idx_shifts_player_game").on(
+      table.playerId,
+      table.gameId,
+      table.teamId
+    ),
     uniqueIndex("uq_shifts_game_player_period_time").on(
       table.gameId,
       table.playerId,

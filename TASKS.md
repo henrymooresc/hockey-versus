@@ -63,10 +63,9 @@ to change and what to watch for.
 
 ## Infrastructure
 
-- [ ] Speed up `/api/players/[id]/team-history` — it takes about 760ms, and roughly 300ms of that is a full scan of all 9.8M shift rows. Every index on `shifts` leads with `game_id`, so a bare `player_id IN (...)` filter cannot use one.
-    - Fix without a new index: the final aggregate already joins `shared_games`, which holds only ~400 rows. Drive the join from there so each lookup uses `idx_shifts_game_player` on `(game_id, player_id)`, instead of scanning `shifts` and joining afterwards.
-    - Avoid adding an index on `shifts(player_id)`. It would work, but costs over 100MB, against a table we just shrank.
-    - The four `EXISTS` subqueries above it also scan all 13,187 games each; worth restructuring at the same time.
+- [x] Speed up `/api/players/[id]/team-history` — 700-900ms down to 12-15ms, with byte-identical output. Two changes: a covering index `idx_shifts_player_game` on `(player_id, game_id, team_id)`, since every other index on `shifts` leads with `game_id`; and splitting one joined statement into three small queries.
+    - The split matters more than the index. As one statement the planner estimated the shared-games set at 1.6M rows when the real answer is about 20, and sized every join for that, including a merge join against the whole `games` table. The estimate cannot be fixed from the query: it comes from not knowing how many distinct games one player appears in. Extended statistics on `(player_id, game_id)` were tried and made it worse.
+    - The old shape was also unstable. Which pairs were fast flipped between `ANALYZE` runs, because the plan choice hinged on that bad estimate.
 - [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season
 - [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
 - [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:241` — slow responses can overwrite newer ones. `SoloAnalysis` and `UpcomingMatchups` already do this; the homepage search still does not.

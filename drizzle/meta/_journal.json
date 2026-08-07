@@ -36,6 +36,13 @@
       "when": 1786141924861,
       "tag": "0004_drop_event_json_and_dead_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786144148387,
+      "tag": "0005_add_shifts_player_index",
+      "breakpoints": true
     }
   ]
 }
