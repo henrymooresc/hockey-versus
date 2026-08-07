@@ -106,6 +106,20 @@ export interface PlayDetails {
   playerId?: number;
   reason?: string;
   descKey?: string;
+  /** O, D or N. */
+  zoneCode?: string;
+  /** wrist, slap, snap, tip-in, backhand, and so on. */
+  shotType?: string;
+  /** Penalty minutes served. */
+  duration?: number;
+  /** Penalty class: MIN, MAJ or MIS. */
+  typeCode?: string;
+  /** Running score, present on goals. */
+  homeScore?: number;
+  awayScore?: number;
+  /** Running shots on goal, present on shots. */
+  homeSOG?: number;
+  awaySOG?: number;
 }
 
 export interface RosterSpot {

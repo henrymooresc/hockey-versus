@@ -5,10 +5,8 @@ import {
   text,
   boolean,
   smallint,
-  serial,
   date,
   timestamp,
-  jsonb,
   real,
   uniqueIndex,
   index,
@@ -77,10 +75,13 @@ export const games = pgTable(
   ]
 );
 
+/**
+ * No surrogate key. The natural key below identifies a shift, and a serial id
+ * cost 217MB of index that nothing pointed at.
+ */
 export const shifts = pgTable(
   "shifts",
   {
-    id: serial("id").primaryKey(),
     gameId: integer("game_id")
       .references(() => games.id)
       .notNull(),
@@ -93,16 +94,9 @@ export const shifts = pgTable(
     period: smallint("period").notNull(),
     startSeconds: smallint("start_seconds").notNull(),
     endSeconds: smallint("end_seconds").notNull(),
-    shiftNumber: smallint("shift_number"),
   },
   (table) => [
     index("idx_shifts_game_player").on(table.gameId, table.playerId),
-    index("idx_shifts_game_period").on(
-      table.gameId,
-      table.period,
-      table.startSeconds,
-      table.endSeconds
-    ),
     uniqueIndex("uq_shifts_game_player_period_time").on(
       table.gameId,
       table.playerId,
@@ -116,7 +110,6 @@ export const shifts = pgTable(
 export const gameEvents = pgTable(
   "game_events",
   {
-    id: serial("id").primaryKey(),
     gameId: integer("game_id")
       .references(() => games.id)
       .notNull(),
@@ -128,7 +121,37 @@ export const gameEvents = pgTable(
     player1Id: integer("player1_id").references(() => players.id),
     player2Id: integer("player2_id").references(() => players.id),
     player3Id: integer("player3_id").references(() => players.id),
-    detailsJson: jsonb("details_json"),
+
+    /**
+     * Fields lifted out of the NHL play-by-play `details` object.
+     *
+     * The raw object used to be kept whole, in a `details_json` column that
+     * cost 643MB and that nothing read. Most of that was the key names, stored
+     * again on all 3.4M rows. These columns hold the same information for
+     * roughly a tenth of the space, and can be queried and indexed.
+     *
+     * Nothing scores on them yet. See TASKS.md for how to use them.
+     */
+    /** Rink coordinates. x spans -100..100, y spans -42..42. */
+    xCoord: smallint("x_coord"),
+    yCoord: smallint("y_coord"),
+    /** Zone the event happened in: O, D or N. */
+    zoneCode: varchar("zone_code", { length: 1 }),
+    /** Shots and goals: wrist, slap, snap, tip-in, backhand, and so on. */
+    shotType: varchar("shot_type", { length: 16 }),
+    /** The goalie facing this shot. Present on 99.3% of shots and goals. */
+    goalieInNetId: integer("goalie_in_net_id").references(() => players.id),
+    /** Penalties: minutes served, the infraction, and MIN/MAJ/MIS. */
+    penaltyMinutes: smallint("penalty_minutes"),
+    penaltyDescKey: varchar("penalty_desc_key", { length: 64 }),
+    penaltyTypeCode: varchar("penalty_type_code", { length: 4 }),
+    /** Running score after a goal, and running shots after a shot. */
+    homeScore: smallint("home_score"),
+    awayScore: smallint("away_score"),
+    homeSog: smallint("home_sog"),
+    awaySog: smallint("away_sog"),
+    /** Why a shot missed or was blocked: wide-of-net, hit-crossbar, and so on. */
+    reason: varchar("reason", { length: 24 }),
   },
   (table) => [
     uniqueIndex("uq_game_events_game_event").on(table.gameId, table.eventId),
@@ -137,14 +160,13 @@ export const gameEvents = pgTable(
       table.period,
       table.timeSeconds
     ),
-    index("idx_events_type").on(table.eventType),
   ]
 );
 
+/** Keyed by the unique index below; a serial id added 110MB and served nothing. */
 export const versusStats = pgTable(
   "versus_stats",
   {
-    id: serial("id").primaryKey(),
     playerAId: integer("player_a_id")
       .references(() => players.id)
       .notNull(),

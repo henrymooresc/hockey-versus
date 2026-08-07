@@ -22,6 +22,20 @@
       "when": 1786031774089,
       "tag": "0002_resume_ingestion_per_game",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786141908250,
+      "tag": "0003_add_event_detail_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786141924861,
+      "tag": "0004_drop_event_json_and_dead_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -83,6 +83,13 @@ function normalizeEvent(play: Play) {
       break;
   }
 
+  // Lift the useful parts of `details` into typed columns. Storing the object
+  // whole cost 643MB, most of it the key names repeated on every row.
+  const num = (v: unknown): number | null =>
+    v === null || v === undefined ? null : Number(v);
+  const str = (v: unknown): string | null =>
+    v === null || v === undefined ? null : String(v);
+
   return {
     eventId: play.eventId,
     period: play.periodDescriptor.number,
@@ -92,7 +99,19 @@ function normalizeEvent(play: Play) {
     player1Id,
     player2Id,
     player3Id,
-    detailsJson: d ?? null,
+    xCoord: num(d?.xCoord),
+    yCoord: num(d?.yCoord),
+    zoneCode: str(d?.zoneCode),
+    shotType: str(d?.shotType),
+    goalieInNetId: num(d?.goalieInNetId),
+    penaltyMinutes: num(d?.duration),
+    penaltyDescKey: str(d?.descKey),
+    penaltyTypeCode: str(d?.typeCode),
+    homeScore: num(d?.homeScore),
+    awayScore: num(d?.awayScore),
+    homeSog: num(d?.homeSOG),
+    awaySog: num(d?.awaySOG),
+    reason: str(d?.reason),
   };
 }
 
