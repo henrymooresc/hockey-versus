@@ -17,21 +17,103 @@ Do these in order. Each item stops the site from feeling finished.
     - 8 `react-hooks/set-state-in-effect`. Each data panel resets state and fetches inside one effect, which costs an extra render. Fixing it means restructuring fetching in eight components, so the rule is set to `warn` rather than silenced.
     - 2 `react-hooks/exhaustive-deps`. Both are deliberate: `SoloAnalysis` depends on `allSeasons.length` rather than the array, and `UpcomingMatchups` on `selectedGame?.opponentTeamId` rather than the whole game.
 
-## Deferred — Public Launch
+## Public Launch — Deploy
 
-Hosting is on hold. The app queries `shifts` and `game_events` live, so a public
-deploy needs the whole database, not just the derived tables. That is now
-**1.9GB**, down from 3.4GB, which widens the choice of host.
+The app queries `shifts` and `game_events` live, so a public deploy needs the
+whole database, not just the derived tables.
 
-- [ ] Choose a database host and load the data.
-- [ ] Deploy the Next.js app and point `DATABASE_URL` at the hosted database.
+Measured 2026-08-10, after the 88-game backfill. All 10 seasons are complete:
+
+- On-disk size is **2077MB**. `shifts` 977MB, `versus_stats` 662MB,
+  `game_events` 421MB.
+- The hot indexes total about **460MB**: `idx_versus_pair_season` 180MB,
+  `idx_shifts_player_game` 83MB, `idx_shifts_game_player` 78MB,
+  `idx_events_game_time` 73MB, `idx_versus_player_b` 37MB.
+- `pg_dump -Fc` of the whole database is **153MB** and takes **26 seconds**.
+
+Ask the host for 2GB of database RAM and 10GB of disk. Less RAM than the hot
+index set makes every `shifts` route read from disk.
+
+**The 152MB dump replaces the re-ingest.** A restore moves the data in minutes.
+A fresh ingest costs many hours of NHL API calls and can hit new gaps. Use
+`pg_dump`/`pg_restore` and keep the ingest scripts for daily updates only.
+
+### Blocks the deploy
+
+- [x] **Choose the host shape** — decided 2026-08-10. The app goes on Vercel and
+  the database on Neon. Vercel needs no build config for Next 16, and its CDN
+  honors cache headers with no extra service. That matters here, because every
+  page is a client shell that fetches from `/api`. The rejected option was one
+  container host (Railway, Render, Fly) for both. It gives a simpler pool and a
+  home for the daily ingest, but it costs a `Dockerfile` and still wants a CDN.
+- [x] **Configure the database client** — `src/db/index.ts` passed no options,
+  so it ran a pool of 10 with prepared statements on. Every serverless instance
+  opened its own pool. It now sets `prepare: false`, which the Neon pooled
+  endpoint requires, plus `max: 5` and `idle_timeout: 20`. TLS comes from
+  `sslmode` in `DATABASE_URL`, so local development keeps working.
+- [x] **Use the direct Neon endpoint for the scripts** — all five scripts now
+  call `createScriptDb()` in `scripts/lib/db.ts`, which prefers
+  `DIRECT_DATABASE_URL` and falls back to `DATABASE_URL`. That replaced the
+  same five-line client block repeated in every script.
+- [ ] **Load the data.** Run `drizzle-kit migrate` against the empty Neon
+  database to create the schema, then `pg_restore --data-only --disable-triggers`
+  the 152MB dump. Run `ANALYZE` after the restore. The planner needs fresh
+  statistics, and `team-history` picks a bad plan without them.
+- [x] **Finish the 88 games** — done 2026-08-10, before the dump. See Data
+  Correctness below.
+- [x] **Add the deploy config** — `vercel.json` pins the functions to `iad1`.
+  **Change that region if you provision Neon anywhere but AWS us-east-1.** A
+  mismatch adds cross-region latency to every query, and several routes run
+  more than one. `package.json` also declares `engines.node` as `24.x`, which
+  matches CI.
+- [ ] **Set `DATABASE_URL` in Vercel** to the pooled Neon endpoint, for all
+  three environments. Add `DIRECT_DATABASE_URL` as a separate secret for the
+  ingestion workflow.
+
+### Needed at launch
+
+- [x] **Cache the API responses** — `src/lib/api-cache.ts` holds two policies
+  and a `cachedJson()` helper. `DERIVED` is `s-maxage=3600` with a 24-hour
+  `stale-while-revalidate`, for anything only the scripts change. `SCHEDULE` is
+  `s-maxage=300` with a 1-hour window, for recent games, upcoming games and
+  standings. All 11 routes carry one of the two, verified against a production
+  build. Error responses carry none, so the CDN cannot pin a failure.
+    - `max-age=0` binds browsers, so a reload after a recompute shows new
+      numbers. Only the shared CDN cache holds the longer window.
+    - The breakdown route uses `DERIVED` rather than an immutable policy. A game
+      is only immutable once final, and the route does not check that. One hour
+      already removes almost all database load, so the edge case is not worth
+      the extra state.
+- [x] **Shrink `public/logo.png`** — 2,002,695 bytes to 29,860, a 98.5% cut. It
+  was 1240x403 and is now 620x202, which still covers the 180px header at 3x.
+  The favicon moved to `src/app/icon.png`, the App Router convention, which
+  crops the emblem to 512x512 and gets a hashed URL. Before this, `layout.tsx`
+  pointed `icons` at `/logo.png` and every visitor downloaded the full 2MB.
+    - The header `Image` now declares 180x59 rather than 180x180. It never
+      rendered square: Tailwind preflight sets `height: auto` on every img, so
+      it always drew at the source aspect ratio. The old numbers only gave Next
+      a wrong ratio to reserve space with.
+- [x] **Add `revalidate` to the schedule fetch** in
+  `/api/players/[id]/upcoming` — 300 seconds, matching the window the route
+  advertises. It hit the NHL API on every request before.
+- [ ] See Discovery below for SEO metadata, `robots.txt`, `sitemap.xml` and
+  analytics.
+
+### Needed before the 2026-27 season starts
+
+The last game in the database is 2026-06-14, so no games arrive until October.
+The site can go live with static data before then.
+
+- [ ] Daily ingestion. See Infrastructure below. A scheduled GitHub Actions
+  workflow can run the scripts with `DATABASE_URL` as a secret, which keeps
+  ingestion independent of the app host.
 
 ## Data Correctness
 
 - [x] Fix the missed-game bug in both ingestion scripts. They compared a game date against the wall-clock time of the last run, so a game that was not final on its first scan was skipped forever. Both now resume from a per-game `players_scanned` flag. Recovered 88 games: the 6 regular-season games of 2026-04-16 and all 82 playoffs of 2025-26.
 - [x] Repair the schema drift that stopped ingestion entirely. `seasons.last_games_ingested_at` and `last_players_scanned_at` were declared in `schema.ts` but never existed in the database, so both scripts crashed on their first query. Removed rather than added, since they were the broken mechanism.
-- [x] ~~Backfill the missing games~~ — not needed. The local database is a pre-launch test copy. A fresh host gets a full re-ingest instead.
-- [ ] Run `ingest:shifts`, `ingest:events` and `compute:versus` for the 88 recovered games, or leave them until the re-ingest. They stay invisible to the site until then, because every query requires both progress flags.
+- [x] ~~Backfill the missing games~~ — reopened as the item below. The reason given here was that a fresh host gets a full re-ingest. The deploy now restores a `pg_dump` instead, so the gap travels to the host unless it is closed locally.
+- [x] **Run `ingest:shifts`, `ingest:events` and then `compute:versus` for the 88 recovered games** — done 2026-08-10. All 88 were in season 20252026: the 6 regular-season games of 2026-04-16 and all 82 playoffs. Added 73,434 shifts and 26,340 events, with no HTML fallbacks and no warnings. `compute:versus` then recomputed the whole season: 289,202 pair-season records, `player_season_totals` at 14,023 rows, and `leaderboard_entries` at 13,200 rows across 11 season scopes and 2 pair kinds. Every progress flag in all 10 seasons is now true, so the database is complete and ready to dump.
 - [x] Remove the `versus_stats.rivalry_score` column. No route read it, and `compute-versus` wrote a skater score for goalie pairs. Freed 37MB.
 - [x] Correct small samples in the rankings — skater pairs now regress toward the league mean (5.65 weighted volume per game) with a 10-game prior. Pairs with 1-3 shared games scored twice the league mean before, which was noise. A `*` marks any score built on fewer than 10 shared games.
 - [x] Pass the season filter to `/api/players/[id]/matchup` — the route ignored `seasons`, so Upcoming Matchups always showed all-time data.
@@ -68,8 +150,8 @@ to change and what to watch for.
 - [x] Speed up `/api/players/[id]/team-history` — 700-900ms down to 12-15ms, with byte-identical output. Two changes: a covering index `idx_shifts_player_game` on `(player_id, game_id, team_id)`, since every other index on `shifts` leads with `game_id`; and splitting one joined statement into three small queries.
     - The split matters more than the index. As one statement the planner estimated the shared-games set at 1.6M rows when the real answer is about 20, and sized every join for that, including a merge join against the whole `games` table. The estimate cannot be fixed from the query: it comes from not knowing how many distinct games one player appears in. Extended statistics on `(player_id, game_id)` were tried and made it worse.
     - The old shape was also unstable. Which pairs were fast flipped between `ANALYZE` runs, because the plan choice hinged on that bad estimate.
-- [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season
-- [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
+- [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season. **The bulk-load half is now solved by the `pg_dump` restore in Public Launch.** Only the daily half remains, and it is due before October 2026.
+- [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects. This blocks running a recompute from a small scheduled runner, so fix it with the daily-update work above. A daily delta of about 10 games does not hit the limit.
 - [x] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx`. All three fetching components now cancel superseded requests.
 - [x] Add a `try/catch` to `/api/players/search` — done during the speed rewrite.
 - [x] Delete the stray `C:/Program Files/Git/home/...` directory in the repo root. A Windows path leaked into a `mkdir` call. It held no files and git never tracked it.
