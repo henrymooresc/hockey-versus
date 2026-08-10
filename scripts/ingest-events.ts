@@ -5,8 +5,6 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
 import { games, gameEvents, players, teams } from "../src/db/schema";
 import { getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
@@ -14,6 +12,7 @@ import { rateLimitedFetch } from "./lib/rate-limiter";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 setFetchImpl(rateLimitedFetch);
 import type { Play } from "../src/types/nhl-api";
@@ -116,11 +115,7 @@ function normalizeEvent(play: Play) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   const filtered = await db
     .select({ id: games.id, seasonId: games.seasonId })

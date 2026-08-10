@@ -6,25 +6,20 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { eq, sql } from "drizzle-orm";
 import { seasons, games, teams } from "../src/db/schema";
 import { getStandings, getClubSeasonSchedule, setFetchImpl } from "../src/lib/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 setFetchImpl(rateLimitedFetch);
 
 const CONCURRENCY = 5;
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   const seasonIds = parseTargetSeasons();
   console.log(`Ingesting ${seasonIds.length} season(s): ${seasonIds.join(", ")}`);

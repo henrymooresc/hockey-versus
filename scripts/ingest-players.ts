@@ -6,8 +6,6 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
 import { games, players } from "../src/db/schema";
 import { getBoxscore, getPlayerLanding, setFetchImpl } from "../src/lib/nhl-api";
@@ -15,6 +13,7 @@ import type { BoxscoreResponse } from "../src/types/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 setFetchImpl(rateLimitedFetch);
 
@@ -41,11 +40,7 @@ function extractPlayersFromBoxscore(boxscore: BoxscoreResponse): Set<number> {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   // 1. Get games whose boxscore we have not read yet.
   //    The flag lives on the game, so a game that arrives late still gets

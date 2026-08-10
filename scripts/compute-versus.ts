@@ -5,8 +5,7 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { games, shifts, gameEvents, versusStats, leaderboardEntries } from "../src/db/schema";
 import { unwrapRows } from "../src/lib/db-utils";
@@ -22,6 +21,7 @@ import {
 } from "../src/lib/rivalry-score";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 const targetSeasons = parseTargetSeasons();
 
@@ -195,11 +195,7 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   // Get games that have both shifts and events ingested, for target seasons.
   // Only regular season (gameType=2) and playoffs (gameType=3) — skip preseason.
