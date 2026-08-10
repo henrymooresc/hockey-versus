@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, emptyMatchupStats, type AggRow } from "@/lib/matchup-mapper";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 import type { MatchupPlayer } from "@/types/versus";
 
 /**
@@ -147,7 +148,7 @@ export async function GET(
         oppStats: emptyMatchupStats(),
       }));
 
-    return NextResponse.json({ matchups: [...matchups, ...noHistory] });
+    return cachedJson({ matchups: [...matchups, ...noHistory] }, DERIVED);
   } catch (err: unknown) {
     console.error("Matchup API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

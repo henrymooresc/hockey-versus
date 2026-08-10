@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows } from "@/lib/db-utils";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 
 interface SharedGameRow {
   game_id: number;
@@ -94,10 +95,13 @@ export async function GET(
     const shared = unwrapRows<SharedGameRow>(sharedRows);
 
     if (shared.length === 0) {
-      return NextResponse.json({
-        playerA: { id: playerAId, teams: [] },
-        playerB: { id: playerBId, teams: [] },
-      } satisfies TeamHistoryResponse);
+      return cachedJson(
+        {
+          playerA: { id: playerAId, teams: [] },
+          playerB: { id: playerBId, teams: [] },
+        } satisfies TeamHistoryResponse,
+        DERIVED
+      );
     }
 
     // 2. Dates for exactly those games, and 3. the teams involved.
@@ -179,7 +183,7 @@ export async function GET(
       playerA: { id: playerAId, teams: aTeams },
       playerB: { id: playerBId, teams: bTeams },
     };
-    return NextResponse.json(response);
+    return cachedJson(response, DERIVED);
   } catch (err: unknown) {
     console.error("Team history API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

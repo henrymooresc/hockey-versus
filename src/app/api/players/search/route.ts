@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { players, teams, seasons, versusStats, playerSeasonTotals } from "@/db/schema";
 import { ilike, asc, isNotNull, inArray, and, or, eq, gt, desc, sql } from "drizzle-orm";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
       .orderBy(asc(players.lastName))
       .limit(q && q.length >= 2 ? 50 : 1000);
 
-    return NextResponse.json({ players: results });
+    return cachedJson({ players: results }, DERIVED);
   } catch (err: unknown) {
     console.error("Player search API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

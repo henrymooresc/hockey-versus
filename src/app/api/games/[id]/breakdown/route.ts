@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows } from "@/lib/db-utils";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 import {
   computeGameVersus,
   type ShiftRecord,
@@ -300,11 +301,14 @@ export async function GET(
     );
 
     if (crossTeamPairs.length === 0) {
-      return NextResponse.json({
-        game: shapeGame(game),
-        teamStats,
-        pairs: [],
-      });
+      return cachedJson(
+        {
+          game: shapeGame(game),
+          teamStats,
+          pairs: [],
+        },
+        DERIVED
+      );
     }
 
     // Bulk-load player info
@@ -491,7 +495,7 @@ export async function GET(
 
     pairs.sort((a, b) => b.thisGame.rivalryScore - a.thisGame.rivalryScore);
 
-    return NextResponse.json({ game: shapeGame(game), teamStats, pairs });
+    return cachedJson({ game: shapeGame(game), teamStats, pairs }, DERIVED);
   } catch (err: unknown) {
     console.error("Game breakdown API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

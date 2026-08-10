@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cachedJson, SCHEDULE } from "@/lib/api-cache";
 
 interface NHLStandingsTeam {
   teamAbbrev: { default: string };
@@ -35,7 +36,7 @@ export async function GET() {
       streak: `${t.streakCode}${t.streakCount}`,
     }));
 
-    return NextResponse.json({ standings });
+    return cachedJson({ standings }, SCHEDULE);
   } catch (err) {
     console.error("Standings API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

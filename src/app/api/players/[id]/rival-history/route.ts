@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows } from "@/lib/db-utils";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 import {
   computeSkaterRivalryScore,
   computeGoalieRivalryScore,
@@ -106,7 +107,7 @@ export async function GET(
     const gamesArray = unwrapRows<GameInfo>(gameRows);
 
     if (gamesArray.length === 0) {
-      return NextResponse.json({ games: [] });
+      return cachedJson({ games: [] }, DERIVED);
     }
 
     const gameIds = gamesArray.map((g) => g.game_id);
@@ -372,7 +373,7 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({ games: results });
+    return cachedJson({ games: results }, DERIVED);
   } catch (err) {
     console.error("Rival history API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

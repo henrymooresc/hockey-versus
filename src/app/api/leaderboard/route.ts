@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter } from "@/lib/db-utils";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 import type { BioPlayer } from "@/types/versus";
 
 interface EntryRow {
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
       toiSharedSeconds: row.toi_shared_seconds,
     }));
 
-    return NextResponse.json({ leaderboard });
+    return cachedJson({ leaderboard }, DERIVED);
   } catch (err: unknown) {
     console.error("Leaderboard API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

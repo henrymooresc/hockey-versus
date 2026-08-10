@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, type AggRow } from "@/lib/matchup-mapper";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 
 /**
  * Returns all opponents (split into skaters and goalies) with full stats
@@ -100,7 +101,7 @@ export async function GET(
   const skaterRivals = opponents.filter((o) => o.position !== "G");
   const goalieRivals = opponents.filter((o) => o.position === "G");
 
-  return NextResponse.json({ skaterRivals, goalieRivals });
+  return cachedJson({ skaterRivals, goalieRivals }, DERIVED);
   } catch (err: unknown) {
     console.error("Rivals API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
