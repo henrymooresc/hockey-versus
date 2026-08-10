@@ -123,12 +123,14 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
 /**
  * League mean weighted volume per game for skater pairs, measured over all 10
  * seasons of regular-season data above the 1800-second noise floor. The pooled
- * mean is 5.587 and the unweighted mean 5.565, across 186,955 pairs.
+ * mean is 5.670 and the unweighted mean 5.647, across 187,000 pairs.
  *
  * Re-derive this after a large data change, or after changing any category
  * weight. Sum the weighted categories per pair, divide by total shared games.
+ * Recompute *every* season first: `compute:versus` defaults to the current one,
+ * so a partial run leaves the other nine at zero and skews the mean.
  */
-const PRIOR_VOLUME_PER_GAME = 5.59;
+const PRIOR_VOLUME_PER_GAME = 5.67;
 
 /**
  * The same figure for goalie pairs, measured the same way. The pooled mean was
