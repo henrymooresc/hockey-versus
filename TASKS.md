@@ -21,7 +21,7 @@ Do these in order. Each item stops the site from feeling finished.
 
 Hosting is on hold. The app queries `shifts` and `game_events` live, so a public
 deploy needs the whole database, not just the derived tables. That is now
-**1.8GB**, down from 3.4GB, which widens the choice of host.
+**1.9GB**, down from 3.4GB, which widens the choice of host.
 
 - [ ] Choose a database host and load the data.
 - [ ] Deploy the Next.js app and point `DATABASE_URL` at the hosted database.
@@ -32,7 +32,7 @@ deploy needs the whole database, not just the derived tables. That is now
 - [x] Repair the schema drift that stopped ingestion entirely. `seasons.last_games_ingested_at` and `last_players_scanned_at` were declared in `schema.ts` but never existed in the database, so both scripts crashed on their first query. Removed rather than added, since they were the broken mechanism.
 - [x] ~~Backfill the missing games~~ — not needed. The local database is a pre-launch test copy. A fresh host gets a full re-ingest instead.
 - [ ] Run `ingest:shifts`, `ingest:events` and `compute:versus` for the 88 recovered games, or leave them until the re-ingest. They stay invisible to the site until then, because every query requires both progress flags.
-- [ ] Remove the `versus_stats.rivalry_score` column — no API route reads it, and `compute-versus.ts:235` writes a skater score for goalie pairs. Every route recomputes the score from the raw sums.
+- [ ] Remove the `versus_stats.rivalry_score` column — no API route reads it, and `compute-versus.ts:413` writes a skater score for goalie pairs. Every route recomputes the score from the raw sums.
 - [x] Correct small samples in the rankings — skater pairs now regress toward the league mean (5.65 weighted volume per game) with a 10-game prior. Pairs with 1-3 shared games scored twice the league mean before, which was noise. A `*` marks any score built on fewer than 10 shared games.
 - [x] Pass the season filter to `/api/players/[id]/matchup` — the route ignored `seasons`, so Upcoming Matchups always showed all-time data.
 - [x] Split the leaderboard into a skater board and a shooter-versus-goalie board. The two formulas measure different contests, so one combined board buried every skater pair.
@@ -86,7 +86,7 @@ to change and what to watch for.
 - [ ] Improve post-game breakdown — add per-pair visualizations (e.g. radar, shared-TOI sparkline) and tighten up the layout
 
 ## Refactor
-- [ ] Condense codebase — find reused code (player headers, stat rows, toggle groups, etc.) and consolidate into shared components/utilities
+- [ ] Condense codebase — find reused code (player headers, stat rows, etc.) and consolidate into shared components/utilities. Partly done: `ToggleGroup` now covers the season and game-type toggles in both panels, `SmallSampleMark` the `*` on scores, `BioPlayer` the shared player shape, and `computePairRivalryScore` the skater/goalie dispatch that used to live in three places. Player headers and stat rows are still duplicated.
 
 ## Data & Explanation
 - [x] Rivalry score tooltip/explanation — don't fully surface the formula and weighting to users
@@ -108,12 +108,13 @@ to change and what to watch for.
 
 ## Database size
 
-Measured 2026-08-07. Total went from 3433MB to 1812MB, a 47% cut, while
+Measured 2026-08-07. Total went from 3433MB to 1912MB, a 44% cut, while
 gaining 13 queryable columns.
 
 - [x] Replace `game_events.details_json` with typed columns. The blob cost 643MB, and most of that was the key names stored again on every one of 3.4M rows. Nothing read it.
 - [x] Drop the serial primary keys on `shifts`, `game_events` and `versus_stats` — 400MB of index that no foreign key referenced. Each table has a natural unique key.
 - [x] Drop `idx_shifts_game_period` (342MB) and `idx_events_type` (24MB). Neither was scanned while exercising every route.
+- [x] Add `idx_shifts_player_game` (81MB) for team-history. This is the only index added back, and it took the total from 1812MB to 1912MB.
 - [x] Drop `shifts.shift_number` — written by ingestion, never read.
 - [x] Add `uq_game_events_game_event`, declared in the schema but never applied. Without it `onConflictDoNothing` had nothing to conflict against, and a re-run of `ingest-events` had already inserted 492 duplicate events. Those are deleted and `compute:versus` has been re-run.
 - [ ] ~~Query shifts and events from the NHL API instead of storing them~~ — investigated and rejected. Latency is fine for one game (about 160ms for both endpoints in parallel), but only the post-game breakdown reads a single game. `rival-history` needs up to 40 games and `team-history` needs many more, so the tables have to stay. It would have cost 150ms and a hard dependency on NHL uptime to save nothing.
