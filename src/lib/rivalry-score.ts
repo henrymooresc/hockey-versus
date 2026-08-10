@@ -5,8 +5,8 @@ export interface SkaterRivalryInput {
   hitsByB: number;
   blocksByA: number;
   blocksByB: number;
-  penaltiesByA: number;
-  penaltiesByB: number;
+  penaltyMinutesA: number;
+  penaltyMinutesB: number;
   faceoffWinsA: number;
   faceoffWinsB: number;
   playerAGoals: number;
@@ -51,7 +51,13 @@ const BALANCE_FLOOR = 0.5;
 
 const CATEGORY_WEIGHTS = {
   points: 5,
-  penalties: 4,
+  /**
+   * Per penalty *minute*, not per penalty. A 2-minute minor still contributes
+   * 4, exactly as the old per-penalty weight of 4 did, so the common case is
+   * unchanged. Severity is what this buys: a 5-minute fight now contributes
+   * 10, and a 10-minute misconduct 20.
+   */
+  penaltyMinutes: 2,
   hits: 3,
   blocks: 2,
   faceoffs: 1.5,
@@ -80,7 +86,7 @@ function skaterVolumeAndBalance(
 
   const weightedVolume =
     CATEGORY_WEIGHTS.points * (ptsA + ptsB) +
-    CATEGORY_WEIGHTS.penalties * (input.penaltiesByA + input.penaltiesByB) +
+    CATEGORY_WEIGHTS.penaltyMinutes * (input.penaltyMinutesA + input.penaltyMinutesB) +
     CATEGORY_WEIGHTS.hits * (input.hitsByA + input.hitsByB) +
     CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
     CATEGORY_WEIGHTS.faceoffs * (input.faceoffWinsA + input.faceoffWinsB) +
@@ -88,7 +94,7 @@ function skaterVolumeAndBalance(
 
   const categories: [number, number][] = [
     [ptsA, ptsB],
-    [input.penaltiesByA, input.penaltiesByB],
+    [input.penaltyMinutesA, input.penaltyMinutesB],
     [input.hitsByA, input.hitsByB],
     [input.blocksByA, input.blocksByB],
     [input.faceoffWinsA, input.faceoffWinsB],
@@ -117,12 +123,12 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
 /**
  * League mean weighted volume per game for skater pairs, measured over all 10
  * seasons of regular-season data above the 1800-second noise floor. The pooled
- * mean was 5.663 and the unweighted mean 5.640.
+ * mean is 5.587 and the unweighted mean 5.565, across 186,955 pairs.
  *
- * Re-derive this after a large data change. Sum the weighted categories per
- * pair, divide the total by total shared games.
+ * Re-derive this after a large data change, or after changing any category
+ * weight. Sum the weighted categories per pair, divide by total shared games.
  */
-const PRIOR_VOLUME_PER_GAME = 5.65;
+const PRIOR_VOLUME_PER_GAME = 5.59;
 
 /**
  * The same figure for goalie pairs, measured the same way. The pooled mean was

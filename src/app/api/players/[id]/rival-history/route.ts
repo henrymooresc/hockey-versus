@@ -32,6 +32,7 @@ interface EventRow {
   player1_id: number | null;
   player2_id: number | null;
   player3_id: number | null;
+  penalty_minutes: number | null;
 }
 
 interface GameInfo {
@@ -127,7 +128,7 @@ export async function GET(
     // 3. Bulk load relevant events across all shared games
     const eventsResult = await db.execute(sql`
       SELECT game_id, event_type, period, time_seconds,
-             team_id, player1_id, player2_id, player3_id
+             team_id, player1_id, player2_id, player3_id, penalty_minutes
       FROM game_events
       WHERE game_id IN (${gameIdList})
         AND event_type IN ('goal', 'shot', 'missed_shot', 'blocked_shot',
@@ -205,8 +206,8 @@ export async function GET(
         hitsByB = 0;
       let blocksByA = 0,
         blocksByB = 0;
-      let penaltiesByA = 0,
-        penaltiesByB = 0;
+      let penaltyMinutesA = 0,
+        penaltyMinutesB = 0;
       let faceoffWinsA = 0,
         faceoffWinsB = 0;
       let playerAGoals = 0,
@@ -268,16 +269,19 @@ export async function GET(
             break;
           }
           case "penalty": {
+            // Minutes, matching versus-engine. A missing duration counts as a
+            // minor rather than nothing.
+            const minutes = event.penalty_minutes || 2;
             if (
               event.player1_id === playerAId &&
               event.player2_id === playerBId
             )
-              penaltiesByA++;
+              penaltyMinutesA += minutes;
             if (
               event.player1_id === playerBId &&
               event.player2_id === playerAId
             )
-              penaltiesByB++;
+              penaltyMinutesB += minutes;
             break;
           }
           case "faceoff": {
@@ -337,8 +341,8 @@ export async function GET(
             hitsByB: isRequestingA ? hitsByB : hitsByA,
             blocksByA: isRequestingA ? blocksByA : blocksByB,
             blocksByB: isRequestingA ? blocksByB : blocksByA,
-            penaltiesByA: isRequestingA ? penaltiesByA : penaltiesByB,
-            penaltiesByB: isRequestingA ? penaltiesByB : penaltiesByA,
+            penaltyMinutesA: isRequestingA ? penaltyMinutesA : penaltyMinutesB,
+            penaltyMinutesB: isRequestingA ? penaltyMinutesB : penaltyMinutesA,
             faceoffWinsA: isRequestingA ? faceoffWinsA : faceoffWinsB,
             faceoffWinsB: isRequestingA ? faceoffWinsB : faceoffWinsA,
             playerAGoals: pGoals,

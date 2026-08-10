@@ -211,8 +211,8 @@ export const versusStats = pgTable(
     blocksByA: smallint("blocks_by_a").notNull().default(0),
     blocksByB: smallint("blocks_by_b").notNull().default(0),
     // Penalties
-    penaltiesByA: smallint("penalties_by_a").notNull().default(0),
-    penaltiesByB: smallint("penalties_by_b").notNull().default(0),
+    penaltyMinutesA: smallint("penalty_minutes_a").notNull().default(0),
+    penaltyMinutesB: smallint("penalty_minutes_b").notNull().default(0),
     // Faceoffs
     faceoffWinsA: smallint("faceoff_wins_a").notNull().default(0),
     faceoffWinsB: smallint("faceoff_wins_b").notNull().default(0),

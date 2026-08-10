@@ -111,7 +111,7 @@ export function SkaterExpandedDetail({
     { key: "shots", label: "Shots", mine: stats.individualShots, opp: oppStats.individualShots },
     { key: "hits", label: "Hits", mine: stats.hits, opp: oppStats.hits },
     { key: "blocks", label: "Blocks", mine: stats.blocks, opp: oppStats.blocks },
-    { key: "penalties", label: "PIM", mine: stats.penalties, opp: oppStats.penalties, higherIsBetter: false },
+    { key: "penalties", label: "PIM", mine: stats.penaltyMinutes, opp: oppStats.penaltyMinutes, higherIsBetter: false },
   ];
   if (showFaceoffs) {
     radarCategories.push({ key: "fo", label: "FO Wins", mine: stats.faceoffWins, opp: oppStats.faceoffWins });
@@ -147,7 +147,7 @@ export function SkaterExpandedDetail({
           <DetailSectionLabel label="Physical" />
           <DetailStatRow label="Hits" mine={stats.hits} opp={oppStats.hits} />
           <DetailStatRow label="Blocks" mine={stats.blocks} opp={oppStats.blocks} />
-          <DetailStatRow label="Penalties" mine={stats.penalties} opp={oppStats.penalties} higherIsBetter={false} />
+          <DetailStatRow label="PIM" mine={stats.penaltyMinutes} opp={oppStats.penaltyMinutes} higherIsBetter={false} />
 
           {showFaceoffs && (
             <>

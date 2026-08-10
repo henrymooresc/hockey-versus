@@ -21,6 +21,8 @@ export interface EventRecord {
   player1Id: number | null;
   player2Id: number | null;
   player3Id: number | null;
+  /** Minutes served, on penalty events. 2, 4, 5, 10 or 15. */
+  penaltyMinutes?: number | null;
 }
 
 export interface PairStats {
@@ -42,8 +44,8 @@ export interface PairStats {
   hitsByB: number;
   blocksByA: number;
   blocksByB: number;
-  penaltiesByA: number;
-  penaltiesByB: number;
+  penaltyMinutesA: number;
+  penaltyMinutesB: number;
   faceoffWinsA: number;
   faceoffWinsB: number;
   playerAGoals: number;
@@ -150,8 +152,8 @@ export function computeGameVersus(
         hitsByB: 0,
         blocksByA: 0,
         blocksByB: 0,
-        penaltiesByA: 0,
-        penaltiesByB: 0,
+        penaltyMinutesA: 0,
+        penaltyMinutesB: 0,
         faceoffWinsA: 0,
         faceoffWinsB: 0,
         playerAGoals: 0,
@@ -236,8 +238,16 @@ export function computeGameVersus(
             break;
           }
           case "penalty": {
-            if (event.player1Id === playerA && event.player2Id === playerB) stats.penaltiesByA++;
-            if (event.player1Id === playerB && event.player2Id === playerA) stats.penaltiesByB++;
+            // Minutes, not a count, so a fight outweighs a hooking. A missing
+            // or zero duration falls back to a minor rather than scoring
+            // nothing: the infraction still happened between these two.
+            const minutes = event.penaltyMinutes || 2;
+            if (event.player1Id === playerA && event.player2Id === playerB) {
+              stats.penaltyMinutesA += minutes;
+            }
+            if (event.player1Id === playerB && event.player2Id === playerA) {
+              stats.penaltyMinutesB += minutes;
+            }
             break;
           }
           case "faceoff": {

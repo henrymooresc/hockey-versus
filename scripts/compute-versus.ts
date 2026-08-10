@@ -119,8 +119,8 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
           SUM(v.hits_by_b)::int AS "hitsByB",
           SUM(v.blocks_by_a)::int AS "blocksByA",
           SUM(v.blocks_by_b)::int AS "blocksByB",
-          SUM(v.penalties_by_a)::int AS "penaltiesByA",
-          SUM(v.penalties_by_b)::int AS "penaltiesByB",
+          SUM(v.penalty_minutes_a)::int AS "penaltyMinutesA",
+          SUM(v.penalty_minutes_b)::int AS "penaltyMinutesB",
           SUM(v.faceoff_wins_a)::int AS "faceoffWinsA",
           SUM(v.faceoff_wins_b)::int AS "faceoffWinsB",
           SUM(v.player_a_goals)::int AS "playerAGoals",
@@ -274,6 +274,7 @@ async function main() {
           player1Id: gameEvents.player1Id,
           player2Id: gameEvents.player2Id,
           player3Id: gameEvents.player3Id,
+          penaltyMinutes: gameEvents.penaltyMinutes,
         })
         .from(gameEvents)
         .where(inArray(gameEvents.gameId, chunkIds)),
@@ -346,8 +347,8 @@ async function main() {
             existing.hitsByB += stats.hitsByB;
             existing.blocksByA += stats.blocksByA;
             existing.blocksByB += stats.blocksByB;
-            existing.penaltiesByA += stats.penaltiesByA;
-            existing.penaltiesByB += stats.penaltiesByB;
+            existing.penaltyMinutesA += stats.penaltyMinutesA;
+            existing.penaltyMinutesB += stats.penaltyMinutesB;
             existing.faceoffWinsA += stats.faceoffWinsA;
             existing.faceoffWinsB += stats.faceoffWinsB;
             existing.playerAGoals += stats.playerAGoals;
@@ -399,8 +400,8 @@ async function main() {
       hitsByB: row.hitsByB,
       blocksByA: row.blocksByA,
       blocksByB: row.blocksByB,
-      penaltiesByA: row.penaltiesByA,
-      penaltiesByB: row.penaltiesByB,
+      penaltyMinutesA: row.penaltyMinutesA,
+      penaltyMinutesB: row.penaltyMinutesB,
       faceoffWinsA: row.faceoffWinsA,
       faceoffWinsB: row.faceoffWinsB,
       playerAGoals: row.playerAGoals,
@@ -437,8 +438,8 @@ async function main() {
           hitsByB: sql`excluded.hits_by_b`,
           blocksByA: sql`excluded.blocks_by_a`,
           blocksByB: sql`excluded.blocks_by_b`,
-          penaltiesByA: sql`excluded.penalties_by_a`,
-          penaltiesByB: sql`excluded.penalties_by_b`,
+          penaltyMinutesA: sql`excluded.penalty_minutes_a`,
+          penaltyMinutesB: sql`excluded.penalty_minutes_b`,
           faceoffWinsA: sql`excluded.faceoff_wins_a`,
           faceoffWinsB: sql`excluded.faceoff_wins_b`,
           playerAGoals: sql`excluded.player_a_goals`,

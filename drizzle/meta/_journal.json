@@ -50,6 +50,20 @@
       "when": 1786372963473,
       "tag": "0006_drop_dead_rivalry_score",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786373945258,
+      "tag": "0007_add_penalty_minutes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786373970976,
+      "tag": "0008_drop_penalty_counts",
+      "breakpoints": true
     }
   ]
 }

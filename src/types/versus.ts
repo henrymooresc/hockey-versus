@@ -61,7 +61,7 @@ export interface MatchupPlayerStats {
   goalsAgainst: number;
   hits: number;
   blocks: number;
-  penalties: number;
+  penaltyMinutes: number;
   faceoffWins: number;
 }
 

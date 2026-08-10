@@ -34,7 +34,7 @@ function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey
     case "shots": return m.stats.individualShots - m.oppStats.individualShots;
     case "hits": return m.stats.hits - m.oppStats.hits;
     case "blocks": return m.stats.blocks - m.oppStats.blocks;
-    case "pim": return m.oppStats.penalties - m.stats.penalties;
+    case "pim": return m.oppStats.penaltyMinutes - m.stats.penaltyMinutes;
     case "foPct": {
       const total = m.stats.faceoffWins + m.oppStats.faceoffWins;
       return total > 0 ? m.stats.faceoffWins / total : 0;
@@ -292,7 +292,7 @@ function MatchupRow({
               <DiffCell diff={matchup.stats.individualShots - matchup.oppStats.individualShots} />
               <DiffCell diff={matchup.stats.hits - matchup.oppStats.hits} />
               <DiffCell diff={matchup.stats.blocks - matchup.oppStats.blocks} />
-              <DiffCell diff={matchup.oppStats.penalties - matchup.stats.penalties} />
+              <DiffCell diff={matchup.oppStats.penaltyMinutes - matchup.stats.penaltyMinutes} />
               {mode === "center" && (
                 <GoalieStatValue
                   value={foPct(matchup.stats.faceoffWins, matchup.oppStats.faceoffWins)}

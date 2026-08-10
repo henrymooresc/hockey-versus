@@ -45,6 +45,7 @@ interface EventRow {
   player1_id: number | null;
   player2_id: number | null;
   player3_id: number | null;
+  penalty_minutes: number | null;
 }
 
 interface PlayerRow {
@@ -71,8 +72,8 @@ interface CareerRow {
   hits_by_b: number;
   blocks_by_a: number;
   blocks_by_b: number;
-  penalties_by_a: number;
-  penalties_by_b: number;
+  penalty_minutes_a: number;
+  penalty_minutes_b: number;
   faceoff_wins_a: number;
   faceoff_wins_b: number;
   wins_a: number;
@@ -97,7 +98,7 @@ function statsFromPair(stats: PairStats, side: "A" | "B"): PerspectiveStats {
       shots: stats.playerAShots,
       hits: stats.hitsByA,
       blocks: stats.blocksByA,
-      penalties: stats.penaltiesByA,
+      penalties: stats.penaltyMinutesA,
       faceoffWins: stats.faceoffWinsA,
     };
   }
@@ -107,7 +108,7 @@ function statsFromPair(stats: PairStats, side: "A" | "B"): PerspectiveStats {
     shots: stats.playerBShots,
     hits: stats.hitsByB,
     blocks: stats.blocksByB,
-    penalties: stats.penaltiesByB,
+    penalties: stats.penaltyMinutesB,
     faceoffWins: stats.faceoffWinsB,
   };
 }
@@ -141,8 +142,8 @@ function rivalryFromPair(
     hitsByB: stats.hitsByB,
     blocksByA: stats.blocksByA,
     blocksByB: stats.blocksByB,
-    penaltiesByA: stats.penaltiesByA,
-    penaltiesByB: stats.penaltiesByB,
+    penaltyMinutesA: stats.penaltyMinutesA,
+    penaltyMinutesB: stats.penaltyMinutesB,
     faceoffWinsA: stats.faceoffWinsA,
     faceoffWinsB: stats.faceoffWinsB,
     playerAGoals: stats.playerAGoals,
@@ -201,7 +202,7 @@ export async function GET(
       `),
       db.execute(sql`
         SELECT event_type, period, time_seconds, team_id,
-               player1_id, player2_id, player3_id
+               player1_id, player2_id, player3_id, penalty_minutes
         FROM game_events
         WHERE game_id = ${gameId}
           AND event_type IN ('goal','shot','missed_shot','blocked_shot',
@@ -224,6 +225,7 @@ export async function GET(
       player1Id: e.player1_id,
       player2Id: e.player2_id,
       player3Id: e.player3_id,
+      penaltyMinutes: e.penalty_minutes,
     }));
 
     if (shifts.length === 0) {
@@ -341,8 +343,8 @@ export async function GET(
           SUM(hits_by_b)::int AS hits_by_b,
           SUM(blocks_by_a)::int AS blocks_by_a,
           SUM(blocks_by_b)::int AS blocks_by_b,
-          SUM(penalties_by_a)::int AS penalties_by_a,
-          SUM(penalties_by_b)::int AS penalties_by_b,
+          SUM(penalty_minutes_a)::int AS penalty_minutes_a,
+          SUM(penalty_minutes_b)::int AS penalty_minutes_b,
           SUM(faceoff_wins_a)::int AS faceoff_wins_a,
           SUM(faceoff_wins_b)::int AS faceoff_wins_b,
           SUM(wins_a)::int AS wins_a,
@@ -424,8 +426,8 @@ export async function GET(
                 hitsByB: career.hits_by_b,
                 blocksByA: career.blocks_by_a,
                 blocksByB: career.blocks_by_b,
-                penaltiesByA: career.penalties_by_a,
-                penaltiesByB: career.penalties_by_b,
+                penaltyMinutesA: career.penalty_minutes_a,
+                penaltyMinutesB: career.penalty_minutes_b,
                 faceoffWinsA: career.faceoff_wins_a,
                 faceoffWinsB: career.faceoff_wins_b,
                 playerAGoals: career.player_a_goals,
@@ -445,7 +447,7 @@ export async function GET(
             shots: career.player_a_shots / career.games_shared,
             hits: career.hits_by_a / career.games_shared,
             blocks: career.blocks_by_a / career.games_shared,
-            penalties: career.penalties_by_a / career.games_shared,
+            penalties: career.penalty_minutes_a / career.games_shared,
             faceoffWins: career.faceoff_wins_a / career.games_shared,
           };
           careerStatsBPerGame = {
@@ -454,7 +456,7 @@ export async function GET(
             shots: career.player_b_shots / career.games_shared,
             hits: career.hits_by_b / career.games_shared,
             blocks: career.blocks_by_b / career.games_shared,
-            penalties: career.penalties_by_b / career.games_shared,
+            penalties: career.penalty_minutes_b / career.games_shared,
             faceoffWins: career.faceoff_wins_b / career.games_shared,
           };
         }

@@ -16,8 +16,8 @@ const baseSkaterInput: SkaterRivalryInput = {
   hitsByB: 4,
   blocksByA: 3,
   blocksByB: 2,
-  penaltiesByA: 2,
-  penaltiesByB: 2,
+  penaltyMinutesA: 2,
+  penaltyMinutesB: 2,
   faceoffWinsA: 10,
   faceoffWinsB: 10,
   playerAGoals: 3,
@@ -82,7 +82,7 @@ describe("computeSkaterRivalryScore", () => {
       gamesShared: 10,
       hitsByA: 0, hitsByB: 0,
       blocksByA: 0, blocksByB: 0,
-      penaltiesByA: 0, penaltiesByB: 0,
+      penaltyMinutesA: 0, penaltyMinutesB: 0,
       faceoffWinsA: 0, faceoffWinsB: 0,
       playerAGoals: 0, playerAAssists: 0, playerAShots: 0,
       playerBGoals: 0, playerBAssists: 0, playerBShots: 0,
@@ -278,7 +278,7 @@ describe("small-sample regression", () => {
       gamesShared,
       hitsByA: per.hits, hitsByB: per.hits,
       blocksByA: per.blocks, blocksByB: per.blocks,
-      penaltiesByA: per.penalties, penaltiesByB: per.penalties,
+      penaltyMinutesA: per.penalties, penaltyMinutesB: per.penalties,
       faceoffWinsA: per.faceoffs, faceoffWinsB: per.faceoffs,
       playerAGoals: per.points, playerAAssists: 0, playerAShots: per.shots,
       playerBGoals: per.points, playerBAssists: 0, playerBShots: per.shots,
@@ -393,5 +393,47 @@ describe("small-sample regression", () => {
     expect(isSmallSample(PRIOR_GAMES - 1)).toBe(true);
     expect(isSmallSample(PRIOR_GAMES)).toBe(false);
     expect(isSmallSample(PRIOR_GAMES + 1)).toBe(false);
+  });
+});
+
+describe("penalty severity", () => {
+  /** Same number of penalties, different severity. */
+  const withPim = (minutesEach: number): SkaterRivalryInput => ({
+    ...baseSkaterInput,
+    penaltyMinutesA: minutesEach,
+    penaltyMinutesB: minutesEach,
+  });
+
+  it("scores a fight above a minor", () => {
+    // One 5-minute fighting major each, against one 2-minute minor each.
+    expect(computeSkaterRivalryScore(withPim(5))).toBeGreaterThan(
+      computeSkaterRivalryScore(withPim(2))
+    );
+  });
+
+  it("scores a misconduct above a fight", () => {
+    expect(computeSkaterRivalryScore(withPim(10))).toBeGreaterThan(
+      computeSkaterRivalryScore(withPim(5))
+    );
+  });
+
+  it("keeps a minor worth what the old per-penalty weight was", () => {
+    // The old formula scored 4 per penalty. At 2 per minute a 2-minute minor
+    // still contributes 4, so ordinary pairs are unaffected by the change.
+    const oneMinorEach = withPim(2);
+    const noPenalties = withPim(0);
+    const parts = (i: SkaterRivalryInput) => computeSkaterRivalryScore(i);
+    // Difference comes only from the penalty term and the balance multiplier,
+    // so assert the direction and that it is not a runaway.
+    expect(parts(oneMinorEach)).toBeGreaterThan(parts(noPenalties));
+    expect(parts(oneMinorEach)).toBeLessThan(parts(noPenalties) * 1.5);
+  });
+
+  it("still treats a lopsided penalty record as less of a rivalry", () => {
+    const even = { ...baseSkaterInput, penaltyMinutesA: 5, penaltyMinutesB: 5 };
+    const lopsided = { ...baseSkaterInput, penaltyMinutesA: 10, penaltyMinutesB: 0 };
+    expect(computeSkaterRivalryScore(even)).toBeGreaterThan(
+      computeSkaterRivalryScore(lopsided)
+    );
   });
 });
