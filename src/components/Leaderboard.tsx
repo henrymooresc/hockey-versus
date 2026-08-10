@@ -78,6 +78,10 @@ function LeaderboardRow({
 }) {
   const { left, right } = orderPair(entry);
   const teamColorsA = getTeamColors(left.teamAbbrev);
+  // A season id here means the board is scoped to one season, where two teams
+  // meet at most a handful of times. Every pair is a short history, so the mark
+  // would sit on nearly every row and say nothing.
+  const isSingleSeason = seasonsParam !== null;
   return (
     <div
       className={`rounded-lg border transition-colors ${
@@ -96,7 +100,7 @@ function LeaderboardRow({
         <PlayerSide player={right} align="left" />
         <div className="text-right font-mono text-sm font-bold text-amber-400">
           {entry.rivalryScore.toFixed(2)}
-          <SmallSampleMark gamesShared={entry.gamesShared} />
+          {!isSingleSeason && <SmallSampleMark gamesShared={entry.gamesShared} />}
         </div>
         <div className="text-right font-mono text-xs text-gray-400">{entry.gamesShared}</div>
         <div className="text-right font-mono text-xs text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
@@ -166,6 +170,10 @@ function ExpandedPair({
   const opponentIsGoalie = opponent.position === "G";
   const requestingIsGoalie = requesting.position === "G";
 
+  // Same rule as the row above: a single-season board makes the mark uniform
+  // and therefore meaningless.
+  const showSmallSampleMark = seasonsParam === null;
+
   if (opponentIsGoalie || requestingIsGoalie) {
     return (
       <GoalieExpandedDetail
@@ -174,6 +182,7 @@ function ExpandedPair({
         player={requesting}
         playerId={requesting.id}
         standings={standings}
+        showSmallSampleMark={showSmallSampleMark}
       />
     );
   }
@@ -184,6 +193,7 @@ function ExpandedPair({
       player={requesting}
       playerId={requesting.id}
       standings={standings}
+      showSmallSampleMark={showSmallSampleMark}
     />
   );
 }

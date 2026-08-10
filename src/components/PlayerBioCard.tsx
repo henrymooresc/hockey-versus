@@ -171,6 +171,7 @@ export function PlayerBioCard({
   gamesShared,
   toiSharedSeconds,
   standings,
+  showSmallSampleMark = true,
 }: {
   player: BioPlayer;
   opponent: BioPlayer;
@@ -178,6 +179,8 @@ export function PlayerBioCard({
   gamesShared: number;
   toiSharedSeconds: number;
   standings: Map<string, StandingsEntry>;
+  /** False on a single-season view, where every pair is a short history. */
+  showSmallSampleMark?: boolean;
 }) {
   const teamColors = getTeamColors(opponent.teamAbbrev);
   const lookup = (p: BioPlayer) => (p.teamAbbrev ? standings.get(p.teamAbbrev) ?? null : null);
@@ -207,7 +210,7 @@ export function PlayerBioCard({
             }`}
           >
             {rivalryScore.toFixed(2)}
-            <SmallSampleMark gamesShared={gamesShared} />
+            {showSmallSampleMark && <SmallSampleMark gamesShared={gamesShared} />}
           </div>
           <div className="text-[10px] text-gray-500">
             <span className="font-mono text-gray-300">{gamesShared}</span> GP

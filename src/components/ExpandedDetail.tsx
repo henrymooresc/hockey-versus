@@ -93,12 +93,15 @@ export function SkaterExpandedDetail({
   player,
   playerId,
   standings,
+  showSmallSampleMark = true,
 }: {
   matchup: MatchupPlayer;
   showFaceoffs: boolean;
   player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  /** False on a single-season view, where every pair is a short history. */
+  showSmallSampleMark?: boolean;
 }) {
   const { stats, oppStats } = matchup;
   const history = useRivalHistory(playerId, matchup.playerId);
@@ -128,6 +131,7 @@ export function SkaterExpandedDetail({
             gamesShared={matchup.gamesShared}
             toiSharedSeconds={matchup.toiSharedSeconds}
             standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
           />
       </div>
 
@@ -200,12 +204,15 @@ export function GoalieExpandedDetail({
   player,
   playerId,
   standings,
+  showSmallSampleMark = true,
 }: {
   matchup: MatchupPlayer;
   playerPosition: PlayerPosition;
   player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  /** False on a single-season view, where every pair is a short history. */
+  showSmallSampleMark?: boolean;
 }) {
   const { stats, oppStats } = matchup;
   const isPlayerGoalie = playerPosition === "G";
@@ -225,6 +232,7 @@ export function GoalieExpandedDetail({
             gamesShared={matchup.gamesShared}
             toiSharedSeconds={matchup.toiSharedSeconds}
             standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
           />
         </div>
 
@@ -282,6 +290,7 @@ export function GoalieExpandedDetail({
             gamesShared={matchup.gamesShared}
             toiSharedSeconds={matchup.toiSharedSeconds}
             standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
           />
       </div>
 
