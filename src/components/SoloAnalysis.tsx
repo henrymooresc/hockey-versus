@@ -214,6 +214,7 @@ export function SoloAnalysis({
                 playerPosition={player.position}
                 player={player}
                 playerId={player.id}
+                showSmallSampleMark={seasonFilter === "all"}
               />
             ) : (
               <PositionGroup
@@ -225,6 +226,7 @@ export function SoloAnalysis({
                 playerPosition={player.position}
                 player={player}
                 playerId={player.id}
+                showSmallSampleMark={seasonFilter === "all"}
               />
             )}
           </div>

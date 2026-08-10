@@ -84,13 +84,21 @@ function GoalieStatValue({ value, className }: { value: string | number; classNa
   );
 }
 
-function RivalryScoreCell({ score, gamesShared }: { score: number; gamesShared: number }) {
+function RivalryScoreCell({
+  score,
+  gamesShared,
+  showSmallSampleMark,
+}: {
+  score: number;
+  gamesShared: number;
+  showSmallSampleMark: boolean;
+}) {
   return (
     <div className="flex items-center justify-center font-mono text-[11px]">
       <span className={score > 0 ? "text-green-400 font-bold" : score < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
         {score.toFixed(1)}
       </span>
-      <SmallSampleMark gamesShared={gamesShared} />
+      {showSmallSampleMark && <SmallSampleMark gamesShared={gamesShared} />}
     </div>
   );
 }
@@ -193,6 +201,7 @@ function MatchupRow({
   player,
   playerId,
   standings,
+  showSmallSampleMark,
 }: {
   matchup: MatchupPlayer;
   mode?: ColumnMode;
@@ -202,6 +211,7 @@ function MatchupRow({
   player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  showSmallSampleMark: boolean;
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
@@ -282,7 +292,7 @@ function MatchupRow({
               <GoalieStatValue value={matchup.stats.goals} className={matchup.stats.goals > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.assists} className={matchup.stats.assists > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.individualShots} />
-              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} showSmallSampleMark={showSmallSampleMark} />
             </>
           ) : (
             <>
@@ -299,7 +309,7 @@ function MatchupRow({
                   className="text-gray-300"
                 />
               )}
-              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} showSmallSampleMark={showSmallSampleMark} />
             </>
           )
         ) : (
@@ -311,9 +321,9 @@ function MatchupRow({
       {expanded && hasHistory && (
         <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
           {mode === "goalie" ? (
-            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} player={player} playerId={playerId} standings={standings} />
+            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} player={player} playerId={playerId} standings={standings} showSmallSampleMark={showSmallSampleMark} />
           ) : (
-            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} player={player} playerId={playerId} standings={standings} />
+            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} player={player} playerId={playerId} standings={standings} showSmallSampleMark={showSmallSampleMark} />
           )}
         </div>
       )}
@@ -330,6 +340,7 @@ export function PositionGroup({
   playerPosition = null,
   player,
   playerId = 0,
+  showSmallSampleMark = true,
 }: {
   label: string;
   matchups: MatchupPlayer[];
@@ -339,6 +350,12 @@ export function PositionGroup({
   playerPosition?: PlayerPosition;
   player: BioPlayer;
   playerId?: number;
+  /**
+   * False when the panel is scoped to one season. Two teams meet a handful of
+   * times a year, so every pair is a short history and the mark would sit on
+   * nearly every row without telling the reader anything.
+   */
+  showSmallSampleMark?: boolean;
 }) {
   const defaultSort: SortKey = "rivalry";
   const [visibleCount, setVisibleCount] = useState(defaultVisible);
@@ -394,6 +411,7 @@ export function PositionGroup({
             player={player}
             playerId={playerId}
             standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
           />
         ))}
       </div>
