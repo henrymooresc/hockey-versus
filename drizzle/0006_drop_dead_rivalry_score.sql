@@ -1,0 +1,1 @@
+ALTER TABLE "versus_stats" DROP COLUMN "rivalry_score";

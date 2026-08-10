@@ -235,14 +235,23 @@ function PlayerCombobox({
   const debouncedQuery = useDebounce(query, 300);
 
   useEffect(() => {
+    // Abort the previous request when the query changes. Without this a slow
+    // answer for an earlier query can arrive last and replace a newer one.
+    const controller = new AbortController();
     setLoading(true);
     const params = new URLSearchParams({ onRoster: "true", minGames: "10" });
     if (debouncedQuery.length >= 2) params.set("q", debouncedQuery);
-    fetch(`/api/players/search?${params}`)
+    fetch(`/api/players/search?${params}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => setResults(data.players ?? []))
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setResults([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [debouncedQuery]);
 
   const handleSelect = useCallback(

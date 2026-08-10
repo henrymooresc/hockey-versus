@@ -17,7 +17,6 @@ import {
   type PairStats,
 } from "../src/lib/versus-engine";
 import {
-  computeSkaterRivalryScore,
   computePairRivalryScore,
   type SkaterRivalryInput,
 } from "../src/lib/rivalry-score";
@@ -410,7 +409,6 @@ async function main() {
       playerBGoals: row.playerBGoals,
       playerBAssists: row.playerBAssists,
       playerBShots: row.playerBShots,
-      rivalryScore: row.sameTeam ? null : computeSkaterRivalryScore(row),
     }));
 
     // Single insert per batch using excluded pseudo-table for conflict resolution
@@ -449,7 +447,6 @@ async function main() {
           playerBGoals: sql`excluded.player_b_goals`,
           playerBAssists: sql`excluded.player_b_assists`,
           playerBShots: sql`excluded.player_b_shots`,
-          rivalryScore: sql`excluded.rivalry_score`,
           computedAt: new Date(),
         },
       });

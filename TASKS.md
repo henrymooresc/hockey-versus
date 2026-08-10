@@ -32,7 +32,7 @@ deploy needs the whole database, not just the derived tables. That is now
 - [x] Repair the schema drift that stopped ingestion entirely. `seasons.last_games_ingested_at` and `last_players_scanned_at` were declared in `schema.ts` but never existed in the database, so both scripts crashed on their first query. Removed rather than added, since they were the broken mechanism.
 - [x] ~~Backfill the missing games~~ — not needed. The local database is a pre-launch test copy. A fresh host gets a full re-ingest instead.
 - [ ] Run `ingest:shifts`, `ingest:events` and `compute:versus` for the 88 recovered games, or leave them until the re-ingest. They stay invisible to the site until then, because every query requires both progress flags.
-- [ ] Remove the `versus_stats.rivalry_score` column — no API route reads it, and `compute-versus.ts:413` writes a skater score for goalie pairs. Every route recomputes the score from the raw sums.
+- [x] Remove the `versus_stats.rivalry_score` column. No route read it, and `compute-versus` wrote a skater score for goalie pairs. Freed 37MB.
 - [x] Correct small samples in the rankings — skater pairs now regress toward the league mean (5.65 weighted volume per game) with a 10-game prior. Pairs with 1-3 shared games scored twice the league mean before, which was noise. A `*` marks any score built on fewer than 10 shared games.
 - [x] Pass the season filter to `/api/players/[id]/matchup` — the route ignored `seasons`, so Upcoming Matchups always showed all-time data.
 - [x] Split the leaderboard into a skater board and a shooter-versus-goalie board. The two formulas measure different contests, so one combined board buried every skater pair.
@@ -68,7 +68,7 @@ to change and what to watch for.
     - The old shape was also unstable. Which pairs were fast flipped between `ANALYZE` runs, because the plan choice hinged on that bad estimate.
 - [ ] Rework stat ingestion and computation to support initial bulk loads and then daily progressive updates during the season
 - [ ] Stream the upserts in `scripts/compute-versus.ts` — the script holds every pair in memory before it writes. A full 10-season recompute builds ~2.6M objects.
-- [ ] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx:241` — slow responses can overwrite newer ones. `SoloAnalysis` and `UpcomingMatchups` already do this; the homepage search still does not.
+- [x] Add an `AbortController` to the player search fetch in `src/components/PlayerSearch.tsx`. All three fetching components now cancel superseded requests.
 - [x] Add a `try/catch` to `/api/players/search` — done during the speed rewrite.
 - [x] Delete the stray `C:/Program Files/Git/home/...` directory in the repo root. A Windows path leaked into a `mkdir` call. It held no files and git never tracked it.
 
@@ -108,7 +108,7 @@ to change and what to watch for.
 
 ## Database size
 
-Measured 2026-08-07. Total went from 3433MB to 1912MB, a 44% cut, while
+Measured 2026-08-07. Total went from 3433MB to 1875MB, a 45% cut, while
 gaining 13 queryable columns.
 
 - [x] Replace `game_events.details_json` with typed columns. The blob cost 643MB, and most of that was the key names stored again on every one of 3.4M rows. Nothing read it.

@@ -43,6 +43,13 @@
       "when": 1786144148387,
       "tag": "0005_add_shifts_player_index",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786372963473,
+      "tag": "0006_drop_dead_rivalry_score",
+      "breakpoints": true
     }
   ]
 }

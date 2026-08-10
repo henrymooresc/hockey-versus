@@ -226,7 +226,6 @@ export const versusStats = pgTable(
     playerBGoals: smallint("player_b_goals").notNull().default(0),
     playerBAssists: smallint("player_b_assists").notNull().default(0),
     playerBShots: smallint("player_b_shots").notNull().default(0),
-    rivalryScore: real("rivalry_score"),
     computedAt: timestamp("computed_at").defaultNow(),
   },
   (table) => [
