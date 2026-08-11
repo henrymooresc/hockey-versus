@@ -58,10 +58,19 @@ A fresh ingest costs many hours of NHL API calls and can hit new gaps. Use
   call `createScriptDb()` in `scripts/lib/db.ts`, which prefers
   `DIRECT_DATABASE_URL` and falls back to `DATABASE_URL`. That replaced the
   same five-line client block repeated in every script.
-- [ ] **Load the data.** Run `drizzle-kit migrate` against the empty Neon
-  database to create the schema, then `pg_restore --data-only --disable-triggers`
-  the 152MB dump. Run `ANALYZE` after the restore. The planner needs fresh
-  statistics, and `team-history` picks a bad plan without them.
+- [ ] **Load the data with one plain `pg_restore`.** Do **not** run
+  `drizzle-kit migrate` first, and do **not** pass `--data-only`. Checked the
+  dump on 2026-08-11: it already carries the `drizzle` schema and the
+  `__drizzle_migrations` ledger, every index and every constraint, and it needs
+  no extensions. A full restore into an empty database therefore lands the
+  schema, the data and a correct migration ledger in one step.
+    - `--disable-triggers` is the trap. It emits
+      `ALTER TABLE ... DISABLE TRIGGER ALL`, which needs superuser because
+      foreign keys are system triggers. Neon does not grant superuser. A plain
+      full restore does not need the flag anyway: `pg_restore` loads the data
+      first and builds indexes and constraints afterwards.
+    - Run `ANALYZE` after the restore. The planner needs fresh statistics, and
+      `team-history` picks a bad plan without them.
 - [x] **Finish the 88 games** — done 2026-08-10, before the dump. See Data
   Correctness below.
 - [x] **Add the deploy config** — `vercel.json` pins the functions to `iad1`.
