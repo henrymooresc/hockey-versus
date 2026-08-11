@@ -98,7 +98,7 @@ function PlayerHeader({ player, align }: { player: PlayerLite; align: "left" | "
         <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 52, height: 52 }} />
       )}
       <div className="min-w-0">
-        <div className="text-lg font-semibold text-white truncate">
+        <div className="text-lg font-semibold text-gray-100 truncate">
           {player.firstName} {player.lastName}
         </div>
         <div className={`flex items-center gap-1.5 text-xs text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
@@ -171,7 +171,7 @@ function PairCard({ pair, rank }: { pair: PairBreakdown; rank: number }) {
       <div className="grid grid-cols-3 items-center gap-3 mb-5 rounded-lg bg-gray-900/40 px-4 py-3">
         <div className="text-center">
           <div className="text-xs uppercase tracking-widest text-gray-500">Shared TOI</div>
-          <div className="mt-1 font-mono text-xl font-bold text-white">{formatSecondsToTime(thisGame.toiSharedSeconds)}</div>
+          <div className="mt-1 font-mono text-xl font-bold text-gray-100">{formatSecondsToTime(thisGame.toiSharedSeconds)}</div>
           {career && (
             <div className="text-xs text-gray-500">avg {formatSecondsToTime(Math.round(career.avgToiPerGame))}</div>
           )}
@@ -369,7 +369,7 @@ function PlayerListPicker({
               <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 44, height: 44 }} />
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-base font-semibold text-white truncate">
+              <div className="text-base font-semibold text-gray-100 truncate">
                 {selected.firstName} {selected.lastName}
               </div>
               <div className="text-xs text-gray-500">{selected.position ?? "—"}</div>
@@ -379,7 +379,7 @@ function PlayerListPicker({
               tabIndex={0}
               onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onSelect(null); setOpen(false); } }}
-              className="rounded p-1.5 text-gray-500 hover:text-white hover:bg-gray-700/50 transition-colors cursor-pointer text-base"
+              className="rounded p-1.5 text-gray-500 hover:text-gray-100 hover:bg-gray-700/50 transition-colors cursor-pointer text-base"
               title="Clear"
             >
               ✕
@@ -412,7 +412,7 @@ function PlayerListPicker({
                     <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-base text-white truncate">
+                    <div className="text-base text-gray-100 truncate">
                       {player.firstName} {player.lastName}
                     </div>
                   </div>

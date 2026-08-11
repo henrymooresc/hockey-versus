@@ -34,11 +34,11 @@ function TeamStintChip({ stint }: { stint: TeamHistoryStint }) {
       >
         {stint.abbrev ?? "?"}
       </span>
-      <span className="text-gray-700 text-[10px]">·</span>
+      <span className="text-gray-600 text-[10px]">·</span>
       <span className="text-[10px] text-gray-500 whitespace-nowrap">
         {formatRange(stint.firstDate, stint.lastDate)}
       </span>
-      <span className="text-gray-700 text-[10px]">·</span>
+      <span className="text-gray-600 text-[10px]">·</span>
       <span className="text-[10px] text-gray-500 whitespace-nowrap">
         <span className="font-mono text-gray-300">{stint.gameCount}</span> GP
       </span>

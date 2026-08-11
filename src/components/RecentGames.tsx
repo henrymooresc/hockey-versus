@@ -46,7 +46,7 @@ function TeamRow({ side, leading }: { side: SeriesSide; leading: boolean }) {
       >
         {side.abbrev ?? "—"}
       </span>
-      <span className="ml-auto font-mono text-xl font-extrabold tabular-nums text-white">
+      <span className="ml-auto font-mono text-xl font-extrabold tabular-nums text-gray-100">
         {side.wins}
       </span>
     </div>
@@ -76,9 +76,9 @@ function GameChip({ game, sides }: { game: SeriesGame; sides: [SeriesSide, Serie
         G{game.gameNumber}
       </span>
       <span className="font-mono text-sm font-bold tabular-nums">
-        <span className={aWon ? "text-white" : "text-gray-600"}>{a ?? "—"}</span>
-        <span className="mx-0.5 text-gray-700">–</span>
-        <span className={bWon ? "text-white" : "text-gray-600"}>{b ?? "—"}</span>
+        <span className={aWon ? "text-gray-100" : "text-gray-600"}>{a ?? "—"}</span>
+        <span className="mx-0.5 text-gray-600">–</span>
+        <span className={bWon ? "text-gray-100" : "text-gray-600"}>{b ?? "—"}</span>
       </span>
     </Link>
   );

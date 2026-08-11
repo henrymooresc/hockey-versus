@@ -40,14 +40,14 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
           <LineChart data={data} margin={{ top: 5, right: 10, bottom: 0, left: 0 }}>
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 9, fill: "#6B7280" }}
-              axisLine={{ stroke: "#374151" }}
+              tick={{ fontSize: 9, fill: "var(--color-gray-500)" }}
+              axisLine={{ stroke: "var(--color-gray-700)" }}
               tickLine={false}
               interval={history.length > 10 ? Math.floor(history.length / 6) : 0}
             />
             <YAxis
               yAxisId="rivalry"
-              tick={{ fontSize: 9, fill: "#6B7280" }}
+              tick={{ fontSize: 9, fill: "var(--color-gray-500)" }}
               axisLine={false}
               tickLine={false}
               width={30}
@@ -55,7 +55,7 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
             <YAxis
               yAxisId="toi"
               orientation="right"
-              tick={{ fontSize: 9, fill: "#6B7280" }}
+              tick={{ fontSize: 9, fill: "var(--color-gray-500)" }}
               axisLine={false}
               tickLine={false}
               width={28}
@@ -63,12 +63,12 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
+                backgroundColor: "var(--color-gray-800)",
+                border: "1px solid var(--color-gray-700)",
                 borderRadius: 8,
                 fontSize: 11,
               }}
-              labelStyle={{ color: "#9CA3AF" }}
+              labelStyle={{ color: "var(--color-gray-500)" }}
               formatter={(value, name) =>
                 name === "rivalryScore"
                   ? [Number(value).toFixed(1), "Rivalry"]
@@ -79,11 +79,11 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
               content={() => (
                 <div style={{ display: "flex", gap: 12, justifyContent: "center", paddingTop: 2 }}>
                   {([
-                    { label: "Rivalry", color: "#60A5FA", dashed: false },
-                    { label: "TOI", color: "#34D399", dashed: true },
-                    { label: `Avg Rivalry (${avg.toFixed(1)})`, color: "#EF4444", dashed: true },
+                    { label: "Rivalry", color: "var(--color-blue-400)", dashed: false },
+                    { label: "TOI", color: "var(--color-emerald-400)", dashed: true },
+                    { label: `Avg Rivalry (${avg.toFixed(1)})`, color: "var(--color-red-400)", dashed: true },
                   ] as const).map(({ label, color, dashed }) => (
-                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: "#9CA3AF" }}>
+                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: "var(--color-gray-500)" }}>
                       <svg width="12" height="10">
                         <line x1="0" y1="5" x2="12" y2="5" stroke={color} strokeWidth="2" strokeDasharray={dashed ? "4 2" : undefined} />
                       </svg>
@@ -98,34 +98,34 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
                 key={seasonId}
                 yAxisId="rivalry"
                 x={data[index].label}
-                stroke="#4B5563"
+                stroke="var(--color-gray-600)"
                 strokeDasharray="3 3"
-                label={{ value: formatSeason(seasonId), position: "insideTopLeft", fontSize: 8, fill: "#6B7280" }}
+                label={{ value: formatSeason(seasonId), position: "insideTopLeft", fontSize: 8, fill: "var(--color-gray-500)" }}
               />
             ))}
             <ReferenceLine
               yAxisId="rivalry"
               y={avg}
-              stroke="#EF4444"
+              stroke="var(--color-red-400)"
               strokeDasharray="4 3"
             />
             <Line
               yAxisId="rivalry"
               type="monotone"
               dataKey="rivalryScore"
-              stroke="#60A5FA"
+              stroke="var(--color-blue-400)"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#60A5FA" }}
-              activeDot={{ r: 5, fill: "#3B82F6" }}
+              dot={{ r: 3, fill: "var(--color-blue-400)" }}
+              activeDot={{ r: 5, fill: "var(--color-blue-500)" }}
             />
             <Line
               yAxisId="toi"
               type="monotone"
               dataKey="toiMinutes"
-              stroke="#34D399"
+              stroke="var(--color-emerald-400)"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#34D399" }}
-              activeDot={{ r: 5, fill: "#10B981" }}
+              dot={{ r: 3, fill: "var(--color-emerald-400)" }}
+              activeDot={{ r: 5, fill: "var(--color-emerald-400)" }}
               strokeDasharray="5 3"
             />
           </LineChart>

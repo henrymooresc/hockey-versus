@@ -303,7 +303,7 @@ export function GoalieExpandedDetail({
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-400">Shots on Goal</span>
-              <span className="font-mono text-white">{stats.individualShots}</span>
+              <span className="font-mono text-gray-100">{stats.individualShots}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Goals Scored</span>
@@ -315,11 +315,11 @@ export function GoalieExpandedDetail({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Points</span>
-              <span className="font-mono font-bold text-white">{stats.points}</span>
+              <span className="font-mono font-bold text-gray-100">{stats.points}</span>
             </div>
             <div className="flex justify-between border-t border-gray-700/50 pt-1.5">
               <span className="text-gray-400">Shooting %</span>
-              <span className="font-mono text-white">{shootingPct}</span>
+              <span className="font-mono text-gray-100">{shootingPct}</span>
             </div>
           </div>
         </div>
@@ -329,7 +329,7 @@ export function GoalieExpandedDetail({
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-400">Shots Faced</span>
-              <span className="font-mono text-white">{shotsOnGoalie}</span>
+              <span className="font-mono text-gray-100">{shotsOnGoalie}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Goals Against</span>
@@ -337,11 +337,11 @@ export function GoalieExpandedDetail({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Saves</span>
-              <span className="font-mono text-white">{shotsOnGoalie - goalsOnGoalie}</span>
+              <span className="font-mono text-gray-100">{shotsOnGoalie - goalsOnGoalie}</span>
             </div>
             <div className="flex justify-between border-t border-gray-700/50 pt-1.5">
               <span className="text-gray-400">Save %</span>
-              <span className="font-mono font-bold text-white">{goalieSavePct}</span>
+              <span className="font-mono font-bold text-gray-100">{goalieSavePct}</span>
             </div>
           </div>
         </div>

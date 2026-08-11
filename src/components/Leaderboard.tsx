@@ -32,7 +32,7 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
         <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
       )}
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-white truncate">
+        <div className="text-sm font-semibold text-gray-100 truncate">
           {player.firstName} {player.lastName}
         </div>
         <div className={`flex items-center gap-1.5 text-[10px] text-gray-500 ${align === "right" ? "justify-end" : ""}`}>

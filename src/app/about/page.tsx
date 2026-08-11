@@ -6,8 +6,8 @@ export const metadata = {
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl pt-10 pb-20">
-      <h1 className="text-4xl font-extrabold tracking-tight text-white">
-        About <span className="text-[#a62639]">Hockey Versus</span>
+      <h1 className="text-4xl font-extrabold tracking-tight text-gray-100">
+        About <span className="text-[var(--color-brand-red)]">Hockey Versus</span>
       </h1>
       <p className="mt-3 text-lg text-gray-400">
         Compare how NHL players perform when sharing the ice.
@@ -37,26 +37,26 @@ export default function AboutPage() {
         <h2 className="text-xl font-bold text-amber-400">Rivalry Score</h2>
         <p className="mt-3 text-sm leading-relaxed text-gray-300">
           Rivalry Score measures how much happens between two players{" "}
-          <span className="font-semibold text-white">per shared game</span>, not how
+          <span className="font-semibold text-gray-100">per shared game</span>, not how
           much has happened in total. A long career together does not raise the score
           on its own. It is built from three parts:
         </p>
         <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
           <li>
-            <span className="font-semibold text-white">Activity</span> — a weighted
+            <span className="font-semibold text-gray-100">Activity</span> — a weighted
             count of what the two players did to each other, divided by the games they
             shared. A point counts 5, a hit 3, a minute of penalty 2, a block 2, a
             faceoff win 1.5, and a shot 1. Penalties count by minutes served, so a
             2-minute minor contributes 4 and a 5-minute fight 10.
           </li>
           <li>
-            <span className="font-semibold text-white">Balance</span> — how evenly
+            <span className="font-semibold text-gray-100">Balance</span> — how evenly
             those events split between the two. An even matchup scores higher than a
             one-sided one. This scales the result between 0.5 and 1.0, so balance can
             halve a score but never erase it.
           </li>
           <li>
-            <span className="font-semibold text-white">Sample size</span> — every pair
+            <span className="font-semibold text-gray-100">Sample size</span> — every pair
             is credited with 10 games of league-average play before its own record
             takes over. Two players who met twice in a wild game would otherwise
             outrank a decade-long rivalry on noise alone.
@@ -95,22 +95,22 @@ export default function AboutPage() {
         <h2 className="text-xl font-bold text-emerald-400">Reading the views</h2>
         <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
           <li>
-            <span className="font-semibold text-white">All-Time Rivals</span> — every
+            <span className="font-semibold text-gray-100">All-Time Rivals</span> — every
             opponent the selected player has shared ice with, sorted by Rivalry Score.
             Filter by name or team, set a minimum shared ice time, and switch between
             skater and goalie opponents.
           </li>
           <li>
-            <span className="font-semibold text-white">Upcoming Matchups</span> — the
+            <span className="font-semibold text-gray-100">Upcoming Matchups</span> — the
             games on the player&apos;s current schedule, each showing their history
             against that opponent&apos;s roster.
           </li>
           <li>
-            <span className="font-semibold text-white">Leaderboard</span> — the highest
+            <span className="font-semibold text-gray-100">Leaderboard</span> — the highest
             scoring pairs in the league, on separate skater and goalie boards.
           </li>
           <li>
-            <span className="font-semibold text-white">Games</span> — recent games,
+            <span className="font-semibold text-gray-100">Games</span> — recent games,
             grouped into playoff series. Open any game to see how each pair matched up
             in it, and how that compares to their usual meetings.
           </li>

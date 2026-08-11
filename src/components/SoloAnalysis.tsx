@@ -105,7 +105,7 @@ export function SoloAnalysis({
 
   return (
     <div className="mt-8">
-      <h2 className="mb-8 text-center text-2xl font-bold text-white">
+      <h2 className="mb-8 text-center text-2xl font-bold text-gray-100">
         {player.firstName} {player.lastName}
         <span className="ml-2 text-lg text-gray-500">Analysis</span>
       </h2>
@@ -127,12 +127,12 @@ export function SoloAnalysis({
                     value={nameQuery}
                     onChange={(e) => setNameQuery(e.target.value)}
                     placeholder="Filter by name…"
-                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
                   />
                   {nameQuery && (
                     <button
                       onClick={() => setNameQuery("")}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-white"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-100"
                       title="Clear"
                     >
                       ✕
@@ -144,7 +144,7 @@ export function SoloAnalysis({
                   onChange={(e) => setTeamFilter(e.target.value)}
                   /* A minimum width, so the very first load does not widen it
                      from "All teams" to a full team name and shift the row. */
-                  className="min-w-[150px] rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none"
+                  className="min-w-[150px] rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
                   title="Filter by team"
                 >
                   <option value="">All teams</option>
@@ -161,7 +161,7 @@ export function SoloAnalysis({
                     min={0}
                     value={minTOI}
                     onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-white focus:border-blue-500 focus:outline-none"
+                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
                   />
                 </label>
                 <PositionTabs

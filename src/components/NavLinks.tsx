@@ -34,10 +34,12 @@ export function NavLinks() {
           <Link
             key={href}
             href={href}
+            /* Brand chrome comes from theme variables, so the nav follows the
+               light and dark themes with the rest of the site. */
             className={`flex shrink-0 items-center whitespace-nowrap px-5 text-sm font-semibold uppercase tracking-widest border-b-2 transition-colors duration-200 ${
               isActive
-                ? "border-[#a62639] text-white bg-[#1b2a4a]/40"
-                : "border-transparent text-[#5a7baa] hover:bg-[#1b2a4a]/20 hover:text-gray-200"
+                ? "border-[var(--color-brand-red)] bg-[var(--color-nav-active-bg)]/40 text-gray-100"
+                : "border-transparent text-[var(--color-nav-link)] hover:bg-[var(--color-nav-active-bg)]/20 hover:text-gray-200"
             }`}
           >
             {label}

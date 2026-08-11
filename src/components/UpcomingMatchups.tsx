@@ -65,7 +65,7 @@ function GameSelector({
               />
             )}
             <div className="text-left">
-              <div className="text-sm font-semibold text-white">
+              <div className="text-sm font-semibold text-gray-100">
                 {game.isHome ? "vs" : "@"} {game.opponentAbbrev}
               </div>
               <div className="text-xs text-gray-500">{formatDate(game.gameDate)}</div>

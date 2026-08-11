@@ -20,7 +20,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
   return (
     <div className="flex flex-col gap-6 pt-8 pb-16">
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-100">
           Post-Game <span className="text-amber-400">Breakdown</span>
         </h1>
       </div>
