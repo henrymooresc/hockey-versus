@@ -7,6 +7,7 @@ import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
 import { SmallSampleMark } from "./SmallSampleMark";
+import { RemoteImage } from "./RemoteImage";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -234,11 +235,12 @@ function MatchupRow({
         onClick={isClickable ? onToggle : undefined}
       >
         {matchup.headshotUrl ? (
-          <img
+          <RemoteImage
             src={matchup.headshotUrl}
             alt=""
+            width={30}
+            height={30}
             className="rounded-full object-cover ring-1 ring-gray-600"
-            style={{ width: 30, height: 30 }}
           />
         ) : (
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
@@ -251,7 +253,7 @@ function MatchupRow({
             >
               {matchup.teamLogoUrl ? (
                 <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
-                  <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 20, height: 20 }} />
+                  <RemoteImage src={matchup.teamLogoUrl} alt="" width={20} height={20} className="object-contain" />
                 </span>
               ) : (
                 <span

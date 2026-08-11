@@ -4,6 +4,7 @@ import type { BioPlayer, StandingsEntry } from "@/types/versus";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 import { SmallSampleMark } from "./SmallSampleMark";
+import { RemoteImage } from "./RemoteImage";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -34,9 +35,11 @@ function PlayerIdentity({ player, align }: { player: BioPlayer; align: "left" | 
   return (
     <div className={`flex min-w-0 items-center gap-3 ${isRight ? "flex-row-reverse text-right" : ""}`}>
       {player.headshotUrl ? (
-        <img
+        <RemoteImage
           src={player.headshotUrl}
           alt={`${player.firstName} ${player.lastName}`}
+          width={64}
+          height={64}
           className="rounded-lg object-cover shrink-0"
           style={{
             width: 64,
@@ -129,7 +132,7 @@ function TeamStrip({
             className="flex items-center justify-center rounded"
             style={{ width: 18, height: 18, background: "rgba(255,255,255,0.12)" }}
           >
-            <img src={player.teamLogoUrl} alt="" className="object-contain" style={{ width: 14, height: 14 }} />
+            <RemoteImage src={player.teamLogoUrl} alt="" width={14} height={14} className="object-contain" />
           </span>
         )}
         {player.teamAbbrev && (
