@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import type { LeaderboardEntry } from "@/app/api/leaderboard/route";
@@ -9,6 +9,9 @@ import { Skeleton } from "./Skeleton";
 import { SkaterExpandedDetail, GoalieExpandedDetail } from "./ExpandedDetail";
 import { SmallSampleMark } from "./SmallSampleMark";
 import { useStandings } from "@/hooks/useStandings";
+import { useFetchedData } from "@/hooks/useFetchedData";
+import { useKeyedState } from "@/hooks/useKeyedState";
+import { RemoteImage } from "./RemoteImage";
 
 interface SeasonMeta { id: string; startDate: string | null; endDate: string | null; }
 
@@ -17,11 +20,13 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
   return (
     <div className={`flex items-center gap-2 min-w-0 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
       {player.headshotUrl ? (
-        <img
+        <RemoteImage
           src={player.headshotUrl}
           alt=""
+          width={36}
+          height={36}
           className="rounded-full object-cover shrink-0"
-          style={{ width: 36, height: 36, border: `2px solid ${colors.primary}80` }}
+          style={{ border: `2px solid ${colors.primary}80`, width: 36, height: 36 }}
         />
       ) : (
         <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
@@ -32,7 +37,7 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
         </div>
         <div className={`flex items-center gap-1.5 text-[10px] text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
           {player.teamLogoUrl && (
-            <img src={player.teamLogoUrl} alt="" className="object-contain" style={{ width: 12, height: 12 }} />
+            <RemoteImage src={player.teamLogoUrl} alt="" width={12} height={12} className="object-contain" />
           )}
           <span style={{ color: getTeamDisplayColor(player.teamAbbrev) }} className="font-semibold">
             {player.teamAbbrev ?? "—"}
@@ -123,38 +128,33 @@ function ExpandedPair({
   seasonsParam: string | null;
   gameTypeParam: string;
 }) {
-  const [matchup, setMatchup] = useState<MatchupPlayer | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const standings = useStandings();
 
   // Same order the row header shows, so a player's stats stay under their name.
   const { left: requesting, right: opponent } = orderPair(entry);
 
-  useEffect(() => {
-    setMatchup(null);
-    setError(null);
+  const url = useMemo(() => {
     const params = new URLSearchParams({
       opponentId: String(opponent.id),
       gameType: gameTypeParam,
     });
     if (seasonsParam) params.set("seasons", seasonsParam);
-    fetch(`/api/players/${requesting.id}/rivals?${params}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Failed to load matchup");
-        return data;
-      })
-      .then((data) => {
-        const all: MatchupPlayer[] = [...(data.skaterRivals ?? []), ...(data.goalieRivals ?? [])];
-        const found = all.find((m) => m.playerId === opponent.id) ?? null;
-        if (!found) {
-          setError("No matchup data");
-          return;
-        }
-        setMatchup(found);
-      })
-      .catch((err) => setError(err.message));
+    return `/api/players/${requesting.id}/rivals?${params}`;
   }, [requesting.id, opponent.id, seasonsParam, gameTypeParam]);
+
+  const { data, error: fetchError } = useFetchedData<{
+    skaterRivals?: MatchupPlayer[];
+    goalieRivals?: MatchupPlayer[];
+  }>(url);
+
+  const matchup = useMemo(() => {
+    if (!data) return null;
+    const all = [...(data.skaterRivals ?? []), ...(data.goalieRivals ?? [])];
+    return all.find((m) => m.playerId === opponent.id) ?? null;
+  }, [data, opponent.id]);
+
+  // The request can succeed and still hold no row for this pair.
+  const error = fetchError ?? (data && !matchup ? "No matchup data" : null);
 
   if (error) {
     return <div className="px-4 py-3 text-center text-sm text-red-400">{error}</div>;
@@ -224,9 +224,6 @@ export function Leaderboard() {
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
   const [pairKind, setPairKind] = useState<PairKind>("skater");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
-  const [entries, setEntries] = useState<LeaderboardEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/seasons").then((r) => r.json()).then((d) => setAllSeasons(d.seasons ?? [])).catch(() => {});
@@ -235,27 +232,22 @@ export function Leaderboard() {
   const seasonsParam =
     seasonFilter === "current" && allSeasons.length > 0 ? allSeasons[0].id : null;
 
-  useEffect(() => {
-    setEntries(null);
-    setError(null);
-    setExpandedKey(null);
+  // Null until the season list arrives in "current" mode, so the first request
+  // never goes out unfiltered.
+  const url = useMemo(() => {
+    if (seasonFilter === "current" && allSeasons.length === 0) return null;
     const params = new URLSearchParams({ limit: "50" });
-    if (seasonFilter === "current" && allSeasons.length > 0) {
-      params.set("season", allSeasons[0].id);
-    } else if (seasonFilter === "current") {
-      return;
-    }
+    if (seasonFilter === "current") params.set("season", allSeasons[0].id);
     params.set("gameType", gameTypeFilter);
     params.set("kind", pairKind);
-    fetch(`/api/leaderboard?${params}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Failed to load leaderboard");
-        return data;
-      })
-      .then((data) => setEntries(data.leaderboard))
-      .catch((err) => setError(err.message));
+    return `/api/leaderboard?${params}`;
   }, [seasonFilter, gameTypeFilter, pairKind, allSeasons]);
+
+  const { data, error } = useFetchedData<{ leaderboard: LeaderboardEntry[] }>(url);
+  const entries = data?.leaderboard ?? null;
+
+  // The open row belongs to one board, so a filter change closes it.
+  const [expandedKey, setExpandedKey] = useKeyedState<string | null>(url ?? "", null);
 
   return (
     <div className="w-full">

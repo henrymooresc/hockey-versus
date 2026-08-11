@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { PlayerSearchResult } from "@/types/versus";
+import { useFetchedData } from "@/hooks/useFetchedData";
 import { SoloAnalysis } from "./SoloAnalysis";
+import { RemoteImage } from "./RemoteImage";
 
 const DIVISIONS: Record<string, string[]> = {
   Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
@@ -47,7 +49,7 @@ function PlayerRow({
       }`}
     >
       {player.headshotUrl ? (
-        <img src={player.headshotUrl} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600 transition-all duration-150 group-hover:ring-gray-400" />
+        <RemoteImage src={player.headshotUrl} alt="" width={48} height={48} className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600 transition-all duration-150 group-hover:ring-gray-400" />
       ) : (
         <div className="h-12 w-12 rounded-full bg-gray-600 ring-2 ring-gray-500" />
       )}
@@ -78,11 +80,11 @@ function TeamGroup({
   onSelect: (p: PlayerSearchResult) => void;
   defaultOpen: boolean;
 }) {
+  // The caller keys this component on `defaultOpen`, so a change in filtering
+  // remounts it and this initialiser picks up the new default. Syncing the
+  // prop in an effect instead cost a render, and a group the user had
+  // collapsed stayed collapsed when filtering resumed.
   const [open, setOpen] = useState(defaultOpen);
-
-  useEffect(() => {
-    setOpen(defaultOpen);
-  }, [defaultOpen]);
 
   return (
     <li className="border-b border-gray-700 last:border-0">
@@ -92,7 +94,7 @@ function TeamGroup({
       >
         {logoUrl ? (
           <span className="flex items-center justify-center rounded" style={{ width: 32, height: 32, background: "rgba(255,255,255,0.15)" }}>
-            <img src={logoUrl} alt={teamAbbrev} className="object-contain" style={{ width: 26, height: 26 }} />
+            <RemoteImage src={logoUrl} alt={teamAbbrev} width={26} height={26} className="object-contain" />
           </span>
         ) : (
           <div className="h-8 w-8" />
@@ -137,7 +139,7 @@ function DivisionSection({
       <ul>
         {sorted.map(([abbrev, group]) => (
           <TeamGroup
-            key={abbrev}
+            key={`${abbrev}-${isFiltering}`}
             teamAbbrev={abbrev}
             teamName={group.teamName}
             logoUrl={group.logoUrl}
@@ -230,29 +232,18 @@ function PlayerCombobox({
   onSelect: (player: PlayerSearchResult | null) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PlayerSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
 
-  useEffect(() => {
-    // Abort the previous request when the query changes. Without this a slow
-    // answer for an earlier query can arrive last and replace a newer one.
-    const controller = new AbortController();
-    setLoading(true);
+  // `useFetchedData` aborts a superseded request, so a slow answer for an
+  // earlier query cannot arrive last and replace a newer one.
+  const url = useMemo(() => {
     const params = new URLSearchParams({ onRoster: "true", minGames: "10" });
     if (debouncedQuery.length >= 2) params.set("q", debouncedQuery);
-    fetch(`/api/players/search?${params}`, { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data) => setResults(data.players ?? []))
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        setResults([]);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+    return `/api/players/search?${params}`;
   }, [debouncedQuery]);
+
+  const { data, loading } = useFetchedData<{ players?: PlayerSearchResult[] }>(url);
+  const results = useMemo(() => data?.players ?? [], [data]);
 
   const handleSelect = useCallback(
     (player: PlayerSearchResult) => {
@@ -271,7 +262,7 @@ function PlayerCombobox({
       {selected ? (
         <div className="flex items-center gap-4 rounded-xl border-2 border-blue-500/70 bg-gradient-to-r from-blue-950/40 to-gray-800 px-5 py-4 shadow-lg shadow-blue-500/5 transition-all duration-300">
           {selected.headshotUrl ? (
-            <img src={selected.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400/70" />
+            <RemoteImage src={selected.headshotUrl} alt="" width={56} height={56} eager className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400/70" />
           ) : (
             <div className="h-14 w-14 rounded-full bg-gray-600" />
           )}

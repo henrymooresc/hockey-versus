@@ -14,6 +14,7 @@ import {
 } from "./ToggleGroup";
 import { RivalsPanelSkeleton } from "./Skeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { useFetchedData } from "@/hooks/useFetchedData";
 
 interface SeasonMeta {
   id: string;
@@ -26,10 +27,6 @@ export function SoloAnalysis({
 }: {
   player: PlayerSearchResult;
 }) {
-  const [skaterRivals, setSkaterRivals] = useState<MatchupPlayer[] | null>(null);
-  const [goalieRivals, setGoalieRivals] = useState<MatchupPlayer[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
   const [minTOI, setMinTOI] = useState(900);
   const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("current");
@@ -50,38 +47,25 @@ export function SoloAnalysis({
     return [allSeasons[0].id];
   }, [seasonFilter, allSeasons]);
 
-  useEffect(() => {
-    // Wait for the seasons list before firing in "current" mode — otherwise the
-    // first fetch goes out without a season filter and can race the filtered one.
-    if (seasonFilter === "current" && allSeasons.length === 0) return;
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+  // Null holds the request back until the seasons list arrives in "current"
+  // mode. Otherwise the first fetch goes out without a season filter and can
+  // race the filtered one.
+  const rivalsUrl = useMemo(() => {
+    if (seasonFilter === "current" && allSeasons.length === 0) return null;
     const params = new URLSearchParams();
     if (seasonIds) params.set("seasons", seasonIds.join(","));
     params.set("gameType", gameTypeFilter);
-    fetch(`/api/players/${player.id}/rivals?${params}`, { signal: controller.signal })
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Failed to fetch rivals");
-        return data;
-      })
-      .then((data) => {
-        setSkaterRivals(data.skaterRivals);
-        setGoalieRivals(data.goalieRivals);
-      })
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        setError(err.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+    return `/api/players/${player.id}/rivals?${params}`;
   }, [player.id, seasonIds, gameTypeFilter, seasonFilter, allSeasons.length]);
 
-  const allSkaterRivals = skaterRivals ?? [];
+  const { data, error, loading } = useFetchedData<{
+    skaterRivals: MatchupPlayer[];
+    goalieRivals: MatchupPlayer[];
+  }>(rivalsUrl);
+
+  // Memoised so `teamOptions` below does not recompute on every render.
+  const allSkaterRivals = useMemo(() => data?.skaterRivals ?? [], [data]);
+  const goalieRivals = useMemo(() => data?.goalieRivals ?? null, [data]);
   const q = nameQuery.trim().toLowerCase();
   const matchesName = (r: MatchupPlayer) =>
     q === "" ||

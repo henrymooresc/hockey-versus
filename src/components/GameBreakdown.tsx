@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { formatSecondsToTime, formatSecondsToHMS } from "@/lib/time-utils";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
+import { useFetchedData } from "@/hooks/useFetchedData";
+import { useKeyedState } from "@/hooks/useKeyedState";
 import { Skeleton } from "./Skeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { RemoteImage } from "./RemoteImage";
 
 interface PlayerLite {
   id: number;
@@ -83,9 +86,11 @@ function PlayerHeader({ player, align }: { player: PlayerLite; align: "left" | "
   return (
     <div className={`flex items-center gap-3 min-w-0 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
       {player.headshotUrl ? (
-        <img
+        <RemoteImage
           src={player.headshotUrl}
           alt=""
+          width={52}
+          height={52}
           className="rounded-full object-cover shrink-0"
           style={{ width: 52, height: 52, border: `2px solid ${colors.primary}80` }}
         />
@@ -98,7 +103,7 @@ function PlayerHeader({ player, align }: { player: PlayerLite; align: "left" | "
         </div>
         <div className={`flex items-center gap-1.5 text-xs text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
           {player.teamLogoUrl && (
-            <img src={player.teamLogoUrl} alt="" className="object-contain" style={{ width: 16, height: 16 }} />
+            <RemoteImage src={player.teamLogoUrl} alt="" width={16} height={16} className="object-contain" />
           )}
           <span style={{ color: getTeamDisplayColor(player.teamAbbrev) }} className="font-semibold">
             {player.teamAbbrev ?? "—"}
@@ -258,7 +263,7 @@ function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: T
             <div className="text-[10px] uppercase tracking-wider text-gray-500">home</div>
           </div>
           {game.home.logoUrl && (
-            <img src={game.home.logoUrl} alt="" className="object-contain" style={{ width: 48, height: 48, filter: homeWon ? undefined : "saturate(0.6)" }} />
+            <RemoteImage src={game.home.logoUrl} alt="" width={48} height={48} eager className="object-contain" style={{ filter: homeWon ? undefined : "saturate(0.6)" }} />
           )}
         </div>
         <div className="text-center">
@@ -271,7 +276,7 @@ function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: T
         </div>
         <div className="flex items-center justify-start gap-3">
           {game.away.logoUrl && (
-            <img src={game.away.logoUrl} alt="" className="object-contain" style={{ width: 48, height: 48, filter: awayWon ? undefined : "saturate(0.6)" }} />
+            <RemoteImage src={game.away.logoUrl} alt="" width={48} height={48} eager className="object-contain" style={{ filter: awayWon ? undefined : "saturate(0.6)" }} />
           )}
           <div className={`${awayWon ? "" : "opacity-70"}`}>
             <div className="text-base font-bold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
@@ -343,7 +348,7 @@ function PlayerListPicker({
     <div ref={ref} className="relative flex flex-col gap-2">
       <div className="flex items-center gap-2.5">
         {teamLogoUrl && (
-          <img src={teamLogoUrl} alt="" className="object-contain" style={{ width: 30, height: 30 }} />
+          <RemoteImage src={teamLogoUrl} alt="" width={30} height={30} className="object-contain" />
         )}
         <span className="text-base font-bold uppercase tracking-widest" style={{ color: getTeamDisplayColor(teamAbbrev) }}>
           {label}
@@ -359,7 +364,7 @@ function PlayerListPicker({
         {selected ? (
           <>
             {selected.headshotUrl ? (
-              <img src={selected.headshotUrl} alt="" className="rounded-full object-cover ring-1 ring-gray-600 shrink-0" style={{ width: 44, height: 44 }} />
+              <RemoteImage src={selected.headshotUrl} alt="" width={44} height={44} className="rounded-full object-cover ring-1 ring-gray-600 shrink-0" style={{ width: 44, height: 44 }} />
             ) : (
               <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 44, height: 44 }} />
             )}
@@ -402,7 +407,7 @@ function PlayerListPicker({
                   }`}
                 >
                   {player.headshotUrl ? (
-                    <img src={player.headshotUrl} alt="" className="rounded-full object-cover ring-1 ring-gray-600 shrink-0" style={{ width: 36, height: 36 }} />
+                    <RemoteImage src={player.headshotUrl} alt="" width={36} height={36} className="rounded-full object-cover ring-1 ring-gray-600 shrink-0" style={{ width: 36, height: 36 }} />
                   ) : (
                     <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
                   )}
@@ -460,38 +465,32 @@ function findPair(
 }
 
 export function GameBreakdown({ gameId }: { gameId: number }) {
-  const [data, setData] = useState<BreakdownResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [awayPlayer, setAwayPlayer] = useState<PlayerLite | null>(null);
-  const [homePlayer, setHomePlayer] = useState<PlayerLite | null>(null);
+  const { data, error } = useFetchedData<BreakdownResponse>(
+    `/api/games/${gameId}/breakdown`
+  );
 
-  useEffect(() => {
-    setData(null);
-    setError(null);
-    setAwayPlayer(null);
-    setHomePlayer(null);
-    fetch(`/api/games/${gameId}/breakdown`)
-      .then(async (r) => {
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Failed to load game breakdown");
-        return j;
-      })
-      .then((d: BreakdownResponse) => {
-        setData(d);
-        // Pre-select the top pair so the page isn't empty on landing.
-        const top = d.pairs[0];
-        if (top) {
-          if (top.playerA.teamAbbrev === d.game.away.abbrev) {
-            setAwayPlayer(top.playerA);
-            setHomePlayer(top.playerB);
-          } else {
-            setAwayPlayer(top.playerB);
-            setHomePlayer(top.playerA);
-          }
-        }
-      })
-      .catch((e) => setError(e.message));
-  }, [gameId]);
+  // Both picks reset when the game changes, because the roster changes with it.
+  const [pickedAway, setPickedAway] = useKeyedState<PlayerLite | null>(
+    String(gameId),
+    null
+  );
+  const [pickedHome, setPickedHome] = useKeyedState<PlayerLite | null>(
+    String(gameId),
+    null
+  );
+
+  // The top pair is the landing selection, so the page is never empty. It is
+  // derived rather than stored, so it follows the data without a second write.
+  const topPair = useMemo(() => {
+    const top = data?.pairs[0];
+    if (!top || !data) return null;
+    return top.playerA.teamAbbrev === data.game.away.abbrev
+      ? { away: top.playerA, home: top.playerB }
+      : { away: top.playerB, home: top.playerA };
+  }, [data]);
+
+  const awayPlayer = pickedAway ?? topPair?.away ?? null;
+  const homePlayer = pickedHome ?? topPair?.home ?? null;
 
   if (error) {
     return (
@@ -531,7 +530,7 @@ export function GameBreakdown({ gameId }: { gameId: number }) {
           teamLogoUrl={data.game.home.logoUrl}
           players={homeRoster}
           selected={homePlayer}
-          onSelect={setHomePlayer}
+          onSelect={setPickedHome}
         />
         <PlayerListPicker
           label={data.game.away.abbrev ?? "Away"}
@@ -539,7 +538,7 @@ export function GameBreakdown({ gameId }: { gameId: number }) {
           teamLogoUrl={data.game.away.logoUrl}
           players={awayRoster}
           selected={awayPlayer}
-          onSelect={setAwayPlayer}
+          onSelect={setPickedAway}
         />
       </div>
 

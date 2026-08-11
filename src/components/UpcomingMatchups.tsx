@@ -12,6 +12,9 @@ import {
   type GameTypeFilter,
 } from "./ToggleGroup";
 import { UpcomingGamesSkeleton, MatchupTableSkeleton } from "./Skeleton";
+import { useFetchedData } from "@/hooks/useFetchedData";
+import { useKeyedState } from "@/hooks/useKeyedState";
+import { RemoteImage } from "./RemoteImage";
 
 interface SeasonMeta {
   id: string;
@@ -53,9 +56,11 @@ function GameSelector({
             }`}
           >
             {game.opponentLogoUrl && (
-              <img
+              <RemoteImage
                 src={game.opponentLogoUrl}
                 alt={game.opponentAbbrev}
+                width={32}
+                height={32}
                 className="h-8 w-8 object-contain"
               />
             )}
@@ -73,13 +78,6 @@ function GameSelector({
 }
 
 export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
-  const [games, setGames] = useState<UpcomingGame[]>([]);
-  const [selectedGame, setSelectedGame] = useState<UpcomingGame | null>(null);
-  const [matchups, setMatchups] = useState<MatchupPlayer[]>([]);
-  const [loadingGames, setLoadingGames] = useState(true);
-  const [loadingMatchups, setLoadingMatchups] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"skaters" | "goalies">("skaters");
   const [seasonFilter, setSeasonFilter] = useState<SeasonFilter>("current");
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter>("regular");
   const [allSeasons, setAllSeasons] = useState<SeasonMeta[]>([]);
@@ -96,59 +94,60 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
     return [allSeasons[0].id];
   }, [seasonFilter, allSeasons]);
 
-  useEffect(() => {
-    setLoadingGames(true);
-    setError(null);
-    setGames([]);
-    setSelectedGame(null);
-    setMatchups([]);
+  const {
+    data: schedule,
+    error: scheduleError,
+    loading: loadingGames,
+  } = useFetchedData<{ upcoming: UpcomingGame[] }>(
+    `/api/players/${player.id}/upcoming`
+  );
+  const games = useMemo(() => schedule?.upcoming ?? [], [schedule]);
 
-    fetch(`/api/players/${player.id}/upcoming`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Failed to fetch schedule");
-        return data;
-      })
-      .then((data) => {
-        setGames(data.upcoming);
-        if (data.upcoming.length > 0) {
-          setSelectedGame(data.upcoming[0]);
-        }
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoadingGames(false));
-  }, [player.id]);
+  // The pick resets when the player changes, and falls back to the first game
+  // so the panel is never empty on landing.
+  const [pickedGameId, setPickedGameId] = useKeyedState<number | null>(
+    String(player.id),
+    null
+  );
+  const selectedGame =
+    games.find((g) => g.gameId === pickedGameId) ?? games[0] ?? null;
 
-  useEffect(() => {
-    if (!selectedGame) return;
-    // Wait for the seasons list in "current" mode, so the first fetch does not
-    // race an unfiltered one.
-    if (seasonFilter === "current" && allSeasons.length === 0) return;
-
-    const controller = new AbortController();
-    setLoadingMatchups(true);
-    setActiveTab("skaters");
+  // Null holds the request back until a game is chosen, and until the seasons
+  // list arrives in "current" mode, so the first fetch does not race an
+  // unfiltered one.
+  const matchupUrl = useMemo(() => {
+    if (!selectedGame) return null;
+    if (seasonFilter === "current" && allSeasons.length === 0) return null;
     const params = new URLSearchParams({
       teamId: String(selectedGame.opponentTeamId),
       gameType: gameTypeFilter,
     });
     if (seasonIds) params.set("seasons", seasonIds.join(","));
-    fetch(`/api/players/${player.id}/matchup?${params}`, { signal: controller.signal })
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || "Failed to fetch matchups");
-        return data;
-      })
-      .then((data) => setMatchups(data.matchups))
-      .catch((err) => {
-        if (err.name === "AbortError") return;
-        setError(err.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingMatchups(false);
-      });
-    return () => controller.abort();
-  }, [player.id, selectedGame?.opponentTeamId, gameTypeFilter, seasonIds, seasonFilter, allSeasons.length]);
+    return `/api/players/${player.id}/matchup?${params}`;
+  }, [
+    player.id,
+    selectedGame,
+    gameTypeFilter,
+    seasonIds,
+    seasonFilter,
+    allSeasons.length,
+  ]);
+
+  const {
+    data: matchupData,
+    error: matchupError,
+    loading: loadingMatchups,
+  } = useFetchedData<{ matchups: MatchupPlayer[] }>(matchupUrl);
+  const matchups = useMemo(() => matchupData?.matchups ?? [], [matchupData]);
+
+  // The open tab belongs to one matchup request, so a new one returns to
+  // skaters.
+  const [activeTab, setActiveTab] = useKeyedState<"skaters" | "goalies">(
+    matchupUrl ?? "",
+    "skaters"
+  );
+
+  const error = scheduleError ?? matchupError;
 
   if (loadingGames) {
     return <UpcomingGamesSkeleton />;
@@ -186,7 +185,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
       <GameSelector
         games={games}
         selected={selectedGame}
-        onSelect={setSelectedGame}
+        onSelect={(game) => setPickedGameId(game.gameId)}
       />
 
       {matchups.length > 0 ? (
