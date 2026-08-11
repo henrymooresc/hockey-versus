@@ -12,7 +12,7 @@ export default function GamesPage() {
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-100 md:text-4xl">
           Recent <span className="text-amber-400">Games</span>
         </h1>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-base text-gray-400">
           Pick a game to see how each pair of players matched up
         </p>
       </div>

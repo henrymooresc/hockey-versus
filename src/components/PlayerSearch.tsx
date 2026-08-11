@@ -57,7 +57,7 @@ function PlayerRow({
         <div className="font-semibold text-gray-100">
           {player.firstName} {player.lastName}
         </div>
-        <div className="text-sm text-gray-400">{player.position ?? "—"}</div>
+        <div className="text-base text-gray-400">{player.position ?? "—"}</div>
       </div>
     </li>
   );
@@ -100,8 +100,8 @@ function TeamGroup({
           <div className="h-8 w-8" />
         )}
         <span className="flex-1 text-left font-semibold text-gray-200">{teamName}</span>
-        <span className="text-xs text-gray-500 mr-2">{players.length}</span>
-        <span className={`text-gray-500 text-sm transition-transform duration-200 inline-block ${open ? "rotate-180" : ""}`}>▼</span>
+        <span className="text-sm text-gray-500 mr-2">{players.length}</span>
+        <span className={`text-gray-500 text-base transition-transform duration-200 inline-block ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
       {open && (
         <ul className="border-t border-gray-700 bg-gray-850">
@@ -134,7 +134,7 @@ function DivisionSection({
   return (
     <li>
       <div className="bg-gray-950 px-5 py-2 sticky top-0 z-10">
-        <span className="text-xs font-bold uppercase tracking-widest text-blue-400">{division}</span>
+        <span className="text-sm font-bold uppercase tracking-widest text-blue-400">{division}</span>
       </div>
       <ul>
         {sorted.map(([abbrev, group]) => (
@@ -200,9 +200,9 @@ function PlayerList({
   return (
     <ul className="overflow-auto scroll-smooth rounded-xl border border-gray-700/70 bg-gray-800/90 backdrop-blur-sm" style={{ maxHeight: "28rem" }}>
       {loading ? (
-        <li className="px-5 py-4 text-sm text-gray-500">Loading...</li>
+        <li className="px-5 py-4 text-base text-gray-500">Loading...</li>
       ) : filtered.length === 0 ? (
-        <li className="px-5 py-4 text-sm text-gray-500">No players found</li>
+        <li className="px-5 py-4 text-base text-gray-500">No players found</li>
       ) : (
         DIVISION_ORDER
           .filter((div) => divisionMap.get(div)!.size > 0)
@@ -255,7 +255,7 @@ function PlayerCombobox({
 
   return (
     <div className="flex flex-col gap-3">
-      <label className="text-sm font-semibold uppercase tracking-wider text-gray-400">
+      <label className="text-base font-semibold uppercase tracking-wider text-gray-400">
         {label}
       </label>
 
@@ -270,7 +270,7 @@ function PlayerCombobox({
             <div className="text-lg font-bold text-gray-100">
               {selected.firstName} {selected.lastName}
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-base text-gray-400">
               {selected.teamName ?? selected.teamAbbrev ?? "—"} &middot; {selected.position ?? "—"}
             </div>
           </div>

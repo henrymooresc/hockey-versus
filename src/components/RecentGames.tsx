@@ -41,7 +41,7 @@ function TeamRow({ side, leading }: { side: SeriesSide; leading: boolean }) {
         <div className="shrink-0 rounded bg-gray-700" style={{ width: 32, height: 32 }} />
       )}
       <span
-        className="truncate text-sm font-bold"
+        className="truncate text-base font-bold"
         style={{ color: getTeamDisplayColor(side.abbrev) }}
       >
         {side.abbrev ?? "—"}
@@ -72,10 +72,10 @@ function GameChip({ game, sides }: { game: SeriesGame; sides: [SeriesSide, Serie
       title={`Game ${game.gameNumber} — ${formatDate(game.date)}`}
       className="group flex flex-col items-center rounded-lg border border-gray-700/50 bg-gray-800/50 px-2.5 py-1.5 transition-colors hover:border-gray-500 hover:bg-gray-700/60"
     >
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 group-hover:text-gray-400">
+      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 group-hover:text-gray-400">
         G{game.gameNumber}
       </span>
-      <span className="font-mono text-sm font-bold tabular-nums">
+      <span className="font-mono text-base font-bold tabular-nums">
         <span className={aWon ? "text-gray-100" : "text-gray-600"}>{a ?? "—"}</span>
         <span className="mx-0.5 text-gray-600">–</span>
         <span className={bWon ? "text-gray-100" : "text-gray-600"}>{b ?? "—"}</span>
@@ -109,13 +109,13 @@ function SeriesCard({ series }: { series: PlayoffSeries }) {
     >
       <div className="mb-3 flex items-baseline justify-between gap-2">
         <span
-          className={`text-[10px] font-bold uppercase tracking-widest ${
+          className={`text-xs font-bold uppercase tracking-widest ${
             isFinal ? "text-amber-400" : "text-blue-400"
           }`}
         >
           {roundName(series.round)}
         </span>
-        <span className="text-[10px] text-gray-600">{dateRange}</span>
+        <span className="text-xs text-gray-600">{dateRange}</span>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -125,7 +125,7 @@ function SeriesCard({ series }: { series: PlayoffSeries }) {
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-gray-700/50 pt-3">
         <span
-          className={`shrink-0 text-xs font-semibold ${
+          className={`shrink-0 text-sm font-semibold ${
             series.decided ? "text-gray-300" : "text-gray-500"
           }`}
         >
@@ -154,14 +154,14 @@ function GameCard({ game }: { game: GameForSeries }) {
     >
       <div className="grid grid-cols-3 items-center gap-2">
         <div className={`flex items-center justify-end gap-2 ${homeWon ? "" : "opacity-70"}`}>
-          <span className="text-sm font-semibold" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
+          <span className="text-base font-semibold" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
             {game.home.abbrev}
           </span>
           {game.home.logoUrl && (
             <RemoteImage src={game.home.logoUrl} alt="" width={26} height={26} className="object-contain" />
           )}
         </div>
-        <div className="text-center font-mono text-base font-bold tabular-nums">
+        <div className="text-center font-mono text-lg font-bold tabular-nums">
           <span className={homeWon ? "text-green-400" : awayWon ? "text-red-400" : "text-gray-300"}>
             {game.home.score}
           </span>
@@ -174,7 +174,7 @@ function GameCard({ game }: { game: GameForSeries }) {
           {game.away.logoUrl && (
             <RemoteImage src={game.away.logoUrl} alt="" width={26} height={26} className="object-contain" />
           )}
-          <span className="text-sm font-semibold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
+          <span className="text-base font-semibold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
             {game.away.abbrev}
           </span>
         </div>
@@ -225,7 +225,7 @@ export function RecentGames() {
     <div className="flex flex-col gap-10">
       {series.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-500">
             Playoff Series
           </h2>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -238,13 +238,13 @@ export function RecentGames() {
 
       {byDate.size > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-widest text-gray-500">
             Regular Season
           </h2>
           <div className="flex flex-col gap-5">
             {Array.from(byDate.entries()).map(([date, dayGames]) => (
               <div key={date}>
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-widest text-blue-400">
+                <div className="mb-2 text-[13px] font-bold uppercase tracking-widest text-blue-400">
                   {formatDate(date)}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

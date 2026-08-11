@@ -64,14 +64,14 @@ function getSortValue(m: MatchupPlayer, key: SortKey, mode: ColumnMode): number 
     : getSkaterSortValue(m, key as SkaterSortKey | CenterSortKey);
 }
 
-const SKATER_ROW_GRID = "30px 1fr 32px 58px 40px 40px 40px 40px 40px 40px";
-const CENTER_ROW_GRID = "30px 1fr 32px 58px 40px 40px 40px 40px 40px 40px 40px";
-const GOALIE_ROW_GRID = "30px 1fr 32px 58px 60px 40px 40px 40px 40px";
+const SKATER_ROW_GRID = "38px minmax(0, 300px) 46px 84px 62px 62px 62px 62px 62px 62px";
+const CENTER_ROW_GRID = "38px minmax(0, 300px) 46px 84px 62px 62px 62px 62px 62px 62px 62px";
+const GOALIE_ROW_GRID = "38px minmax(0, 300px) 46px 84px 84px 62px 62px 62px 62px";
 
 function DiffCell({ diff }: { diff: number }) {
   const label = diff > 0 ? `+${diff}` : `${diff}`;
   return (
-    <div className={`text-center font-mono text-[11px] ${diff > 0 ? "text-green-400 font-bold" : diff < 0 ? "text-red-400 font-bold" : "text-gray-500"}`}>
+    <div className={`text-center font-mono text-[13px] ${diff > 0 ? "text-green-400 font-bold" : diff < 0 ? "text-red-400 font-bold" : "text-gray-500"}`}>
       {diff === 0 ? "0" : label}
     </div>
   );
@@ -79,7 +79,7 @@ function DiffCell({ diff }: { diff: number }) {
 
 function GoalieStatValue({ value, className }: { value: string | number; className?: string }) {
   return (
-    <div className={`flex items-center justify-center font-mono text-[11px] ${className ?? "text-gray-300"}`}>
+    <div className={`flex items-center justify-center font-mono text-[13px] ${className ?? "text-gray-300"}`}>
       {value}
     </div>
   );
@@ -95,7 +95,7 @@ function RivalryScoreCell({
   showSmallSampleMark: boolean;
 }) {
   return (
-    <div className="flex items-center justify-center font-mono text-[11px]">
+    <div className="flex items-center justify-center font-mono text-[13px]">
       <span className={score > 0 ? "text-green-400 font-bold" : score < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
         {score.toFixed(1)}
       </span>
@@ -166,7 +166,7 @@ function StatHeader({
   return (
     <div
       className="grid items-center"
-      style={{ gridTemplateColumns: gridTemplate, padding: "0 10px", gap: 6, marginBottom: 6 }}
+      style={{ gridTemplateColumns: gridTemplate, justifyContent: "center", padding: "0 10px", gap: 6, marginBottom: 6 }}
     >
       <div />
       <div />
@@ -176,7 +176,7 @@ function StatHeader({
           <button
             key={col.key}
             onClick={() => onSort(col.key)}
-            className={`text-center text-[10px] uppercase tracking-wider cursor-pointer transition-colors ${
+            className={`text-center text-xs uppercase tracking-wider cursor-pointer transition-colors ${
               isActive ? "text-blue-400 font-bold" : "text-gray-600 hover:text-gray-400"
             }`}
           >
@@ -231,7 +231,7 @@ function MatchupRow({
     >
       <div
         className={`grid items-center ${isClickable ? "cursor-pointer" : ""}`}
-        style={{ gridTemplateColumns: gridTemplate, padding: "10px 10px", gap: 6 }}
+        style={{ gridTemplateColumns: gridTemplate, justifyContent: "center", padding: "12px 10px", gap: 6 }}
         onClick={isClickable ? onToggle : undefined}
       >
         {matchup.headshotUrl ? (
@@ -246,7 +246,7 @@ function MatchupRow({
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
         )}
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-100 truncate">
+          <div className="flex items-center gap-1.5 text-base font-semibold text-gray-100 truncate">
             <span
               className="flex shrink-0 items-center gap-1"
               title={matchup.teamName ?? matchup.teamAbbrev ?? "Not on an active roster"}
@@ -257,7 +257,7 @@ function MatchupRow({
                 </span>
               ) : (
                 <span
-                  className="flex shrink-0 items-center justify-center rounded text-[14px] font-bold text-gray-500"
+                  className="flex shrink-0 items-center justify-center rounded text-base font-bold text-gray-500"
                   style={{ width: 26, height: 26, background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(156,163,175,0.35)" }}
                 >
                   ?
@@ -265,7 +265,7 @@ function MatchupRow({
               )}
               {matchup.teamAbbrev && (
                 <span
-                  className="text-[11px] font-bold tracking-wide"
+                  className="text-[13px] font-bold tracking-wide"
                   style={{ color: getTeamDisplayColor(matchup.teamAbbrev) }}
                 >
                   {matchup.teamAbbrev}
@@ -273,7 +273,7 @@ function MatchupRow({
               )}
             </span>
             {(matchup.sweaterNumber || matchup.position) && (
-              <span className="text-xs text-gray-500">
+              <span className="text-sm text-gray-500">
                 {matchup.sweaterNumber && `#${matchup.sweaterNumber}`}
                 {matchup.sweaterNumber && matchup.position && " "}
                 {matchup.position && <span className={positionColor(matchup.position)}>{matchup.position}</span>}
@@ -286,7 +286,7 @@ function MatchupRow({
           mode === "goalie" ? (
             <>
               <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
-              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
+              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-xs" />
               <GoalieStatValue
                 value={savePct(matchup.stats.individualShots, matchup.stats.goals)}
                 className="text-gray-100 font-bold"
@@ -299,7 +299,7 @@ function MatchupRow({
           ) : (
             <>
               <GoalieStatValue value={matchup.gamesShared} className="text-gray-400" />
-              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-[10px]" />
+              <GoalieStatValue value={formatSecondsToHMS(matchup.toiSharedSeconds)} className="text-gray-400 text-xs" />
               <DiffCell diff={matchup.stats.points - matchup.oppStats.points} />
               <DiffCell diff={matchup.stats.individualShots - matchup.oppStats.individualShots} />
               <DiffCell diff={matchup.stats.hits - matchup.oppStats.hits} />
@@ -397,7 +397,7 @@ export function PositionGroup({
 
   return (
     <div className="rounded-xl border border-gray-700/40 bg-gray-900/50" style={{ padding: "14px 10px" }}>
-      <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500" style={{ marginBottom: 12, paddingLeft: 4 }}>
+      <h4 className="text-sm font-bold uppercase tracking-widest text-gray-500" style={{ marginBottom: 12, paddingLeft: 4 }}>
         {label}
       </h4>
       <StatHeader sortKey={sortKey} sortDir={sortDir} onSort={handleSort} columns={columns} gridTemplate={gridTemplate} />
@@ -422,7 +422,7 @@ export function PositionGroup({
           {hasMore && (
             <button
               onClick={() => setVisibleCount((c) => c + SHOW_MORE_STEP)}
-              className="flex-1 rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+              className="flex-1 rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
             >
               Show {Math.min(SHOW_MORE_STEP, remaining)} more
             </button>
@@ -430,7 +430,7 @@ export function PositionGroup({
           {canCollapse && (
             <button
               onClick={() => setVisibleCount(defaultVisible)}
-              className="rounded-lg border border-gray-700/50 bg-gray-800/40 px-4 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+              className="rounded-lg border border-gray-700/50 bg-gray-800/40 px-4 py-1.5 text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
             >
               Show less
             </button>

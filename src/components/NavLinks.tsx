@@ -36,7 +36,7 @@ export function NavLinks() {
             href={href}
             /* Brand chrome comes from theme variables, so the nav follows the
                light and dark themes with the rest of the site. */
-            className={`flex shrink-0 items-center whitespace-nowrap px-5 text-sm font-semibold uppercase tracking-widest border-b-2 transition-colors duration-200 ${
+            className={`flex shrink-0 items-center whitespace-nowrap px-5 text-base font-semibold uppercase tracking-widest border-b-2 transition-colors duration-200 ${
               isActive
                 ? "border-[var(--color-brand-red)] bg-[var(--color-nav-active-bg)]/40 text-gray-100"
                 : "border-transparent text-[var(--color-nav-link)] hover:bg-[var(--color-nav-active-bg)]/20 hover:text-gray-200"

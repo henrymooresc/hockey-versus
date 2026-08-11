@@ -15,6 +15,23 @@ import { RemoteImage } from "./RemoteImage";
 
 interface SeasonMeta { id: string; startDate: string | null; endDate: string | null; }
 
+/**
+ * Row layout for the board, shared by the header and every row so the columns
+ * line up.
+ *
+ * The two player columns are capped rather than left as `1fr`. Stretched to a
+ * wide screen they grew to 530px each while holding about 120px of name, so
+ * each row carried roughly 800px of empty space and the pair floated apart.
+ * Capping them and centring the track set keeps the row readable at any width,
+ * and the columns still shrink on a narrow one.
+ *
+ * 300px is set from the data: across the top 50 pairs the widest player block
+ * measures 184px and the median 147px, so this leaves room for a longer name
+ * than any currently on the board without reopening the gap.
+ */
+const LEADERBOARD_GRID =
+  "44px minmax(0, 300px) 64px minmax(0, 300px) 96px 76px 108px";
+
 function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; align: "left" | "right" }) {
   const colors = getTeamColors(player.teamAbbrev);
   return (
@@ -23,19 +40,19 @@ function PlayerSide({ player, align }: { player: LeaderboardEntry["playerA"]; al
         <RemoteImage
           src={player.headshotUrl}
           alt=""
-          width={36}
-          height={36}
+          width={44}
+          height={44}
           className="rounded-full object-cover shrink-0"
-          style={{ border: `2px solid ${colors.primary}80`, width: 36, height: 36 }}
+          style={{ border: `2px solid ${colors.primary}80`, width: 44, height: 44 }}
         />
       ) : (
-        <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
+        <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 44, height: 44 }} />
       )}
       <div className="min-w-0">
-        <div className="text-sm font-semibold text-gray-100 truncate">
+        <div className="text-base font-semibold text-gray-100 truncate">
           {player.firstName} {player.lastName}
         </div>
-        <div className={`flex items-center gap-1.5 text-[10px] text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
+        <div className={`flex items-center gap-1.5 text-xs text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
           {player.teamLogoUrl && (
             <RemoteImage src={player.teamLogoUrl} alt="" width={12} height={12} className="object-contain" />
           )}
@@ -96,19 +113,19 @@ function LeaderboardRow({
     >
       <div
         className="grid items-center gap-3 cursor-pointer"
-        style={{ gridTemplateColumns: "36px 1fr 80px 1fr 70px 60px 80px", padding: "10px 14px" }}
+        style={{ gridTemplateColumns: LEADERBOARD_GRID, justifyContent: "center", padding: "12px 14px" }}
         onClick={onToggle}
       >
-        <div className="text-center font-mono text-sm font-bold text-gray-500">{rank}</div>
+        <div className="text-center font-mono text-base font-bold text-gray-500">{rank}</div>
         <PlayerSide player={left} align="right" />
-        <div className="text-center text-[10px] uppercase tracking-widest text-gray-600">vs</div>
+        <div className="text-center text-xs uppercase tracking-widest text-gray-600">vs</div>
         <PlayerSide player={right} align="left" />
-        <div className="text-right font-mono text-sm font-bold text-amber-400">
+        <div className="text-right font-mono text-base font-bold text-amber-400">
           {entry.rivalryScore.toFixed(2)}
           {!isSingleSeason && <SmallSampleMark gamesShared={entry.gamesShared} />}
         </div>
-        <div className="text-right font-mono text-xs text-gray-400">{entry.gamesShared}</div>
-        <div className="text-right font-mono text-xs text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
+        <div className="text-right font-mono text-sm text-gray-400">{entry.gamesShared}</div>
+        <div className="text-right font-mono text-sm text-gray-400">{formatSecondsToHMS(entry.toiSharedSeconds)}</div>
       </div>
       {expanded && (
         <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
@@ -157,7 +174,7 @@ function ExpandedPair({
   const error = fetchError ?? (data && !matchup ? "No matchup data" : null);
 
   if (error) {
-    return <div className="px-4 py-3 text-center text-sm text-red-400">{error}</div>;
+    return <div className="px-4 py-3 text-center text-base text-red-400">{error}</div>;
   }
   if (!matchup) {
     return (
@@ -201,8 +218,8 @@ function ExpandedPair({
 function HeaderRow() {
   return (
     <div
-      className="grid items-center gap-3 px-3.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-500"
-      style={{ gridTemplateColumns: "36px 1fr 80px 1fr 70px 60px 80px" }}
+      className="grid items-center gap-3 px-3.5 pb-1 text-xs font-bold uppercase tracking-widest text-gray-500"
+      style={{ gridTemplateColumns: LEADERBOARD_GRID, justifyContent: "center" }}
     >
       <div className="text-center">#</div>
       <div />
@@ -260,7 +277,7 @@ export function Leaderboard() {
             <button
               key={value}
               onClick={() => setPairKind(value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+              className={`rounded-md px-3 py-1.5 text-base font-medium transition-all duration-150 ${
                 pairKind === value ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
               }`}
             >
@@ -271,7 +288,7 @@ export function Leaderboard() {
         <div className="flex items-center gap-1 rounded-lg border border-gray-700 bg-gray-800/60 p-1">
           <button
             onClick={() => setSeasonFilter("current")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-base font-medium transition-all duration-150 ${
               seasonFilter === "current" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
             }`}
           >
@@ -279,7 +296,7 @@ export function Leaderboard() {
           </button>
           <button
             onClick={() => setSeasonFilter("all")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+            className={`rounded-md px-3 py-1.5 text-base font-medium transition-all duration-150 ${
               seasonFilter === "all" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
             }`}
           >
@@ -295,7 +312,7 @@ export function Leaderboard() {
             <button
               key={value}
               onClick={() => setGameTypeFilter(value)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150 ${
+              className={`rounded-md px-3 py-1.5 text-base font-medium transition-all duration-150 ${
                 gameTypeFilter === value
                   ? "bg-amber-600 text-white shadow"
                   : "text-gray-400 hover:text-gray-200"

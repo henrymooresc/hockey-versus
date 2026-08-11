@@ -39,11 +39,11 @@ function DetailStatRow({
 
   return (
     <div className="grid grid-cols-3 items-center py-1.5">
-      <div className={`text-right font-mono text-xs font-semibold ${iWin ? "text-green-400" : theyWin ? "text-red-400" : "text-gray-300"}`}>
+      <div className={`text-right font-mono text-sm font-semibold ${iWin ? "text-green-400" : theyWin ? "text-red-400" : "text-gray-300"}`}>
         {mine}
       </div>
-      <div className="text-center text-[10px] text-gray-500">{label}</div>
-      <div className={`text-left font-mono text-xs font-semibold ${theyWin ? "text-green-400" : iWin ? "text-red-400" : "text-gray-300"}`}>
+      <div className="text-center text-xs text-gray-500">{label}</div>
+      <div className={`text-left font-mono text-sm font-semibold ${theyWin ? "text-green-400" : iWin ? "text-red-400" : "text-gray-300"}`}>
         {opp}
       </div>
     </div>
@@ -53,7 +53,7 @@ function DetailStatRow({
 function DetailSectionLabel({ label }: { label: string }) {
   return (
     <div className="pt-2 pb-0.5 text-center">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-widest text-blue-400">{label}</span>
     </div>
   );
 }
@@ -80,9 +80,9 @@ function useRivalHistory(playerId: number, opponentId: number): RivalGameHistory
 function ColumnHeaders({ playerName, opponentName }: { playerName: string; opponentName: string }) {
   return (
     <div className="grid grid-cols-3 items-center pb-1 mb-1 border-b border-gray-700/50">
-      <div className="text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">{playerName}</div>
+      <div className="text-right text-xs font-bold uppercase tracking-wider text-gray-500">{playerName}</div>
       <div />
-      <div className="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">{opponentName}</div>
+      <div className="text-left text-xs font-bold uppercase tracking-wider text-gray-500">{opponentName}</div>
     </div>
   );
 }
@@ -136,7 +136,7 @@ export function SkaterExpandedDetail({
       </div>
 
       <div className="pt-2 pb-1 text-center">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+        <span className="text-[13px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
@@ -237,7 +237,7 @@ export function GoalieExpandedDetail({
         </div>
 
         <div className="pt-2 pb-1 text-center">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+          <span className="text-[13px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
         </div>
         <ColumnHeaders playerName={playerName} opponentName={`${matchup.firstName[0]}. ${matchup.lastName}`} />
 
@@ -295,12 +295,12 @@ export function GoalieExpandedDetail({
       </div>
 
       <div className="pt-2 pb-2 text-center">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
+        <span className="text-[13px] font-bold uppercase tracking-widest text-blue-400">Stat Comparison</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-gray-700/50 bg-gray-800/40 p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{playerName}</div>
-          <div className="space-y-1.5 text-xs">
+          <div className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{playerName}</div>
+          <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">Shots on Goal</span>
               <span className="font-mono text-gray-100">{stats.individualShots}</span>
@@ -325,8 +325,8 @@ export function GoalieExpandedDetail({
         </div>
 
         <div className="rounded-lg border border-gray-700/50 bg-gray-800/40 p-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{matchup.firstName[0]}. {matchup.lastName}</div>
-          <div className="space-y-1.5 text-xs">
+          <div className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-2 text-center">{matchup.firstName[0]}. {matchup.lastName}</div>
+          <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">Shots Faced</span>
               <span className="font-mono text-gray-100">{shotsOnGoalie}</span>

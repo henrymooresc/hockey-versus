@@ -15,18 +15,18 @@ export default function AboutPage() {
 
       <section className="mt-10 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-blue-400">What is &ldquo;shared ice&rdquo;?</h2>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           For every NHL game over the last 10 seasons, we line up each player&apos;s
           shifts second-by-second and record what happened — goals, assists, shots,
           hits, blocks, penalties, faceoffs — only while both players were on the ice
           together. That is about 13,000 games and 10 million shifts.
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           Events are attributed to a pair, not merely to the ice. A hit, a faceoff or
           a penalty counts only when one of the two players was on each side of it.
           Sharing the ice with someone while they hit a third player does not count.
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           Everything comes from the public NHL API and is aggregated ahead of time,
           so the site reads precomputed pair totals rather than recalculating them
           on each visit.
@@ -35,13 +35,13 @@ export default function AboutPage() {
 
       <section id="rivalry-score" className="mt-6 scroll-mt-24 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-amber-400">Rivalry Score</h2>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           Rivalry Score measures how much happens between two players{" "}
           <span className="font-semibold text-gray-100">per shared game</span>, not how
           much has happened in total. A long career together does not raise the score
           on its own. It is built from three parts:
         </p>
-        <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
+        <ul className="mt-3 list-disc pl-6 text-base leading-relaxed text-gray-300 space-y-1.5">
           <li>
             <span className="font-semibold text-gray-100">Activity</span> — a weighted
             count of what the two players did to each other, divided by the games they
@@ -62,7 +62,7 @@ export default function AboutPage() {
             outrank a decade-long rivalry on noise alone.
           </li>
         </ul>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           A score marked with an asterisk{" "}
           <span className="font-mono text-amber-300">*</span> comes from fewer than 10
           shared games, so the league average is still doing much of the work.
@@ -71,17 +71,17 @@ export default function AboutPage() {
 
       <section className="mt-6 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-purple-400">Two boards, two scales</h2>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           Skater pairs and shooter-versus-goalie pairs are ranked separately, because
           the two contests do not share a scale.
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           A goalie matchup is scored from the shooter&apos;s side: a goal counts 8, an
           assist 4, and a shot 1, with balance measured as goals against saves. Because
           a shooter converts only a small share of their shots, that balance term stays
           low by nature, and goalie scores land near half of skater ones.
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           For scale, among the top all-time regular-season pairs, skater scores run
           from about <span className="font-mono text-blue-300">12</span> to{" "}
           <span className="font-mono text-blue-300">19.6</span>, and goalie scores from
@@ -93,7 +93,7 @@ export default function AboutPage() {
 
       <section className="mt-6 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-emerald-400">Reading the views</h2>
-        <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
+        <ul className="mt-3 list-disc pl-6 text-base leading-relaxed text-gray-300 space-y-1.5">
           <li>
             <span className="font-semibold text-gray-100">All-Time Rivals</span> — every
             opponent the selected player has shared ice with, sorted by Rivalry Score.
@@ -115,7 +115,7 @@ export default function AboutPage() {
             in it, and how that compares to their usual meetings.
           </li>
         </ul>
-        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+        <p className="mt-3 text-base leading-relaxed text-gray-300">
           The first three can be scoped to the current season or all 10, and to
           regular season, playoffs, or both.
         </p>

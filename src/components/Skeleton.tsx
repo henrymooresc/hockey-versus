@@ -27,7 +27,7 @@ export function MatchupRowSkeleton() {
   return (
     <div
       className="rounded-lg border border-gray-700/40 bg-gray-800/40 grid items-center"
-      style={{ gridTemplateColumns: "30px 1fr 40px 32px 58px 40px 40px 40px 40px 40px 40px", padding: "10px", gap: 6 }}
+      style={{ gridTemplateColumns: "38px minmax(0, 300px) 46px 46px 84px 62px 62px 62px 62px 62px 62px", padding: "10px", gap: 6, justifyContent: "center" }}
     >
       <Skeleton width={30} height={30} rounded="full" />
       <div className="flex items-center gap-2 min-w-0">

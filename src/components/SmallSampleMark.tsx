@@ -16,7 +16,7 @@ export function SmallSampleMark({ gamesShared }: { gamesShared: number }) {
 
   return (
     <span
-      className="ml-0.5 cursor-help align-super text-[9px] leading-none text-gray-500"
+      className="ml-0.5 cursor-help align-super text-[11px] leading-none text-gray-500"
       title={`Small sample: ${gamesShared} shared ${
         gamesShared === 1 ? "game" : "games"
       }. Scores below ${PRIOR_GAMES} games sit near the league average until the pair plays more.`}

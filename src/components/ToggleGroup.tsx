@@ -24,7 +24,7 @@ export function ToggleGroup<T extends string>({
           key={value}
           onClick={() => onChange(value)}
           aria-pressed={active === value}
-          className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
+          className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-colors ${
             active === value
               ? "bg-blue-600 text-white shadow-sm"
               : "text-gray-400 hover:text-gray-200"

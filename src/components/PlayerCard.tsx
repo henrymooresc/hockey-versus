@@ -28,11 +28,11 @@ export function PlayerCard({ player }: { player: PlayerInfo }) {
         )}
       </div>
       <div className="text-center">
-        <div className="text-sm font-medium text-gray-400">{player.firstName}</div>
+        <div className="text-base font-medium text-gray-400">{player.firstName}</div>
         <div className="text-3xl font-extrabold tracking-tight text-gray-100">
           {player.lastName}
         </div>
-        <div className="mt-1 flex items-center justify-center gap-2 text-sm text-gray-400">
+        <div className="mt-1 flex items-center justify-center gap-2 text-base text-gray-400">
           {player.teamAbbrev && <span>{player.teamAbbrev}</span>}
           {player.teamAbbrev && player.position && <span className="text-gray-600">·</span>}
           {player.position && <span>{player.position}</span>}

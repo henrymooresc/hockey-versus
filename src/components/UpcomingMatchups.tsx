@@ -65,10 +65,10 @@ function GameSelector({
               />
             )}
             <div className="text-left">
-              <div className="text-sm font-semibold text-gray-100">
+              <div className="text-base font-semibold text-gray-100">
                 {game.isHome ? "vs" : "@"} {game.opponentAbbrev}
               </div>
-              <div className="text-xs text-gray-500">{formatDate(game.gameDate)}</div>
+              <div className="text-sm text-gray-500">{formatDate(game.gameDate)}</div>
             </div>
           </button>
         );
@@ -167,7 +167,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
 
   if (games.length === 0) {
     return (
-      <div className="text-center text-gray-500 text-sm">
+      <div className="text-center text-gray-500 text-base">
         No upcoming games found
       </div>
     );
@@ -195,7 +195,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
       {matchups.length > 0 ? (
         <div style={{ marginTop: 28 }} className={`transition-opacity duration-200 ${loadingMatchups ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
           <div className="flex flex-wrap items-center justify-between gap-3" style={{ marginBottom: 20 }}>
-            <div className="text-xs text-gray-600">
+            <div className="text-sm text-gray-600">
               {withHistory.length} of {matchups.length} players with shared history
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -248,7 +248,7 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
           <MatchupTableSkeleton rows={6} />
         </div>
       ) : (
-        <div className="mt-6 text-center text-sm text-gray-500">
+        <div className="mt-6 text-center text-base text-gray-500">
           No roster data available
         </div>
       )}

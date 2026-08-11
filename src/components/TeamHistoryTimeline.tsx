@@ -29,17 +29,17 @@ function TeamStintChip({ stint }: { stint: TeamHistoryStint }) {
         <div className="rounded bg-gray-700 shrink-0" style={{ width: 18, height: 18 }} />
       )}
       <span
-        className="text-[11px] font-bold tracking-wide"
+        className="text-[13px] font-bold tracking-wide"
         style={{ color: getTeamDisplayColor(stint.abbrev) }}
       >
         {stint.abbrev ?? "?"}
       </span>
-      <span className="text-gray-600 text-[10px]">·</span>
-      <span className="text-[10px] text-gray-500 whitespace-nowrap">
+      <span className="text-gray-600 text-xs">·</span>
+      <span className="text-xs text-gray-500 whitespace-nowrap">
         {formatRange(stint.firstDate, stint.lastDate)}
       </span>
-      <span className="text-gray-600 text-[10px]">·</span>
-      <span className="text-[10px] text-gray-500 whitespace-nowrap">
+      <span className="text-gray-600 text-xs">·</span>
+      <span className="text-xs text-gray-500 whitespace-nowrap">
         <span className="font-mono text-gray-300">{stint.gameCount}</span> GP
       </span>
     </div>
@@ -49,14 +49,14 @@ function TeamStintChip({ stint }: { stint: TeamHistoryStint }) {
 function PlayerRow({ label, teams }: { label: string; teams: TeamHistoryStint[] }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="shrink-0 whitespace-nowrap text-right text-[10px] font-bold uppercase tracking-widest text-gray-500" style={{ minWidth: 96 }}>
+      <div className="shrink-0 whitespace-nowrap text-right text-xs font-bold uppercase tracking-widest text-gray-500" style={{ minWidth: 96 }}>
         {label}
       </div>
       {teams.map((stint, i) => (
         <div key={`${stint.teamId}-${i}`} className="flex items-center gap-2">
           <TeamStintChip stint={stint} />
           {i < teams.length - 1 && (
-            <span className="text-gray-600 text-sm">→</span>
+            <span className="text-gray-600 text-base">→</span>
           )}
         </div>
       ))}
@@ -100,7 +100,7 @@ export function TeamHistoryTimeline({
 
   return (
     <div className="mt-3 rounded-lg border border-gray-700/40 bg-gray-900/40 px-3 py-2">
-      <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+      <div className="mb-1.5 text-xs font-bold uppercase tracking-widest text-gray-500">
         Team History
       </div>
       <div className="flex flex-col gap-1.5">
