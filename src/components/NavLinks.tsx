@@ -14,14 +14,27 @@ export function NavLinks() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex self-stretch items-stretch">
+    /**
+     * The links scroll sideways when they do not fit, rather than pushing the
+     * page wider. Below about 700px the logo and four links exceed the screen,
+     * and the whole page scrolled sideways before this.
+     *
+     * `min-w-0` is what makes it work. A flex item defaults to
+     * `min-width: auto`, which refuses to shrink below its content, so
+     * `overflow-x-auto` alone would do nothing here.
+     *
+     * The scrollbar is hidden. It would only ever appear on a touch screen,
+     * where swiping is the natural gesture, and a visible bar inside a sticky
+     * header looks broken.
+     */
+    <nav className="flex min-w-0 flex-1 self-stretch items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {links.map(({ href, label }) => {
         const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
         return (
           <Link
             key={href}
             href={href}
-            className={`flex items-center px-5 text-sm font-semibold uppercase tracking-widest border-b-2 transition-colors duration-200 ${
+            className={`flex shrink-0 items-center whitespace-nowrap px-5 text-sm font-semibold uppercase tracking-widest border-b-2 transition-colors duration-200 ${
               isActive
                 ? "border-[#a62639] text-white bg-[#1b2a4a]/40"
                 : "border-transparent text-[#5a7baa] hover:bg-[#1b2a4a]/20 hover:text-gray-200"
