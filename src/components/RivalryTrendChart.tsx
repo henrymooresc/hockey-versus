@@ -32,7 +32,7 @@ export function RivalryTrendChart({ history }: { history: RivalGameHistory[] }) 
 
   return (
     <div className="mt-2">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+      <div className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
         Rivalry Score by Game
       </div>
       <div style={{ width: "100%", height: 120 }}>

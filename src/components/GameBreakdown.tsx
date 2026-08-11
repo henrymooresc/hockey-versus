@@ -101,7 +101,7 @@ function PlayerHeader({ player, align }: { player: PlayerLite; align: "left" | "
         <div className="text-lg font-semibold text-gray-100 truncate">
           {player.firstName} {player.lastName}
         </div>
-        <div className={`flex items-center gap-1.5 text-xs text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
+        <div className={`flex items-center gap-1.5 text-sm text-gray-500 ${align === "right" ? "justify-end" : ""}`}>
           {player.teamLogoUrl && (
             <RemoteImage src={player.teamLogoUrl} alt="" width={16} height={16} className="object-contain" />
           )}
@@ -134,15 +134,15 @@ function StatCompareRow({
   const aWin = gameA > gameB;
   const bWin = gameB > gameA;
   return (
-    <div className="grid grid-cols-5 items-center text-base py-1">
+    <div className="grid grid-cols-5 items-center text-lg py-1">
       <div className={`text-right font-mono font-semibold ${aWin ? "text-green-400" : bWin ? "text-red-400" : "text-gray-300"}`}>
         {gameA}
       </div>
-      <div className="text-right font-mono text-xs text-gray-600">
+      <div className="text-right font-mono text-sm text-gray-600">
         {avgA != null ? avgA.toFixed(decimals === 0 ? 1 : decimals) : "—"}
       </div>
-      <div className="text-center text-xs uppercase tracking-wider text-gray-500">{label}</div>
-      <div className="text-left font-mono text-xs text-gray-600">
+      <div className="text-center text-sm uppercase tracking-wider text-gray-500">{label}</div>
+      <div className="text-left font-mono text-sm text-gray-600">
         {avgB != null ? avgB.toFixed(decimals === 0 ? 1 : decimals) : "—"}
       </div>
       <div className={`text-left font-mono font-semibold ${bWin ? "text-green-400" : aWin ? "text-red-400" : "text-gray-300"}`}>
@@ -160,45 +160,45 @@ function PairCard({ pair, rank }: { pair: PairBreakdown; rank: number }) {
   return (
     <div className="rounded-xl border border-gray-700/50 bg-gray-800/50 p-6">
       <div className="flex items-center gap-3 mb-5">
-        <div className="text-center font-mono text-sm font-bold text-gray-600 w-6">{rank}</div>
+        <div className="text-center font-mono text-base font-bold text-gray-600 w-6">{rank}</div>
         <div className="flex-1 grid grid-cols-[1fr_60px_1fr] items-center gap-4">
           <PlayerHeader player={playerA} align="right" />
-          <div className="text-center text-xs uppercase tracking-widest text-gray-600">vs</div>
+          <div className="text-center text-sm uppercase tracking-widest text-gray-600">vs</div>
           <PlayerHeader player={playerB} align="left" />
         </div>
       </div>
 
       <div className="grid grid-cols-3 items-center gap-3 mb-5 rounded-lg bg-gray-900/40 px-4 py-3">
         <div className="text-center">
-          <div className="text-xs uppercase tracking-widest text-gray-500">Shared TOI</div>
+          <div className="text-sm uppercase tracking-widest text-gray-500">Shared TOI</div>
           <div className="mt-1 font-mono text-xl font-bold text-gray-100">{formatSecondsToTime(thisGame.toiSharedSeconds)}</div>
           {career && (
-            <div className="text-xs text-gray-500">avg {formatSecondsToTime(Math.round(career.avgToiPerGame))}</div>
+            <div className="text-sm text-gray-500">avg {formatSecondsToTime(Math.round(career.avgToiPerGame))}</div>
           )}
         </div>
         <div className="text-center border-x border-gray-700/50">
-          <div className="text-xs uppercase tracking-widest text-gray-500">Game Rivalry</div>
+          <div className="text-sm uppercase tracking-widest text-gray-500">Game Rivalry</div>
           <div className={`mt-1 font-mono text-2xl font-bold ${thisGame.rivalryScore > 0 ? "text-amber-400" : "text-gray-400"}`}>
             {thisGame.rivalryScore.toFixed(2)}
           </div>
           {rivalryDelta != null && (
-            <div className={`text-xs font-mono ${arrowColor}`}>
+            <div className={`text-sm font-mono ${arrowColor}`}>
               {arrow} {rivalryDelta > 0 ? "+" : ""}{rivalryDelta.toFixed(2)} vs typical
             </div>
           )}
         </div>
         <div className="text-center">
-          <div className="text-xs uppercase tracking-widest text-gray-500">Career Avg</div>
+          <div className="text-sm uppercase tracking-widest text-gray-500">Career Avg</div>
           <div className="mt-1 font-mono text-xl font-bold text-gray-300">
             {career ? career.avgRivalryScore.toFixed(2) : "—"}
           </div>
           {career && (
-            <div className="text-xs text-gray-500">{career.gamesShared} GP · {formatSecondsToHMS(career.toiSharedSeconds)}</div>
+            <div className="text-sm text-gray-500">{career.gamesShared} GP · {formatSecondsToHMS(career.toiSharedSeconds)}</div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-5 text-xs uppercase tracking-wider text-gray-600 pb-1.5 mb-1.5 border-b border-gray-800/80">
+      <div className="grid grid-cols-5 text-sm uppercase tracking-wider text-gray-600 pb-1.5 mb-1.5 border-b border-gray-800/80">
         <div className="text-right">Game</div>
         <div className="text-right">Avg</div>
         <div />
@@ -233,11 +233,11 @@ function TeamStatRow({
   const homeWins = higherIsBetter ? home > away : home < away;
   const awayWins = higherIsBetter ? away > home : away < home;
   return (
-    <div className="grid grid-cols-3 items-center py-1 text-sm">
+    <div className="grid grid-cols-3 items-center py-1 text-base">
       <div className={`text-right font-mono font-semibold ${homeWins ? "text-green-400" : awayWins ? "text-red-400" : "text-gray-300"}`}>
         {home}
       </div>
-      <div className="text-center text-[10px] uppercase tracking-widest text-gray-500">{label}</div>
+      <div className="text-center text-xs uppercase tracking-widest text-gray-500">{label}</div>
       <div className={`text-left font-mono font-semibold ${awayWins ? "text-green-400" : homeWins ? "text-red-400" : "text-gray-300"}`}>
         {away}
       </div>
@@ -251,16 +251,16 @@ function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: T
 
   return (
     <div className="rounded-2xl border border-gray-700/60 bg-gray-900/90 px-6 py-5">
-      <div className="text-center text-xs uppercase tracking-widest text-gray-500 mb-3">
+      <div className="text-center text-sm uppercase tracking-widest text-gray-500 mb-3">
         {formatDate(game.date)}
       </div>
       <div className="grid grid-cols-3 items-center gap-4">
         <div className="flex items-center justify-end gap-3">
           <div className={`text-right ${homeWon ? "" : "opacity-70"}`}>
-            <div className="text-base font-bold" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
+            <div className="text-lg font-bold" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
               {game.home.name ?? game.home.abbrev}
             </div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">home</div>
+            <div className="text-xs uppercase tracking-wider text-gray-500">home</div>
           </div>
           {game.home.logoUrl && (
             <RemoteImage src={game.home.logoUrl} alt="" width={48} height={48} eager className="object-contain" style={{ filter: homeWon ? undefined : "saturate(0.6)" }} />
@@ -272,24 +272,24 @@ function GameHeader({ game, teamStats }: { game: GameInfo; teamStats?: { home: T
             <span className="mx-2 text-gray-600">·</span>
             <span className={awayWon ? "text-green-400" : homeWon ? "text-red-400" : "text-gray-300"}>{game.away.score ?? "—"}</span>
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-widest text-gray-600">Final</div>
+          <div className="mt-1 text-xs uppercase tracking-widest text-gray-600">Final</div>
         </div>
         <div className="flex items-center justify-start gap-3">
           {game.away.logoUrl && (
             <RemoteImage src={game.away.logoUrl} alt="" width={48} height={48} eager className="object-contain" style={{ filter: awayWon ? undefined : "saturate(0.6)" }} />
           )}
           <div className={`${awayWon ? "" : "opacity-70"}`}>
-            <div className="text-base font-bold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
+            <div className="text-lg font-bold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
               {game.away.name ?? game.away.abbrev}
             </div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">away</div>
+            <div className="text-xs uppercase tracking-wider text-gray-500">away</div>
           </div>
         </div>
       </div>
 
       {teamStats && (
         <div className="mt-5 border-t border-gray-700/50 pt-4">
-          <div className="grid grid-cols-3 items-center pb-1 mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <div className="grid grid-cols-3 items-center pb-1 mb-1 text-xs font-bold uppercase tracking-wider text-gray-500">
             <div className="text-right" style={{ color: getTeamDisplayColor(game.home.abbrev) }}>
               {game.home.abbrev}
             </div>
@@ -350,7 +350,7 @@ function PlayerListPicker({
         {teamLogoUrl && (
           <RemoteImage src={teamLogoUrl} alt="" width={30} height={30} className="object-contain" />
         )}
-        <span className="text-base font-bold uppercase tracking-widest" style={{ color: getTeamDisplayColor(teamAbbrev) }}>
+        <span className="text-lg font-bold uppercase tracking-widest" style={{ color: getTeamDisplayColor(teamAbbrev) }}>
           {label}
         </span>
       </div>
@@ -369,26 +369,26 @@ function PlayerListPicker({
               <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 44, height: 44 }} />
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-base font-semibold text-gray-100 truncate">
+              <div className="text-lg font-semibold text-gray-100 truncate">
                 {selected.firstName} {selected.lastName}
               </div>
-              <div className="text-xs text-gray-500">{selected.position ?? "—"}</div>
+              <div className="text-sm text-gray-500">{selected.position ?? "—"}</div>
             </div>
             <span
               role="button"
               tabIndex={0}
               onClick={(e) => { e.stopPropagation(); onSelect(null); setOpen(false); }}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onSelect(null); setOpen(false); } }}
-              className="rounded p-1.5 text-gray-500 hover:text-gray-100 hover:bg-gray-700/50 transition-colors cursor-pointer text-base"
+              className="rounded p-1.5 text-gray-500 hover:text-gray-100 hover:bg-gray-700/50 transition-colors cursor-pointer text-lg"
               title="Clear"
             >
               ✕
             </span>
           </>
         ) : (
-          <span className="flex-1 text-base text-gray-500">Select a player…</span>
+          <span className="flex-1 text-lg text-gray-500">Select a player…</span>
         )}
-        <span className={`text-gray-500 text-base transition-transform duration-200 inline-block ${open ? "rotate-180" : ""}`}>▼</span>
+        <span className={`text-gray-500 text-lg transition-transform duration-200 inline-block ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
 
       {open && (
@@ -412,11 +412,11 @@ function PlayerListPicker({
                     <div className="rounded-full bg-gray-700 shrink-0" style={{ width: 36, height: 36 }} />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-base text-gray-100 truncate">
+                    <div className="text-lg text-gray-100 truncate">
                       {player.firstName} {player.lastName}
                     </div>
                   </div>
-                  <span className="text-xs text-gray-500">{player.position ?? "—"}</span>
+                  <span className="text-sm text-gray-500">{player.position ?? "—"}</span>
                 </button>
               </li>
             );
@@ -544,11 +544,11 @@ export function GameBreakdown({ gameId }: { gameId: number }) {
 
       <div>
         {!awayPlayer || !homePlayer ? (
-          <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-sm text-gray-500">
+          <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-base text-gray-500">
             Pick a player from each team to see how they matched up.
           </div>
         ) : !selectedPair ? (
-          <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-sm text-gray-500">
+          <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-base text-gray-500">
             {awayPlayer.firstName} {awayPlayer.lastName} and {homePlayer.firstName} {homePlayer.lastName} did not share the ice in this game.
           </div>
         ) : (
@@ -559,7 +559,7 @@ export function GameBreakdown({ gameId }: { gameId: number }) {
       </div>
 
       <div className="mt-6 text-center">
-        <Link href="/games" className="text-xs text-gray-500 hover:text-gray-300">
+        <Link href="/games" className="text-sm text-gray-500 hover:text-gray-300">
           ← back to recent games
         </Link>
       </div>

@@ -116,7 +116,7 @@ export function SoloAnalysis({
             <div className="flex flex-wrap items-start justify-between gap-3" style={{ marginBottom: 20 }}>
               <div>
                 <h2 className="text-xl font-bold text-blue-400">All-Time Rivals</h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-base text-gray-500">
                   Performance vs opponent players sharing ice time
                 </p>
               </div>
@@ -127,12 +127,12 @@ export function SoloAnalysis({
                     value={nameQuery}
                     onChange={(e) => setNameQuery(e.target.value)}
                     placeholder="Filter by name…"
-                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
                   />
                   {nameQuery && (
                     <button
                       onClick={() => setNameQuery("")}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-100"
                       title="Clear"
                     >
                       ✕
@@ -144,7 +144,7 @@ export function SoloAnalysis({
                   onChange={(e) => setTeamFilter(e.target.value)}
                   /* A minimum width, so the very first load does not widen it
                      from "All teams" to a full team name and shift the row. */
-                  className="min-w-[150px] rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
+                  className="min-w-[150px] rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
                   title="Filter by team"
                 >
                   <option value="">All teams</option>
@@ -154,14 +154,14 @@ export function SoloAnalysis({
                     </option>
                   ))}
                 </select>
-                <label className="flex items-center gap-1.5 text-xs text-gray-400">
-                  <span className="uppercase tracking-wider text-[10px] text-gray-500">Min TOI (sec)</span>
+                <label className="flex items-center gap-1.5 text-sm text-gray-400">
+                  <span className="uppercase tracking-wider text-xs text-gray-500">Min TOI (sec)</span>
                   <input
                     type="number"
                     min={0}
                     value={minTOI}
                     onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
+                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-sm text-gray-100 focus:border-blue-500 focus:outline-none"
                   />
                 </label>
                 <PositionTabs
@@ -200,7 +200,7 @@ export function SoloAnalysis({
                 }`}
               >
                 {!hasAnyData ? (
-                  <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-sm text-gray-500">
+                  <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-base text-gray-500">
                     No rivalry data for this filter combination
                   </div>
                 ) : activeTab === "skaters" ? (
@@ -237,7 +237,7 @@ export function SoloAnalysis({
         <ErrorBoundary label="Upcoming Matchups">
           <div className="rounded-xl border border-gray-700/60 bg-gray-900/90 shadow-lg shadow-black/20" style={{ padding: "28px 32px" }}>
             <h2 className="text-xl font-bold text-emerald-400">Upcoming Matchups</h2>
-            <p className="text-sm text-gray-500" style={{ marginBottom: 20 }}>
+            <p className="text-base text-gray-500" style={{ marginBottom: 20 }}>
               Select a game to see historical performance vs projected opponent roster
             </p>
             <UpcomingMatchups player={player} />

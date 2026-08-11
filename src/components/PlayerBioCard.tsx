@@ -57,18 +57,18 @@ function PlayerIdentity({ player, align }: { player: BioPlayer; align: "left" | 
         />
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-bold text-gray-100">
+        <div className="truncate text-base font-bold text-gray-100">
           {player.firstName} {player.lastName}
         </div>
         <div className={`mt-0.5 flex items-center gap-2 ${isRight ? "justify-end" : ""}`}>
           {player.sweaterNumber && (
-            <span className="text-xs text-gray-400">#{player.sweaterNumber}</span>
+            <span className="text-sm text-gray-400">#{player.sweaterNumber}</span>
           )}
           {player.position && (
-            <span className={`text-xs ${positionColor(player.position)}`}>{player.position}</span>
+            <span className={`text-sm ${positionColor(player.position)}`}>{player.position}</span>
           )}
         </div>
-        {age !== null && <div className="mt-0.5 text-[10px] text-gray-500">Age {age}</div>}
+        {age !== null && <div className="mt-0.5 text-xs text-gray-500">Age {age}</div>}
       </div>
     </div>
   );
@@ -93,7 +93,7 @@ function TeamStrip({
   if (!standings) {
     return (
       <div
-        className={`flex items-center gap-2 rounded px-2 py-1 text-[10px] ${isRight ? "flex-row-reverse" : ""}`}
+        className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${isRight ? "flex-row-reverse" : ""}`}
         style={{
           backgroundColor: "rgba(255,255,255,0.04)",
           ...(isRight
@@ -102,7 +102,7 @@ function TeamStrip({
         }}
       >
         <span
-          className="flex shrink-0 items-center justify-center rounded text-[11px] font-bold text-gray-500"
+          className="flex shrink-0 items-center justify-center rounded text-[13px] font-bold text-gray-500"
           style={{
             width: 18,
             height: 18,
@@ -120,7 +120,7 @@ function TeamStrip({
 
   return (
     <div
-      className={`flex items-center gap-3 rounded px-2 py-1 text-[10px] ${isRight ? "flex-row-reverse" : ""}`}
+      className={`flex items-center gap-3 rounded px-2 py-1 text-xs ${isRight ? "flex-row-reverse" : ""}`}
       style={{ backgroundColor: teamColors.primary + "15", ...border }}
     >
       <span
@@ -137,7 +137,7 @@ function TeamStrip({
         )}
         {player.teamAbbrev && (
           <span
-            className="text-xs font-semibold"
+            className="text-sm font-semibold"
             style={{ color: getTeamDisplayColor(player.teamAbbrev) }}
           >
             {player.teamAbbrev}
@@ -197,12 +197,12 @@ export function PlayerBioCard({
         <PlayerIdentity player={player} align="left" />
 
         <div className="shrink-0 text-center">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          <div className="text-xs font-bold uppercase tracking-widest text-gray-500">
             Rivalry Score
             <a
               href="/about#rivalry-score"
               title="What is Rivalry Score?"
-              className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 align-middle text-[8px] font-bold text-gray-400 transition-colors hover:border-blue-400 hover:text-blue-400"
+              className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-gray-600 align-middle text-[10px] font-bold text-gray-400 transition-colors hover:border-blue-400 hover:text-blue-400"
             >
               i
             </a>
@@ -215,7 +215,7 @@ export function PlayerBioCard({
             {rivalryScore.toFixed(2)}
             {showSmallSampleMark && <SmallSampleMark gamesShared={gamesShared} />}
           </div>
-          <div className="text-[10px] text-gray-500">
+          <div className="text-xs text-gray-500">
             <span className="font-mono text-gray-300">{gamesShared}</span> GP
             <span className="mx-1 text-gray-600">·</span>
             <span className="font-mono text-gray-300">{formatSecondsToHMS(toiSharedSeconds)}</span>

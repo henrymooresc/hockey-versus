@@ -10,7 +10,7 @@ export default function HomePage() {
         <p className="mt-4 text-xl text-gray-400">
           Compare how NHL players perform when sharing the ice
         </p>
-        <p className="mt-2 text-sm text-gray-600">Covering the last 10 NHL seasons</p>
+        <p className="mt-2 text-base text-gray-600">Covering the last 10 NHL seasons</p>
       </div>
 
       <PlayerSearch />
