@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, type AggRow } from "@/lib/matchup-mapper";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 
 /**
  * Returns all opponents (split into skaters and goalies) with full stats
@@ -24,6 +25,17 @@ export async function GET(
   const seasonsParam = searchParams.get("seasons");
   const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
   const gtFilter = parseGameTypeFilter(searchParams.get("gameType"));
+  const opponentIdParam = searchParams.get("opponentId");
+  const opponentId = opponentIdParam ? parseInt(opponentIdParam, 10) : null;
+  if (opponentIdParam && (opponentId === null || isNaN(opponentId))) {
+    return NextResponse.json({ error: "Invalid opponentId" }, { status: 400 });
+  }
+
+  const playerRows = await db.execute(sql`
+    SELECT position FROM players WHERE id = ${playerId}
+  `);
+  const requestingPosition =
+    unwrapRows<{ position: string | null }>(playerRows)[0]?.position ?? null;
 
   const rows = await db.execute(sql`
     WITH aggregated AS (
@@ -50,8 +62,8 @@ export async function GET(
         SUM(hits_by_b)::int AS hits_by_b,
         SUM(blocks_by_a)::int AS blocks_by_a,
         SUM(blocks_by_b)::int AS blocks_by_b,
-        SUM(penalties_by_a)::int AS penalties_by_a,
-        SUM(penalties_by_b)::int AS penalties_by_b,
+        SUM(penalty_minutes_a)::int AS penalty_minutes_a,
+        SUM(penalty_minutes_b)::int AS penalty_minutes_b,
         SUM(faceoff_wins_a)::int AS faceoff_wins_a,
         SUM(faceoff_wins_b)::int AS faceoff_wins_b,
         SUM(wins_a)::int AS wins_a,
@@ -60,6 +72,7 @@ export async function GET(
       WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
         AND same_team = false
         AND toi_shared_seconds > 0
+        ${opponentId !== null ? sql`AND (player_a_id = ${opponentId} OR player_b_id = ${opponentId})` : sql``}
         ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
         ${gameTypeClause(gtFilter)}
       GROUP BY opponent_id, player_side
@@ -81,12 +94,14 @@ export async function GET(
     ORDER BY a.toi_shared_seconds DESC
   `);
 
-  const opponents = unwrapRows<AggRow>(rows).map(mapAggRowToMatchup);
+  const opponents = unwrapRows<AggRow>(rows).map((row) =>
+    mapAggRowToMatchup(row, requestingPosition)
+  );
 
   const skaterRivals = opponents.filter((o) => o.position !== "G");
   const goalieRivals = opponents.filter((o) => o.position === "G");
 
-  return NextResponse.json({ skaterRivals, goalieRivals });
+  return cachedJson({ skaterRivals, goalieRivals }, DERIVED);
   } catch (err: unknown) {
     console.error("Rivals API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

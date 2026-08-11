@@ -5,8 +5,6 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
 import { games, gameEvents, players, teams } from "../src/db/schema";
 import { getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
@@ -14,6 +12,7 @@ import { rateLimitedFetch } from "./lib/rate-limiter";
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 setFetchImpl(rateLimitedFetch);
 import type { Play } from "../src/types/nhl-api";
@@ -49,7 +48,7 @@ function normalizeEvent(play: Play) {
   let player1Id: number | null = null;
   let player2Id: number | null = null;
   let player3Id: number | null = null;
-  let teamId: number | null = d?.eventOwnerTeamId ?? null;
+  const teamId: number | null = d?.eventOwnerTeamId ?? null;
 
   switch (eventType) {
     case "goal":
@@ -79,9 +78,16 @@ function normalizeEvent(play: Play) {
       break;
     case "giveaway":
     case "takeaway":
-      player1Id = d?.playerId ?? (d as any)?.playerId ?? null;
+      player1Id = d?.playerId ?? null;
       break;
   }
+
+  // Lift the useful parts of `details` into typed columns. Storing the object
+  // whole cost 643MB, most of it the key names repeated on every row.
+  const num = (v: unknown): number | null =>
+    v === null || v === undefined ? null : Number(v);
+  const str = (v: unknown): string | null =>
+    v === null || v === undefined ? null : String(v);
 
   return {
     eventId: play.eventId,
@@ -92,16 +98,24 @@ function normalizeEvent(play: Play) {
     player1Id,
     player2Id,
     player3Id,
-    detailsJson: d ?? null,
+    xCoord: num(d?.xCoord),
+    yCoord: num(d?.yCoord),
+    zoneCode: str(d?.zoneCode),
+    shotType: str(d?.shotType),
+    goalieInNetId: num(d?.goalieInNetId),
+    penaltyMinutes: num(d?.duration),
+    penaltyDescKey: str(d?.descKey),
+    penaltyTypeCode: str(d?.typeCode),
+    homeScore: num(d?.homeScore),
+    awayScore: num(d?.awayScore),
+    homeSog: num(d?.homeSOG),
+    awaySog: num(d?.awaySOG),
+    reason: str(d?.reason),
   };
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   const filtered = await db
     .select({ id: games.id, seasonId: games.seasonId })

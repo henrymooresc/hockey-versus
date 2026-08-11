@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows } from "@/lib/db-utils";
+import { cachedJson, SCHEDULE } from "@/lib/api-cache";
 
 interface Row {
   id: number;
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
       },
     }));
 
-    return NextResponse.json({ games });
+    return cachedJson({ games }, SCHEDULE);
   } catch (err) {
     console.error("Recent games API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

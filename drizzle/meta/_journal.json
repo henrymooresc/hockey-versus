@@ -1,0 +1,69 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785869744910,
+      "tag": "0000_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785875718042,
+      "tag": "0001_split_leaderboard_by_pair_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786031774089,
+      "tag": "0002_resume_ingestion_per_game",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786141908250,
+      "tag": "0003_add_event_detail_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786141924861,
+      "tag": "0004_drop_event_json_and_dead_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786144148387,
+      "tag": "0005_add_shifts_player_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786372963473,
+      "tag": "0006_drop_dead_rivalry_score",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786373945258,
+      "tag": "0007_add_penalty_minutes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786373970976,
+      "tag": "0008_drop_penalty_counts",
+      "breakpoints": true
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getTeamDisplayColor } from "@/lib/team-colors";
 import { Skeleton } from "./Skeleton";
+import { RemoteImage } from "./RemoteImage";
 
 interface GameSummary {
   id: number;
@@ -31,7 +32,7 @@ function GameCard({ game }: { game: GameSummary }) {
             {game.home.abbrev}
           </span>
           {game.home.logoUrl && (
-            <img src={game.home.logoUrl} alt="" className="object-contain" style={{ width: 28, height: 28 }} />
+            <RemoteImage src={game.home.logoUrl} alt="" width={28} height={28} className="object-contain" />
           )}
         </div>
         <div className="text-center font-mono text-base font-bold">
@@ -41,7 +42,7 @@ function GameCard({ game }: { game: GameSummary }) {
         </div>
         <div className={`flex items-center justify-start gap-2 ${awayWon ? "" : "opacity-70"}`}>
           {game.away.logoUrl && (
-            <img src={game.away.logoUrl} alt="" className="object-contain" style={{ width: 28, height: 28 }} />
+            <RemoteImage src={game.away.logoUrl} alt="" width={28} height={28} className="object-contain" />
           )}
           <span className="text-sm font-semibold" style={{ color: getTeamDisplayColor(game.away.abbrev) }}>
             {game.away.abbrev}

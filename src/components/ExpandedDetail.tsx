@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
+import type { BioPlayer, MatchupPlayer, RivalGameHistory, StandingsEntry } from "@/types/versus";
 import { PlayerBioCard } from "./PlayerBioCard";
 import { RivalryTrendChart } from "./RivalryTrendChart";
 import { MatchupRadarChart, type RadarCategory } from "./MatchupRadarChart";
@@ -90,19 +90,22 @@ function ColumnHeaders({ playerName, opponentName }: { playerName: string; oppon
 export function SkaterExpandedDetail({
   matchup,
   showFaceoffs,
-  playerName,
+  player,
   playerId,
   standings,
+  showSmallSampleMark = true,
 }: {
   matchup: MatchupPlayer;
   showFaceoffs: boolean;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  /** False on a single-season view, where every pair is a short history. */
+  showSmallSampleMark?: boolean;
 }) {
   const { stats, oppStats } = matchup;
   const history = useRivalHistory(playerId, matchup.playerId);
-  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
   const oppShort = `${matchup.firstName[0]}. ${matchup.lastName}`;
 
   const radarCategories: RadarCategory[] = [
@@ -111,7 +114,7 @@ export function SkaterExpandedDetail({
     { key: "shots", label: "Shots", mine: stats.individualShots, opp: oppStats.individualShots },
     { key: "hits", label: "Hits", mine: stats.hits, opp: oppStats.hits },
     { key: "blocks", label: "Blocks", mine: stats.blocks, opp: oppStats.blocks },
-    { key: "penalties", label: "PIM", mine: stats.penalties, opp: oppStats.penalties, higherIsBetter: false },
+    { key: "penalties", label: "PIM", mine: stats.penaltyMinutes, opp: oppStats.penaltyMinutes, higherIsBetter: false },
   ];
   if (showFaceoffs) {
     radarCategories.push({ key: "fo", label: "FO Wins", mine: stats.faceoffWins, opp: oppStats.faceoffWins });
@@ -121,7 +124,15 @@ export function SkaterExpandedDetail({
   return (
     <div className="px-2 pb-3">
       <div className="mb-3">
-        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+        <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
+          />
       </div>
 
       <div className="pt-2 pb-1 text-center">
@@ -140,7 +151,7 @@ export function SkaterExpandedDetail({
           <DetailSectionLabel label="Physical" />
           <DetailStatRow label="Hits" mine={stats.hits} opp={oppStats.hits} />
           <DetailStatRow label="Blocks" mine={stats.blocks} opp={oppStats.blocks} />
-          <DetailStatRow label="Penalties" mine={stats.penalties} opp={oppStats.penalties} higherIsBetter={false} />
+          <DetailStatRow label="PIM" mine={stats.penaltyMinutes} opp={oppStats.penaltyMinutes} higherIsBetter={false} />
 
           {showFaceoffs && (
             <>
@@ -190,20 +201,23 @@ export function SkaterExpandedDetail({
 export function GoalieExpandedDetail({
   matchup,
   playerPosition,
-  playerName,
+  player,
   playerId,
   standings,
+  showSmallSampleMark = true,
 }: {
   matchup: MatchupPlayer;
   playerPosition: PlayerPosition;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  /** False on a single-season view, where every pair is a short history. */
+  showSmallSampleMark?: boolean;
 }) {
   const { stats, oppStats } = matchup;
   const isPlayerGoalie = playerPosition === "G";
   const history = useRivalHistory(playerId, matchup.playerId);
-  const teamStandings = matchup.teamAbbrev ? standings.get(matchup.teamAbbrev) ?? null : null;
+  const playerName = `${player.firstName[0]}. ${player.lastName}`;
 
   if (isPlayerGoalie) {
     const mySaves = stats.individualShots - stats.goals;
@@ -211,7 +225,15 @@ export function GoalieExpandedDetail({
     return (
       <div className="px-2 pb-3">
         <div className="mb-3">
-          <PlayerBioCard matchup={matchup} standings={teamStandings} />
+          <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
+          />
         </div>
 
         <div className="pt-2 pb-1 text-center">
@@ -261,7 +283,15 @@ export function GoalieExpandedDetail({
   return (
     <div className="px-2 pb-3">
       <div className="mb-3">
-        <PlayerBioCard matchup={matchup} standings={teamStandings} />
+        <PlayerBioCard
+            player={player}
+            opponent={matchup}
+            rivalryScore={matchup.rivalryScore}
+            gamesShared={matchup.gamesShared}
+            toiSharedSeconds={matchup.toiSharedSeconds}
+            standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
+          />
       </div>
 
       <div className="pt-2 pb-2 text-center">

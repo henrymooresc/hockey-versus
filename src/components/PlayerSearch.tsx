@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { PlayerSearchResult } from "@/types/versus";
+import { useFetchedData } from "@/hooks/useFetchedData";
 import { SoloAnalysis } from "./SoloAnalysis";
-import { HeadToHeadComparison } from "./HeadToHeadComparison";
+import { RemoteImage } from "./RemoteImage";
 
 const DIVISIONS: Record<string, string[]> = {
   Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
@@ -11,6 +12,8 @@ const DIVISIONS: Record<string, string[]> = {
   Central:      ["CHI", "COL", "DAL", "MIN", "NSH", "STL", "UTA", "WPG"],
   Pacific:      ["ANA", "CGY", "EDM", "LAK", "SJS", "SEA", "VAN", "VGK"],
 };
+
+const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
 
 function abbrevToDivision(abbrev: string): string {
   for (const [division, abbrevs] of Object.entries(DIVISIONS)) {
@@ -46,7 +49,7 @@ function PlayerRow({
       }`}
     >
       {player.headshotUrl ? (
-        <img src={player.headshotUrl} alt="" className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600 transition-all duration-150 group-hover:ring-gray-400" />
+        <RemoteImage src={player.headshotUrl} alt="" width={48} height={48} className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-600 transition-all duration-150 group-hover:ring-gray-400" />
       ) : (
         <div className="h-12 w-12 rounded-full bg-gray-600 ring-2 ring-gray-500" />
       )}
@@ -77,11 +80,11 @@ function TeamGroup({
   onSelect: (p: PlayerSearchResult) => void;
   defaultOpen: boolean;
 }) {
+  // The caller keys this component on `defaultOpen`, so a change in filtering
+  // remounts it and this initialiser picks up the new default. Syncing the
+  // prop in an effect instead cost a render, and a group the user had
+  // collapsed stayed collapsed when filtering resumed.
   const [open, setOpen] = useState(defaultOpen);
-
-  useEffect(() => {
-    setOpen(defaultOpen);
-  }, [defaultOpen]);
 
   return (
     <li className="border-b border-gray-700 last:border-0">
@@ -91,7 +94,7 @@ function TeamGroup({
       >
         {logoUrl ? (
           <span className="flex items-center justify-center rounded" style={{ width: 32, height: 32, background: "rgba(255,255,255,0.15)" }}>
-            <img src={logoUrl} alt={teamAbbrev} className="object-contain" style={{ width: 26, height: 26 }} />
+            <RemoteImage src={logoUrl} alt={teamAbbrev} width={26} height={26} className="object-contain" />
           </span>
         ) : (
           <div className="h-8 w-8" />
@@ -136,7 +139,7 @@ function DivisionSection({
       <ul>
         {sorted.map(([abbrev, group]) => (
           <TeamGroup
-            key={abbrev}
+            key={`${abbrev}-${isFiltering}`}
             teamAbbrev={abbrev}
             teamName={group.teamName}
             logoUrl={group.logoUrl}
@@ -153,22 +156,19 @@ function DivisionSection({
 
 function PlayerList({
   results,
-  exclude,
   selected,
   onSelect,
   isFiltering,
   loading,
 }: {
   results: PlayerSearchResult[];
-  exclude: PlayerSearchResult | null;
   selected: PlayerSearchResult | null;
   onSelect: (p: PlayerSearchResult) => void;
   isFiltering: boolean;
   loading: boolean;
 }) {
-  const filtered = results.filter((p) => p.id !== exclude?.id);
+  const filtered = results;
 
-  const divisionOrder = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
 
   const divisionMap = useMemo(() => {
     // Group by team
@@ -187,7 +187,7 @@ function PlayerList({
 
     // Group teams by division
     const map = new Map<string, Map<string, { teamName: string; logoUrl: string | null; players: PlayerSearchResult[] }>>();
-    for (const div of divisionOrder) map.set(div, new Map());
+    for (const div of DIVISION_ORDER) map.set(div, new Map());
 
     for (const [abbrev, group] of teamMap.entries()) {
       const div = abbrevToDivision(abbrev);
@@ -204,7 +204,7 @@ function PlayerList({
       ) : filtered.length === 0 ? (
         <li className="px-5 py-4 text-sm text-gray-500">No players found</li>
       ) : (
-        divisionOrder
+        DIVISION_ORDER
           .filter((div) => divisionMap.get(div)!.size > 0)
           .map((div) => (
             <DivisionSection
@@ -226,29 +226,24 @@ function PlayerCombobox({
   label,
   selected,
   onSelect,
-  exclude,
 }: {
   label: string;
   selected: PlayerSearchResult | null;
   onSelect: (player: PlayerSearchResult | null) => void;
-  exclude: PlayerSearchResult | null;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PlayerSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
 
-  useEffect(() => {
-    setLoading(true);
+  // `useFetchedData` aborts a superseded request, so a slow answer for an
+  // earlier query cannot arrive last and replace a newer one.
+  const url = useMemo(() => {
     const params = new URLSearchParams({ onRoster: "true", minGames: "10" });
     if (debouncedQuery.length >= 2) params.set("q", debouncedQuery);
-    if (exclude?.id) params.set("versusWith", String(exclude.id));
-    fetch(`/api/players/search?${params}`)
-      .then((r) => r.json())
-      .then((data) => setResults(data.players ?? []))
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
-  }, [debouncedQuery, exclude?.id]);
+    return `/api/players/search?${params}`;
+  }, [debouncedQuery]);
+
+  const { data, loading } = useFetchedData<{ players?: PlayerSearchResult[] }>(url);
+  const results = useMemo(() => data?.players ?? [], [data]);
 
   const handleSelect = useCallback(
     (player: PlayerSearchResult) => {
@@ -267,7 +262,7 @@ function PlayerCombobox({
       {selected ? (
         <div className="flex items-center gap-4 rounded-xl border-2 border-blue-500/70 bg-gradient-to-r from-blue-950/40 to-gray-800 px-5 py-4 shadow-lg shadow-blue-500/5 transition-all duration-300">
           {selected.headshotUrl ? (
-            <img src={selected.headshotUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400/70" />
+            <RemoteImage src={selected.headshotUrl} alt="" width={56} height={56} eager className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-400/70" />
           ) : (
             <div className="h-14 w-14 rounded-full bg-gray-600" />
           )}
@@ -299,7 +294,6 @@ function PlayerCombobox({
       {!selected && (
         <PlayerList
           results={results}
-          exclude={exclude}
           selected={selected}
           onSelect={handleSelect}
           isFiltering={debouncedQuery.length >= 2}
@@ -311,83 +305,16 @@ function PlayerCombobox({
 }
 
 export function PlayerSearch() {
-  const [playerA, setPlayerA] = useState<PlayerSearchResult | null>(null);
-  const [playerB, setPlayerB] = useState<PlayerSearchResult | null>(null);
-  const [compareMode, setCompareMode] = useState(false);
-
-  const handleToggleCompare = () => {
-    if (compareMode) {
-      setPlayerB(null);
-      setCompareMode(false);
-    } else {
-      setCompareMode(true);
-    }
-  };
+  const [player, setPlayer] = useState<PlayerSearchResult | null>(null);
 
   return (
     <div className="w-full">
-      {/* Top controls row */}
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
-        {/* Compare toggle */}
-        <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-400">Head-to-Head</span>
-        <button
-          onClick={handleToggleCompare}
-          className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-            compareMode
-              ? "border-blue-500 bg-blue-600"
-              : "border-gray-600 bg-gray-700"
-          }`}
-          role="switch"
-          aria-checked={compareMode}
-        >
-          <span
-            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-200 ${
-              compareMode ? "translate-x-[22px]" : "translate-x-[2px]"
-            }`}
-          />
-        </button>
-        </div>
-      </div>
-
-      {/* Player selection area */}
-      {!compareMode ? (
-        // Solo mode: single player picker
-        <div>
-          <PlayerCombobox
-            label="Select a Player"
-            selected={playerA}
-            onSelect={setPlayerA}
-            exclude={null}
-          />
-
-          {playerA && (
-            <SoloAnalysis player={playerA} />
-          )}
-        </div>
-      ) : (
-        // Compare mode: two player pickers side by side
-        <div>
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <PlayerCombobox
-              label="Player 1"
-              selected={playerA}
-              onSelect={setPlayerA}
-              exclude={playerB}
-            />
-            <PlayerCombobox
-              label="Player 2"
-              selected={playerB}
-              onSelect={setPlayerB}
-              exclude={playerA}
-            />
-          </div>
-
-          {playerA && playerB && (
-            <HeadToHeadComparison playerA={playerA} playerB={playerB} />
-          )}
-        </div>
-      )}
+      <PlayerCombobox
+        label="Select a Player"
+        selected={player}
+        onSelect={setPlayer}
+      />
+      {player && <SoloAnalysis player={player} />}
     </div>
   );
 }

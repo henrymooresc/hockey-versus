@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { MatchupPlayer, StandingsEntry } from "@/types/versus";
+import type { BioPlayer, MatchupPlayer, StandingsEntry } from "@/types/versus";
 import { formatSecondsToHMS } from "@/lib/time-utils";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import { useStandings } from "@/hooks/useStandings";
 import { SkaterExpandedDetail, GoalieExpandedDetail, type PlayerPosition } from "./ExpandedDetail";
+import { SmallSampleMark } from "./SmallSampleMark";
+import { RemoteImage } from "./RemoteImage";
 
 function positionColor(pos: string | null | undefined): string {
   switch (pos) {
@@ -33,7 +35,7 @@ function getSkaterSortValue(m: MatchupPlayer, key: SkaterSortKey | CenterSortKey
     case "shots": return m.stats.individualShots - m.oppStats.individualShots;
     case "hits": return m.stats.hits - m.oppStats.hits;
     case "blocks": return m.stats.blocks - m.oppStats.blocks;
-    case "pim": return m.oppStats.penalties - m.stats.penalties;
+    case "pim": return m.oppStats.penaltyMinutes - m.stats.penaltyMinutes;
     case "foPct": {
       const total = m.stats.faceoffWins + m.oppStats.faceoffWins;
       return total > 0 ? m.stats.faceoffWins / total : 0;
@@ -83,12 +85,21 @@ function GoalieStatValue({ value, className }: { value: string | number; classNa
   );
 }
 
-function RivalryScoreCell({ score }: { score: number }) {
+function RivalryScoreCell({
+  score,
+  gamesShared,
+  showSmallSampleMark,
+}: {
+  score: number;
+  gamesShared: number;
+  showSmallSampleMark: boolean;
+}) {
   return (
     <div className="flex items-center justify-center font-mono text-[11px]">
       <span className={score > 0 ? "text-green-400 font-bold" : score < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
         {score.toFixed(1)}
       </span>
+      {showSmallSampleMark && <SmallSampleMark gamesShared={gamesShared} />}
     </div>
   );
 }
@@ -188,18 +199,20 @@ function MatchupRow({
   expanded,
   onToggle,
   playerPosition,
-  playerName,
+  player,
   playerId,
   standings,
+  showSmallSampleMark,
 }: {
   matchup: MatchupPlayer;
   mode?: ColumnMode;
   expanded: boolean;
   onToggle: () => void;
   playerPosition: PlayerPosition;
-  playerName: string;
+  player: BioPlayer;
   playerId: number;
   standings: Map<string, StandingsEntry>;
+  showSmallSampleMark: boolean;
 }) {
   const hasHistory = matchup.gamesShared > 0;
   const gridTemplate = mode === "goalie" ? GOALIE_ROW_GRID : mode === "center" ? CENTER_ROW_GRID : SKATER_ROW_GRID;
@@ -222,11 +235,12 @@ function MatchupRow({
         onClick={isClickable ? onToggle : undefined}
       >
         {matchup.headshotUrl ? (
-          <img
+          <RemoteImage
             src={matchup.headshotUrl}
             alt=""
+            width={30}
+            height={30}
             className="rounded-full object-cover ring-1 ring-gray-600"
-            style={{ width: 30, height: 30 }}
           />
         ) : (
           <div className="rounded-full bg-gray-600" style={{ width: 36, height: 36 }} />
@@ -239,7 +253,7 @@ function MatchupRow({
             >
               {matchup.teamLogoUrl ? (
                 <span className="flex shrink-0 items-center justify-center rounded" style={{ width: 26, height: 26, background: "rgba(255,255,255,0.10)" }}>
-                  <img src={matchup.teamLogoUrl} alt="" className="object-contain" style={{ width: 20, height: 20 }} />
+                  <RemoteImage src={matchup.teamLogoUrl} alt="" width={20} height={20} className="object-contain" />
                 </span>
               ) : (
                 <span
@@ -280,7 +294,7 @@ function MatchupRow({
               <GoalieStatValue value={matchup.stats.goals} className={matchup.stats.goals > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.assists} className={matchup.stats.assists > 0 ? "text-green-400 font-bold" : "text-gray-300"} />
               <GoalieStatValue value={matchup.stats.individualShots} />
-              <RivalryScoreCell score={matchup.rivalryScore} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} showSmallSampleMark={showSmallSampleMark} />
             </>
           ) : (
             <>
@@ -290,14 +304,14 @@ function MatchupRow({
               <DiffCell diff={matchup.stats.individualShots - matchup.oppStats.individualShots} />
               <DiffCell diff={matchup.stats.hits - matchup.oppStats.hits} />
               <DiffCell diff={matchup.stats.blocks - matchup.oppStats.blocks} />
-              <DiffCell diff={matchup.oppStats.penalties - matchup.stats.penalties} />
+              <DiffCell diff={matchup.oppStats.penaltyMinutes - matchup.stats.penaltyMinutes} />
               {mode === "center" && (
                 <GoalieStatValue
                   value={foPct(matchup.stats.faceoffWins, matchup.oppStats.faceoffWins)}
                   className="text-gray-300"
                 />
               )}
-              <RivalryScoreCell score={matchup.rivalryScore} />
+              <RivalryScoreCell score={matchup.rivalryScore} gamesShared={matchup.gamesShared} showSmallSampleMark={showSmallSampleMark} />
             </>
           )
         ) : (
@@ -309,9 +323,9 @@ function MatchupRow({
       {expanded && hasHistory && (
         <div className="border-t border-gray-700/50 mx-2 mb-1 mt-0">
           {mode === "goalie" ? (
-            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} playerName={playerName} playerId={playerId} standings={standings} />
+            <GoalieExpandedDetail matchup={matchup} playerPosition={playerPosition} player={player} playerId={playerId} standings={standings} showSmallSampleMark={showSmallSampleMark} />
           ) : (
-            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} playerName={playerName} playerId={playerId} standings={standings} />
+            <SkaterExpandedDetail matchup={matchup} showFaceoffs={mode === "center"} player={player} playerId={playerId} standings={standings} showSmallSampleMark={showSmallSampleMark} />
           )}
         </div>
       )}
@@ -326,8 +340,9 @@ export function PositionGroup({
   defaultVisible = 6,
   mode = "skater",
   playerPosition = null,
-  playerName = "",
+  player,
   playerId = 0,
+  showSmallSampleMark = true,
 }: {
   label: string;
   matchups: MatchupPlayer[];
@@ -335,15 +350,22 @@ export function PositionGroup({
   defaultVisible?: number;
   mode?: ColumnMode;
   playerPosition?: PlayerPosition;
-  playerName?: string;
+  player: BioPlayer;
   playerId?: number;
+  /**
+   * False when the panel is scoped to one season. Two teams meet a handful of
+   * times a year, so every pair is a short history and the mark would sit on
+   * nearly every row without telling the reader anything.
+   */
+  showSmallSampleMark?: boolean;
 }) {
   const defaultSort: SortKey = "rivalry";
-  const [showAll, setShowAll] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(defaultVisible);
   const [sortKey, setSortKey] = useState<SortKey>(defaultSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const standings = useStandings();
+  const SHOW_MORE_STEP = 25;
 
   if (matchups.length === 0) return null;
 
@@ -358,8 +380,11 @@ export function PositionGroup({
     return sortDir === "desc" ? diff : -diff;
   });
 
-  const visible = collapsible && !showAll ? sorted.slice(0, defaultVisible) : sorted;
-  const hasMore = collapsible && matchups.length > defaultVisible;
+  const cap = collapsible ? Math.min(visibleCount, sorted.length) : sorted.length;
+  const visible = sorted.slice(0, cap);
+  const hasMore = collapsible && cap < sorted.length;
+  const canCollapse = collapsible && cap > defaultVisible;
+  const remaining = sorted.length - cap;
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -376,7 +401,7 @@ export function PositionGroup({
         {label}
       </h4>
       <StatHeader sortKey={sortKey} sortDir={sortDir} onSort={handleSort} columns={columns} gridTemplate={gridTemplate} />
-      <div className={`flex flex-col gap-3 ${showAll ? "max-h-[600px] overflow-y-auto" : ""}`}>
+      <div className="flex flex-col gap-3">
         {visible.map((m) => (
           <MatchupRow
             key={m.playerId}
@@ -385,22 +410,32 @@ export function PositionGroup({
             expanded={expandedId === m.playerId}
             onToggle={() => setExpandedId(expandedId === m.playerId ? null : m.playerId)}
             playerPosition={playerPosition}
-            playerName={playerName}
+            player={player}
             playerId={playerId}
             standings={standings}
+            showSmallSampleMark={showSmallSampleMark}
           />
         ))}
       </div>
-      {hasMore && (
-        <button
-          onClick={() => setShowAll((v) => !v)}
-          style={{ marginTop: 10 }}
-          className="w-full rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
-        >
-          {showAll
-            ? "Show less"
-            : `Show ${matchups.length - defaultVisible} more`}
-        </button>
+      {(hasMore || canCollapse) && (
+        <div className="mt-2.5 flex gap-2">
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount((c) => c + SHOW_MORE_STEP)}
+              className="flex-1 rounded-lg border border-gray-700/50 bg-gray-800/40 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Show {Math.min(SHOW_MORE_STEP, remaining)} more
+            </button>
+          )}
+          {canCollapse && (
+            <button
+              onClick={() => setVisibleCount(defaultVisible)}
+              className="rounded-lg border border-gray-700/50 bg-gray-800/40 px-4 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors"
+            >
+              Show less
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -8,8 +8,6 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
 import { games, shifts, players, teams } from "../src/db/schema";
 import { getShiftChart, getPlayByPlay, setFetchImpl } from "../src/lib/nhl-api";
@@ -20,6 +18,7 @@ setFetchImpl(rateLimitedFetch);
 import { parseTimeToSeconds } from "../src/lib/time-utils";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 const targetSeasons = parseTargetSeasons();
 
@@ -27,11 +26,7 @@ const targetSeasons = parseTargetSeasons();
 const CONCURRENCY = 3;
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
   // Get games that haven't had shifts ingested yet, limited to target seasons
   const filtered = await db
@@ -117,7 +112,6 @@ async function main() {
               period: s.period,
               startSeconds: parseTimeToSeconds(s.startTime),
               endSeconds: parseTimeToSeconds(s.endTime),
-              shiftNumber: s.shiftNumber,
             }));
 
           // Batch insert shifts

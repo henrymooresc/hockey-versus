@@ -4,6 +4,7 @@ import { players, teams } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { UpcomingGame } from "@/types/versus";
 import type { ScheduleGame } from "@/types/nhl-api";
+import { cachedJson, SCHEDULE } from "@/lib/api-cache";
 
 const WEB_API = "https://api-web.nhle.com";
 
@@ -44,8 +45,11 @@ export async function GET(
 
     const teamAbbrev = team[0].abbrev;
 
-    // Fetch NHL schedule — returns ~1 week of games
-    const response = await fetch(`${WEB_API}/v1/schedule/now`);
+    // Fetch NHL schedule — returns ~1 week of games. `revalidate` matches the
+    // window this route advertises, so one NHL call serves 5 minutes of traffic.
+    const response = await fetch(`${WEB_API}/v1/schedule/now`, {
+      next: { revalidate: 300 },
+    });
     if (!response.ok) {
       return NextResponse.json({ error: "Failed to fetch schedule" }, { status: 502 });
     }
@@ -80,7 +84,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ upcoming, teamAbbrev });
+    return cachedJson({ upcoming, teamAbbrev }, SCHEDULE);
   } catch (err: unknown) {
     console.error("Upcoming API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

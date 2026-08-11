@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getTeamColors, getTeamDisplayColor } from "@/lib/team-colors";
 import type { TeamHistoryResponse, TeamHistoryStint } from "@/app/api/players/[id]/team-history/route";
+import { RemoteImage } from "./RemoteImage";
 
 function formatRange(first: string, last: string): string {
   const f = new Date(first + "T00:00:00");
@@ -23,7 +24,7 @@ function TeamStintChip({ stint }: { stint: TeamHistoryStint }) {
       title={stint.name ?? stint.abbrev ?? undefined}
     >
       {stint.logoUrl ? (
-        <img src={stint.logoUrl} alt="" className="object-contain shrink-0" style={{ width: 18, height: 18 }} />
+        <RemoteImage src={stint.logoUrl} alt="" width={18} height={18} className="object-contain shrink-0" />
       ) : (
         <div className="rounded bg-gray-700 shrink-0" style={{ width: 18, height: 18 }} />
       )}
@@ -95,8 +96,7 @@ export function TeamHistoryTimeline({
   const requesterTeams = aIsRequester ? data.playerA.teams : data.playerB.teams;
   const opponentTeams = aIsRequester ? data.playerB.teams : data.playerA.teams;
 
-  // Only render when at least one player spans multiple teams during this rivalry.
-  if (requesterTeams.length <= 1 && opponentTeams.length <= 1) return null;
+  if (requesterTeams.length === 0 && opponentTeams.length === 0) return null;
 
   return (
     <div className="mt-3 rounded-lg border border-gray-700/40 bg-gray-900/40 px-3 py-2">

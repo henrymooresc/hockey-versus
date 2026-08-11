@@ -29,10 +29,9 @@ export function useStandings(): Map<string, StandingsEntry> {
   );
 
   useEffect(() => {
-    if (cachedStandings) {
-      setStandings(cachedStandings);
-      return;
-    }
+    // The initialiser above already reads the cache, so only a cold start
+    // needs to fetch.
+    if (cachedStandings) return;
     fetchStandings().then(setStandings);
   }, []);
 

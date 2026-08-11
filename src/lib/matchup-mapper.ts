@@ -1,5 +1,5 @@
 import type { MatchupPlayer, MatchupPlayerStats } from "@/types/versus";
-import { computeSkaterRivalryScore, computeGoalieRivalryScore } from "@/lib/rivalry-score";
+import { computePairRivalryScore } from "@/lib/rivalry-score";
 
 export interface AggRow {
   opponent_id: number;
@@ -33,8 +33,8 @@ export interface AggRow {
   hits_by_b: number;
   blocks_by_a: number;
   blocks_by_b: number;
-  penalties_by_a: number;
-  penalties_by_b: number;
+  penalty_minutes_a: number;
+  penalty_minutes_b: number;
   faceoff_wins_a: number;
   faceoff_wins_b: number;
   wins_a: number;
@@ -60,47 +60,41 @@ function buildStats(row: AggRow, isA: boolean): MatchupPlayerStats {
     goalsAgainst: pick(isA, row.goals_against_a, row.goals_against_b),
     hits: pick(isA, row.hits_by_a, row.hits_by_b),
     blocks: pick(isA, row.blocks_by_a, row.blocks_by_b),
-    penalties: pick(isA, row.penalties_by_a, row.penalties_by_b),
+    penaltyMinutes: pick(isA, row.penalty_minutes_a, row.penalty_minutes_b),
     faceoffWins: pick(isA, row.faceoff_wins_a, row.faceoff_wins_b),
   };
 }
 
-export function mapAggRowToMatchup(row: AggRow): MatchupPlayer {
+export function mapAggRowToMatchup(
+  row: AggRow,
+  requestingPlayerPosition: string | null = null
+): MatchupPlayer {
   const isA = row.player_side === "A";
   const stats = buildStats(row, isA);
   const oppStats = buildStats(row, !isA);
-  const isGoalie = row.position === "G";
-
-  const rivalryScore = isGoalie
-    ? computeGoalieRivalryScore({
-        toiSharedSeconds: row.toi_shared_seconds,
-        gamesShared: row.games_shared,
-        skaterShots: stats.individualShots,
-        skaterGoals: stats.goals,
-        skaterAssists: stats.assists,
-        winsA: pick(isA, row.wins_a, row.wins_b),
-        winsB: pick(isA, row.wins_b, row.wins_a),
-      })
-    : computeSkaterRivalryScore({
-        toiSharedSeconds: row.toi_shared_seconds,
-        gamesShared: row.games_shared,
-        hitsByA: stats.hits,
-        hitsByB: oppStats.hits,
-        blocksByA: stats.blocks,
-        blocksByB: oppStats.blocks,
-        penaltiesByA: stats.penalties,
-        penaltiesByB: oppStats.penalties,
-        faceoffWinsA: stats.faceoffWins,
-        faceoffWinsB: oppStats.faceoffWins,
-        playerAGoals: stats.goals,
-        playerAAssists: stats.assists,
-        playerAShots: stats.individualShots,
-        playerBGoals: oppStats.goals,
-        playerBAssists: oppStats.assists,
-        playerBShots: oppStats.individualShots,
-        winsA: pick(isA, row.wins_a, row.wins_b),
-        winsB: pick(isA, row.wins_b, row.wins_a),
-      });
+  // Side A is the requesting player, side B is the opponent.
+  const rivalryScore = computePairRivalryScore({
+    positionA: requestingPlayerPosition,
+    positionB: row.position,
+    toiSharedSeconds: row.toi_shared_seconds,
+    gamesShared: row.games_shared,
+    hitsByA: stats.hits,
+    hitsByB: oppStats.hits,
+    blocksByA: stats.blocks,
+    blocksByB: oppStats.blocks,
+    penaltyMinutesA: stats.penaltyMinutes,
+    penaltyMinutesB: oppStats.penaltyMinutes,
+    faceoffWinsA: stats.faceoffWins,
+    faceoffWinsB: oppStats.faceoffWins,
+    playerAGoals: stats.goals,
+    playerAAssists: stats.assists,
+    playerAShots: stats.individualShots,
+    playerBGoals: oppStats.goals,
+    playerBAssists: oppStats.assists,
+    playerBShots: oppStats.individualShots,
+    winsA: pick(isA, row.wins_a, row.wins_b),
+    winsB: pick(isA, row.wins_b, row.wins_a),
+  });
 
   return {
     playerId: row.opponent_id,
@@ -125,6 +119,6 @@ export function emptyMatchupStats(): MatchupPlayerStats {
   return {
     points: 0, goals: 0, assists: 0, individualShots: 0,
     shotsFor: 0, shotsAgainst: 0, goalsFor: 0, goalsAgainst: 0,
-    hits: 0, blocks: 0, penalties: 0, faceoffWins: 0,
+    hits: 0, blocks: 0, penaltyMinutes: 0, faceoffWins: 0,
   };
 }

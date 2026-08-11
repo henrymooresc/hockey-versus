@@ -80,21 +80,3 @@ export function UpcomingGamesSkeleton() {
   );
 }
 
-export function HeadToHeadSkeleton() {
-  return (
-    <div className="mt-8 flex flex-col" style={{ gap: 24 }}>
-      <div className="grid grid-cols-2 gap-6">
-        <Skeleton height={120} rounded="lg" />
-        <Skeleton height={120} rounded="lg" />
-      </div>
-      <div className="rounded-xl border border-gray-700/60 bg-gray-900/90" style={{ padding: "28px 32px" }}>
-        <Skeleton width={140} height={16} className="mb-4" />
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} height={18} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

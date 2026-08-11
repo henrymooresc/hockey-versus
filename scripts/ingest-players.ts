@@ -6,21 +6,21 @@
  * Default: current season only.
  */
 import "dotenv/config";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { and, eq, inArray } from "drizzle-orm";
-import { games, players, seasons } from "../src/db/schema";
+import { games, players } from "../src/db/schema";
 import { getBoxscore, getPlayerLanding, setFetchImpl } from "../src/lib/nhl-api";
+import type { BoxscoreResponse } from "../src/types/nhl-api";
 import { rateLimitedFetch } from "./lib/rate-limiter";
 import { Progress } from "./lib/progress";
 import { parseTargetSeasons } from "./lib/seasons";
+import { createScriptDb } from "./lib/db";
 
 setFetchImpl(rateLimitedFetch);
 
 const targetSeasons = parseTargetSeasons();
 const CONCURRENCY = 5;
 
-function extractPlayersFromBoxscore(boxscore: any): Set<number> {
+function extractPlayersFromBoxscore(boxscore: BoxscoreResponse): Set<number> {
   const playerIds = new Set<number>();
   const stats = boxscore.playerByGameStats;
   if (!stats) return playerIds;
@@ -40,51 +40,34 @@ function extractPlayersFromBoxscore(boxscore: any): Set<number> {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL environment variable is not set");
-  }
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const { client, db } = createScriptDb();
 
-  // 1. Load last-scanned timestamps for target seasons
-  const seasonRows = await db
-    .select({ id: seasons.id, lastPlayersScannedAt: seasons.lastPlayersScannedAt })
-    .from(seasons)
-    .where(inArray(seasons.id, targetSeasons));
-  const lastScannedAt = new Map(seasonRows.map((s) => [s.id, s.lastPlayersScannedAt]));
+  // 1. Get games whose boxscore we have not read yet.
+  //    The flag lives on the game, so a game that arrives late still gets
+  //    scanned. A per-season timestamp skipped it forever once its date fell
+  //    behind the cutoff.
+  const newGames = await db
+    .select({ id: games.id, seasonId: games.seasonId })
+    .from(games)
+    .where(and(inArray(games.seasonId, targetSeasons), eq(games.playersScanned, false)));
 
-  for (const sid of targetSeasons) {
-    const cutoff = lastScannedAt.get(sid) ?? null;
-    console.log(
-      cutoff
-        ? `Season ${sid}: scanning boxscores for games since ${cutoff.toISOString().slice(0, 10)}`
-        : `Season ${sid}: scanning all boxscores (first run)`
-    );
-  }
-
-  // 2. Get games for target seasons, skipping already-scanned ones.
-  //    Each season tracks its own cutoff, so filter in memory after one query.
-  const allCandidates = await db
-    .select({ id: games.id, seasonId: games.seasonId, gameDate: games.gameDate })
+  const totalForSeasons = await db
+    .select({ id: games.id })
     .from(games)
     .where(inArray(games.seasonId, targetSeasons));
 
-  const newGames = allCandidates.filter((g) => {
-    const cutoff = lastScannedAt.get(g.seasonId) ?? null;
-    if (!cutoff) return true;
-    return new Date(g.gameDate) > cutoff;
-  });
-
   console.log(
-    `Found ${newGames.length} new game(s) to scan (${allCandidates.length} total for target seasons)`
+    `Found ${newGames.length} unscanned game(s) (${totalForSeasons.length} total for target seasons)`
   );
 
-  // 3. Discover unique player IDs from boxscores (parallel)
+  // 2. Discover unique player IDs from boxscores (parallel)
   const existingPlayers = await db.select({ id: players.id }).from(players);
   const allPlayerIds = new Set(existingPlayers.map((p) => p.id));
   console.log(`Already have ${allPlayerIds.size} players in database`);
 
   const newPlayerIds = new Set<number>();
+  // Games whose boxscore read succeeded, and the players each one named.
+  const readGames = new Map<number, Set<number>>();
 
   if (newGames.length > 0) {
     const progress1 = new Progress(newGames.length, "Scanning boxscores");
@@ -94,7 +77,7 @@ async function main() {
       const results = await Promise.all(
         batch.map(async (game) => {
           try {
-            return await getBoxscore(game.id);
+            return { gameId: game.id, boxscore: await getBoxscore(game.id) };
           } catch (err) {
             console.warn(
               `\nWarning: Could not fetch boxscore for game ${game.id}: ${err instanceof Error ? err.message : err}`
@@ -103,9 +86,10 @@ async function main() {
           }
         })
       );
-      for (const boxscore of results) {
-        if (!boxscore) continue;
-        const ids = extractPlayersFromBoxscore(boxscore);
+      for (const result of results) {
+        if (!result) continue;
+        const ids = extractPlayersFromBoxscore(result.boxscore);
+        readGames.set(result.gameId, ids);
         for (const id of ids) {
           if (!allPlayerIds.has(id)) {
             newPlayerIds.add(id);
@@ -120,7 +104,8 @@ async function main() {
 
   console.log(`Found ${newPlayerIds.size} new players to fetch`);
 
-  // 4. Fetch player landing pages and insert (parallel)
+  // 3. Fetch player landing pages and insert (parallel)
+  const failedPlayerIds = new Set<number>();
   if (newPlayerIds.size > 0) {
     const progress2 = new Progress(newPlayerIds.size, "Fetching player details");
     const playerIdArray = Array.from(newPlayerIds);
@@ -155,6 +140,7 @@ async function main() {
                 },
               });
           } catch (err) {
+            failedPlayerIds.add(playerId);
             console.warn(
               `\nWarning: Could not fetch player ${playerId}: ${err instanceof Error ? err.message : err}`
             );
@@ -166,16 +152,28 @@ async function main() {
     progress2.done();
   }
 
-  // 5. Update last-scanned timestamp for each season
-  const now = new Date();
-  for (const sid of targetSeasons) {
+  // 4. Mark games whose players all resolved.
+  //    A game whose player failed to load stays unscanned, so the next run
+  //    retries it. Otherwise ingest-shifts would silently drop that player's
+  //    shifts, because it skips shifts for anyone missing from `players`.
+  const completedGameIds = Array.from(readGames.entries())
+    .filter(([, ids]) => !Array.from(ids).some((id) => failedPlayerIds.has(id)))
+    .map(([gameId]) => gameId);
+
+  const MARK_BATCH = 500;
+  for (let i = 0; i < completedGameIds.length; i += MARK_BATCH) {
     await db
-      .update(seasons)
-      .set({ lastPlayersScannedAt: now })
-      .where(eq(seasons.id, sid));
+      .update(games)
+      .set({ playersScanned: true })
+      .where(inArray(games.id, completedGameIds.slice(i, i + MARK_BATCH)));
   }
 
-  console.log(`\nDone! ${allPlayerIds.size} total players in database.`);
+  const heldBack = newGames.length - completedGameIds.length;
+  console.log(
+    `\nDone! ${allPlayerIds.size} total players in database. ` +
+      `Marked ${completedGameIds.length} game(s) scanned` +
+      (heldBack > 0 ? `, held back ${heldBack} for the next run.` : ".")
+  );
   await client.end();
 }
 

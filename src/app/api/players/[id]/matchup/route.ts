@@ -3,13 +3,15 @@ import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
 import { mapAggRowToMatchup, emptyMatchupStats, type AggRow } from "@/lib/matchup-mapper";
+import { cachedJson, DERIVED } from "@/lib/api-cache";
 import type { MatchupPlayer } from "@/types/versus";
 
 /**
  * Returns aggregated versus stats for a player against all players
  * on a given opponent team's current roster.
  *
- * GET /api/players/{id}/matchup?teamId={opponentTeamId}
+ * GET /api/players/{id}/matchup?teamId={opponentTeamId}&seasons={a,b}&gameType={t}
+ * Omit `seasons` for every season combined.
  */
 export async function GET(
   request: NextRequest,
@@ -27,12 +29,20 @@ export async function GET(
       10
     );
     const gtFilter = parseGameTypeFilter(request.nextUrl.searchParams.get("gameType"));
+    const seasonsParam = request.nextUrl.searchParams.get("seasons");
+    const seasonFilter = seasonsParam ? seasonsParam.split(",").filter(Boolean) : null;
     if (isNaN(teamId)) {
       return NextResponse.json(
         { error: "teamId query parameter required" },
         { status: 400 }
       );
     }
+
+    const playerRows = await db.execute(sql`
+      SELECT position FROM players WHERE id = ${playerId}
+    `);
+    const requestingPosition =
+      unwrapRows<{ position: string | null }>(playerRows)[0]?.position ?? null;
 
     const rows = await db.execute(sql`
       WITH aggregated AS (
@@ -59,8 +69,8 @@ export async function GET(
           SUM(hits_by_b)::int AS hits_by_b,
           SUM(blocks_by_a)::int AS blocks_by_a,
           SUM(blocks_by_b)::int AS blocks_by_b,
-          SUM(penalties_by_a)::int AS penalties_by_a,
-          SUM(penalties_by_b)::int AS penalties_by_b,
+          SUM(penalty_minutes_a)::int AS penalty_minutes_a,
+          SUM(penalty_minutes_b)::int AS penalty_minutes_b,
           SUM(faceoff_wins_a)::int AS faceoff_wins_a,
           SUM(faceoff_wins_b)::int AS faceoff_wins_b,
           SUM(wins_a)::int AS wins_a,
@@ -69,6 +79,7 @@ export async function GET(
         WHERE (player_a_id = ${playerId} OR player_b_id = ${playerId})
           AND same_team = false
           AND toi_shared_seconds > 0
+          ${seasonFilter ? sql`AND season_id IN (${sql.join(seasonFilter.map((s) => sql`${s}`), sql`, `)})` : sql``}
           ${gameTypeClause(gtFilter)}
         GROUP BY opponent_id, player_side
       )
@@ -90,7 +101,9 @@ export async function GET(
       ORDER BY a.toi_shared_seconds DESC
     `);
 
-    const matchups = unwrapRows<AggRow>(rows).map(mapAggRowToMatchup);
+    const matchups = unwrapRows<AggRow>(rows).map((row) =>
+      mapAggRowToMatchup(row, requestingPosition)
+    );
 
     // Also return opponent roster players with no versus data
     const matchupPlayerIds = new Set(matchups.map((m) => m.playerId));
@@ -135,7 +148,7 @@ export async function GET(
         oppStats: emptyMatchupStats(),
       }));
 
-    return NextResponse.json({ matchups: [...matchups, ...noHistory] });
+    return cachedJson({ matchups: [...matchups, ...noHistory] }, DERIVED);
   } catch (err: unknown) {
     console.error("Matchup API error:", err instanceof Error ? err.message : err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
