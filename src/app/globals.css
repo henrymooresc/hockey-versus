@@ -1,12 +1,41 @@
 @import "tailwindcss";
 
+/**
+ * The grey scale, lifted and tinted toward the brand navy (#1b2a4a).
+ *
+ * Every surface and label in the app is written as `bg-gray-*` or
+ * `text-gray-*`, so redefining the scale here brightens the whole site
+ * without touching a single component.
+ *
+ * The page was #030712, which is close to black. Panels sat only one step
+ * above it, so cards barely separated from the background, and the dimmest
+ * labels ran under 4.5:1 against their own card.
+ *
+ * gray-850 is not a Tailwind default. `PlayerSearch` already asked for it, so
+ * the class silently did nothing. It is defined here as a real step between
+ * 800 and 900.
+ */
+@theme {
+  --color-gray-950: #0e1420; /* page */
+  --color-gray-900: #172032; /* panels */
+  --color-gray-850: #1c2537; /* nested list surface */
+  --color-gray-800: #232e42; /* raised: inputs, chips, rows */
+  --color-gray-700: #3a4760; /* borders */
+  --color-gray-600: #6c7c96; /* faintest text, dividers */
+  --color-gray-500: #8b98ad; /* labels */
+  --color-gray-400: #adb8c8; /* secondary text */
+  --color-gray-300: #d4dae3; /* body text */
+  --color-gray-200: #e6eaf0;
+  --color-gray-100: #f2f5f8;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #374151 transparent;
+  scrollbar-color: var(--color-gray-700) transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {
