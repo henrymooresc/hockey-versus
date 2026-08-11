@@ -16,42 +16,78 @@ export default function AboutPage() {
       <section className="mt-10 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-blue-400">What is &ldquo;shared ice&rdquo;?</h2>
         <p className="mt-3 text-sm leading-relaxed text-gray-300">
-          For every NHL game over the last 10 seasons, we line up each player&apos;s shifts
-          second-by-second and record what happened — goals, assists, shots, hits,
-          blocks, penalties, faceoffs — only when both players were on the ice at the
-          same time. Stats and standings are pulled from the public NHL API and
-          re-aggregated locally.
+          For every NHL game over the last 10 seasons, we line up each player&apos;s
+          shifts second-by-second and record what happened — goals, assists, shots,
+          hits, blocks, penalties, faceoffs — only while both players were on the ice
+          together. That is about 13,000 games and 10 million shifts.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          Events are attributed to a pair, not merely to the ice. A hit, a faceoff or
+          a penalty counts only when one of the two players was on each side of it.
+          Sharing the ice with someone while they hit a third player does not count.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          Everything comes from the public NHL API and is aggregated ahead of time,
+          so the site reads precomputed pair totals rather than recalculating them
+          on each visit.
         </p>
       </section>
 
       <section id="rivalry-score" className="mt-6 scroll-mt-24 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
         <h2 className="text-xl font-bold text-amber-400">Rivalry Score</h2>
         <p className="mt-3 text-sm leading-relaxed text-gray-300">
-          Rivalry Score is a single number that captures how meaningful and contested
-          a matchup is between two players. It rewards three things:
+          Rivalry Score measures how much happens between two players{" "}
+          <span className="font-semibold text-white">per shared game</span>, not how
+          much has happened in total. A long career together does not raise the score
+          on its own. It is built from three parts:
         </p>
         <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
           <li>
-            <span className="font-semibold text-white">Volume</span> — total shared ice
-            time and games together. A pair with hours of head-to-head ice will always
-            score higher than a pair with a handful of shifts.
-          </li>
-          <li>
-            <span className="font-semibold text-white">Activity</span> — how much
-            actually happens between them. Goals and points carry the most weight,
-            then penalties, hits, blocks, faceoffs, and shots.
+            <span className="font-semibold text-white">Activity</span> — a weighted
+            count of what the two players did to each other, divided by the games they
+            shared. A point counts 5, a hit 3, a minute of penalty 2, a block 2, a
+            faceoff win 1.5, and a shot 1. Penalties count by minutes served, so a
+            2-minute minor contributes 4 and a 5-minute fight 10.
           </li>
           <li>
             <span className="font-semibold text-white">Balance</span> — how evenly
-            those events are split between the two players. A back-and-forth
-            matchup scores higher than a one-sided one.
+            those events split between the two. An even matchup scores higher than a
+            one-sided one. This scales the result between 0.5 and 1.0, so balance can
+            halve a score but never erase it.
+          </li>
+          <li>
+            <span className="font-semibold text-white">Sample size</span> — every pair
+            is credited with 10 games of league-average play before its own record
+            takes over. Two players who met twice in a wild game would otherwise
+            outrank a decade-long rivalry on noise alone.
           </li>
         </ul>
         <p className="mt-3 text-sm leading-relaxed text-gray-300">
-          The score is unbounded. In practice, anything north of <span className="font-mono text-blue-300">15</span>{" "}
-          marks a serious league-wide rivalry; double-digit scores are rare outside
-          of frequent divisional opponents. For goalies, shots faced and goals
-          allowed replace the skater stat mix, so the same scale applies.
+          A score marked with an asterisk{" "}
+          <span className="font-mono text-amber-300">*</span> comes from fewer than 10
+          shared games, so the league average is still doing much of the work.
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-gray-700/60 bg-gray-900/90 p-6 shadow-lg shadow-black/20">
+        <h2 className="text-xl font-bold text-purple-400">Two boards, two scales</h2>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          Skater pairs and shooter-versus-goalie pairs are ranked separately, because
+          the two contests do not share a scale.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          A goalie matchup is scored from the shooter&apos;s side: a goal counts 8, an
+          assist 4, and a shot 1, with balance measured as goals against saves. Because
+          a shooter converts only a small share of their shots, that balance term stays
+          low by nature, and goalie scores land near half of skater ones.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          For scale, among the top all-time regular-season pairs, skater scores run
+          from about <span className="font-mono text-blue-300">12</span> to{" "}
+          <span className="font-mono text-blue-300">19.6</span>, and goalie scores from
+          about <span className="font-mono text-blue-300">7.4</span> to{" "}
+          <span className="font-mono text-blue-300">9.8</span>. Compare a score against
+          its own board, never across the two.
         </p>
       </section>
 
@@ -60,20 +96,29 @@ export default function AboutPage() {
         <ul className="mt-3 list-disc pl-6 text-sm leading-relaxed text-gray-300 space-y-1.5">
           <li>
             <span className="font-semibold text-white">All-Time Rivals</span> — every
-            opponent the selected player has shared meaningful ice time with, sorted
-            by Rivalry Score.
-          </li>
-          <li>
-            <span className="font-semibold text-white">Team Rivalry Lookup</span> —
-            pick any team to see a TOI-weighted summary of the player&apos;s shared-ice
-            history against that team&apos;s current roster.
+            opponent the selected player has shared ice with, sorted by Rivalry Score.
+            Filter by name or team, set a minimum shared ice time, and switch between
+            skater and goalie opponents.
           </li>
           <li>
             <span className="font-semibold text-white">Upcoming Matchups</span> — the
-            next three scheduled games, with historical performance vs each opponent&apos;s
-            projected roster.
+            games on the player&apos;s current schedule, each showing their history
+            against that opponent&apos;s roster.
+          </li>
+          <li>
+            <span className="font-semibold text-white">Leaderboard</span> — the highest
+            scoring pairs in the league, on separate skater and goalie boards.
+          </li>
+          <li>
+            <span className="font-semibold text-white">Games</span> — recent games,
+            grouped into playoff series. Open any game to see how each pair matched up
+            in it, and how that compares to their usual meetings.
           </li>
         </ul>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          The first three can be scoped to the current season or all 10, and to
+          regular season, playoffs, or both.
+        </p>
       </section>
     </div>
   );
