@@ -28,8 +28,16 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env
-.env*.local
+# Ignore every .env variant, then re-admit the committed template. The old
+# rules covered only `.env` and `.env*.local`, so a file named `.env.neon` or
+# `.env.production` holding real credentials would have been committed.
+.env*
+*.env
+!.env.example
+
+# database dumps — these hold the whole dataset
+*.dump
+*.sql.gz
 
 # vercel
 .vercel
