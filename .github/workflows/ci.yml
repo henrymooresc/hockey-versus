@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Fails on errors only. Warnings are known debt, tracked in TASKS.md.
+      # The script passes --max-warnings 0, so a warning fails the build.
       - name: Lint
         run: npm run lint
 

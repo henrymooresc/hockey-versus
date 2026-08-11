@@ -6,22 +6,21 @@ import nextTypeScript from "eslint-config-next/typescript";
  * `eslint-config-next` ships flat config, which is why there is no FlatCompat
  * shim here.
  */
+/**
+ * No rule overrides. `react-hooks/set-state-in-effect` was a warning while the
+ * data panels reset their state inside the fetch effect. They now derive
+ * `loading` during render through `useFetchedData`, so the rule is back at its
+ * default of error.
+ *
+ * `@next/next/no-img-element` also stays on. `src/components/RemoteImage.tsx`
+ * holds the one exception, and explains why an NHL headshot or team logo is a
+ * plain `<img>`. Keeping the rule enabled means a new raw `<img>` anywhere else
+ * still fails.
+ */
 const config = [
   { ignores: [".next/**", "coverage/**"] },
   ...nextCoreWebVitals,
   ...nextTypeScript,
-  {
-    name: "hockey-versus/known-debt",
-    rules: {
-      /**
-       * Every data panel resets its state and then fetches, inside one effect.
-       * The rule is right that this costs an extra render, but the fix is to
-       * restructure fetching in eight components, not to silence it here.
-       * Kept visible as a warning until that happens. See TASKS.md.
-       */
-      "react-hooks/set-state-in-effect": "warn",
-    },
-  },
 ];
 
 export default config;
