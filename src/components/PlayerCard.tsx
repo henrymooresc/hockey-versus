@@ -29,7 +29,7 @@ export function PlayerCard({ player }: { player: PlayerInfo }) {
       </div>
       <div className="text-center">
         <div className="text-sm font-medium text-gray-400">{player.firstName}</div>
-        <div className="text-3xl font-extrabold tracking-tight text-white">
+        <div className="text-3xl font-extrabold tracking-tight text-gray-100">
           {player.lastName}
         </div>
         <div className="mt-1 flex items-center justify-center gap-2 text-sm text-gray-400">

@@ -58,10 +58,14 @@ export function SoloAnalysis({
     return `/api/players/${player.id}/rivals?${params}`;
   }, [player.id, seasonIds, gameTypeFilter, seasonFilter, allSeasons.length]);
 
-  const { data, error, loading } = useFetchedData<{
+  // The toolbar below sizes itself from this data: the team dropdown lists the
+  // teams in it, and the tabs show its counts. Clearing to null on every
+  // filter change collapsed both and reflowed the row, so the toggle the user
+  // had just clicked jumped out from under the pointer.
+  const { data, error, loading, refreshing } = useFetchedData<{
     skaterRivals: MatchupPlayer[];
     goalieRivals: MatchupPlayer[];
-  }>(rivalsUrl);
+  }>(rivalsUrl, { keepPreviousData: true });
 
   // Memoised so `teamOptions` below does not recompute on every render.
   const allSkaterRivals = useMemo(() => data?.skaterRivals ?? [], [data]);
@@ -101,7 +105,7 @@ export function SoloAnalysis({
 
   return (
     <div className="mt-8">
-      <h2 className="mb-8 text-center text-2xl font-bold text-white">
+      <h2 className="mb-8 text-center text-2xl font-bold text-gray-100">
         {player.firstName} {player.lastName}
         <span className="ml-2 text-lg text-gray-500">Analysis</span>
       </h2>
@@ -123,12 +127,12 @@ export function SoloAnalysis({
                     value={nameQuery}
                     onChange={(e) => setNameQuery(e.target.value)}
                     placeholder="Filter by name…"
-                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                    className="w-44 rounded-md border border-gray-700/60 bg-gray-800/60 px-2.5 py-1 pr-7 text-xs text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
                   />
                   {nameQuery && (
                     <button
                       onClick={() => setNameQuery("")}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-white"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-100"
                       title="Clear"
                     >
                       ✕
@@ -138,7 +142,9 @@ export function SoloAnalysis({
                 <select
                   value={teamFilter}
                   onChange={(e) => setTeamFilter(e.target.value)}
-                  className="rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none"
+                  /* A minimum width, so the very first load does not widen it
+                     from "All teams" to a full team name and shift the row. */
+                  className="min-w-[150px] rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
                   title="Filter by team"
                 >
                   <option value="">All teams</option>
@@ -155,7 +161,7 @@ export function SoloAnalysis({
                     min={0}
                     value={minTOI}
                     onChange={(e) => setMinTOI(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-white focus:border-blue-500 focus:outline-none"
+                    className="w-20 rounded-md border border-gray-700/60 bg-gray-800/60 px-2 py-1 text-center text-xs text-gray-100 focus:border-blue-500 focus:outline-none"
                   />
                 </label>
                 <PositionTabs
@@ -184,34 +190,45 @@ export function SoloAnalysis({
               <div className="rounded-xl border border-red-900/50 bg-red-950/30 px-6 py-4 text-center text-red-400">
                 {error}
               </div>
-            ) : !hasAnyData ? (
-              <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-sm text-gray-500">
-                No rivalry data for this filter combination
-              </div>
-            ) : activeTab === "skaters" ? (
-              <PositionGroup
-                label="Skaters"
-                matchups={filteredSkaterRivals}
-                collapsible
-                defaultVisible={10}
-                mode={player.position === "C" ? "center" : "skater"}
-                playerPosition={player.position}
-                player={player}
-                playerId={player.id}
-                showSmallSampleMark={seasonFilter === "all"}
-              />
             ) : (
-              <PositionGroup
-                label="Goalies"
-                matchups={filteredGoalieRivals}
-                collapsible
-                defaultVisible={10}
-                mode="goalie"
-                playerPosition={player.position}
-                player={player}
-                playerId={player.id}
-                showSmallSampleMark={seasonFilter === "all"}
-              />
+              /* The previous table stays in place and dims while the next one
+                 loads. Swapping to a skeleton here collapsed the panel and
+                 moved everything below it. */
+              <div
+                className={`transition-opacity duration-200 ${
+                  refreshing ? "opacity-40 pointer-events-none" : "opacity-100"
+                }`}
+              >
+                {!hasAnyData ? (
+                  <div className="rounded-xl border border-dashed border-gray-700/60 bg-gray-900/30 px-6 py-10 text-center text-sm text-gray-500">
+                    No rivalry data for this filter combination
+                  </div>
+                ) : activeTab === "skaters" ? (
+                  <PositionGroup
+                    label="Skaters"
+                    matchups={filteredSkaterRivals}
+                    collapsible
+                    defaultVisible={10}
+                    mode={player.position === "C" ? "center" : "skater"}
+                    playerPosition={player.position}
+                    player={player}
+                    playerId={player.id}
+                    showSmallSampleMark={seasonFilter === "all"}
+                  />
+                ) : (
+                  <PositionGroup
+                    label="Goalies"
+                    matchups={filteredGoalieRivals}
+                    collapsible
+                    defaultVisible={10}
+                    mode="goalie"
+                    playerPosition={player.position}
+                    player={player}
+                    playerId={player.id}
+                    showSmallSampleMark={seasonFilter === "all"}
+                  />
+                )}
+              </div>
             )}
           </div>
         </ErrorBoundary>

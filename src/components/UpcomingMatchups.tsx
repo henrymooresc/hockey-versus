@@ -65,7 +65,7 @@ function GameSelector({
               />
             )}
             <div className="text-left">
-              <div className="text-sm font-semibold text-white">
+              <div className="text-sm font-semibold text-gray-100">
                 {game.isHome ? "vs" : "@"} {game.opponentAbbrev}
               </div>
               <div className="text-xs text-gray-500">{formatDate(game.gameDate)}</div>
@@ -133,11 +133,15 @@ export function UpcomingMatchups({ player }: { player: PlayerSearchResult }) {
     allSeasons.length,
   ]);
 
+  // Same reason as the rivals panel: the tab counts come from this data, so
+  // clearing it on a filter change collapsed them and reflowed the row.
   const {
     data: matchupData,
     error: matchupError,
-    loading: loadingMatchups,
-  } = useFetchedData<{ matchups: MatchupPlayer[] }>(matchupUrl);
+    refreshing: loadingMatchups,
+  } = useFetchedData<{ matchups: MatchupPlayer[] }>(matchupUrl, {
+    keepPreviousData: true,
+  });
   const matchups = useMemo(() => matchupData?.matchups ?? [], [matchupData]);
 
   // The open tab belongs to one matchup request, so a new one returns to

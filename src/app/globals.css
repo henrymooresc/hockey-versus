@@ -1,12 +1,146 @@
 @import "tailwindcss";
 
+/**
+ * Two themes, driven entirely by CSS variables.
+ *
+ * Every surface and label in the app is written as `bg-gray-*` or
+ * `text-gray-*`, and Tailwind compiles those to `var(--color-gray-*)`.
+ * Redefining the scale therefore reskins the whole site, and no component
+ * needs a `dark:` variant.
+ *
+ * The scale is used by role, not by brightness:
+ *
+ *   950  page          900  panels       850  nested list
+ *   800  raised rows   700  borders      600..300  text, faint to strong
+ *
+ * So the light theme is not the dark values reversed arithmetically. Each step
+ * keeps its role and takes the value that role needs on a light page.
+ *
+ * Light is the default, which is why it lives in `@theme` and dark overrides
+ * it. `html[data-theme="dark"]` sits outside Tailwind's layers and carries more
+ * specificity than `:root`, so it wins.
+ */
+@theme {
+  /* Surfaces */
+  --color-gray-950: #f4f7fb; /* page */
+  --color-gray-900: #ffffff; /* panels */
+  --color-gray-850: #f8fafc; /* nested list surface */
+  --color-gray-800: #eaeff6; /* raised: inputs, chips, rows */
+  --color-gray-700: #cdd7e4; /* borders */
+
+  /* Text, faint to strong. gray-600 is the faintest step and carries hints and
+     separators, so it is set to clear 4.5:1 on the page rather than the 4.4
+     that Tailwind's slate-500 gives. */
+  --color-gray-600: #5c6b81;
+  --color-gray-500: #475569;
+  --color-gray-400: #334155;
+  --color-gray-300: #1e293b;
+  --color-gray-200: #0f172a;
+  --color-gray-100: #020617;
+
+  /* Accents. The -400 steps are headings and figures, so on a light page they
+     need to be darker than Tailwind's defaults, not lighter. */
+  --color-blue-400: #1d4ed8;
+  --color-blue-300: #1e40af;
+  --color-blue-200: #172554;
+  --color-blue-500: #2563eb;
+  --color-blue-600: #2563eb;
+  --color-blue-950: #eff6ff;
+  --color-amber-400: #b45309;
+  --color-amber-300: #92400e;
+  --color-amber-500: #d97706;
+  --color-green-400: #15803d;
+  --color-emerald-400: #047857;
+  --color-purple-400: #7e22ce;
+  --color-red-400: #b91c1c;
+  --color-red-300: #991b1b;
+  --color-red-200: #7f1d1d;
+  --color-red-700: #fca5a5;
+  --color-red-900: #fecaca;
+  --color-red-950: #fef2f2;
+
+  /* Brand chrome, used by the header and nav. */
+  --color-brand-red: #a62639;
+  --color-nav-link: #64748b;
+  --color-nav-active-bg: #dbe6f5;
+  --color-header-border: #cdd7e4;
+  --color-scrollbar-thumb: #b6c2d3;
+}
+
+html[data-theme="dark"] {
+  /* Surfaces */
+  --color-gray-950: #0e1420;
+  --color-gray-900: #172032;
+  --color-gray-850: #1c2537;
+  --color-gray-800: #232e42;
+  --color-gray-700: #3a4760;
+
+  /* Text, faint to strong. Same reasoning as the light theme: gray-600 is the
+     faintest step and is nudged up to clear 4.5:1 on the page. */
+  --color-gray-600: #77899f;
+  --color-gray-500: #8b98ad;
+  --color-gray-400: #adb8c8;
+  --color-gray-300: #d4dae3;
+  --color-gray-200: #e6eaf0;
+  --color-gray-100: #f2f5f8;
+
+  /* Accents return to Tailwind's light-on-dark defaults. */
+  --color-blue-400: #60a5fa;
+  --color-blue-300: #93c5fd;
+  --color-blue-200: #bfdbfe;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-950: #172554;
+  --color-amber-400: #fbbf24;
+  --color-amber-300: #fcd34d;
+  --color-amber-500: #f59e0b;
+  --color-green-400: #4ade80;
+  --color-emerald-400: #34d399;
+  --color-purple-400: #c084fc;
+  --color-red-400: #f87171;
+  --color-red-300: #fca5a5;
+  --color-red-200: #fecaca;
+  --color-red-700: #b91c1c;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+
+  --color-brand-red: #a62639;
+  --color-nav-link: #5a7baa;
+  --color-nav-active-bg: #1b2a4a;
+  --color-header-border: #1b2a4a;
+  --color-scrollbar-thumb: #3a4760;
+}
+
+/* Tells the browser which way round the page is, so form controls, the caret
+   and the default scrollbar match the theme. */
 html {
+  color-scheme: light;
   scroll-behavior: smooth;
+  background-color: var(--color-gray-950);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/**
+ * Theme-conditional display, used by the logo and the toggle icon.
+ *
+ * Both variants ship in the HTML and CSS picks one. That keeps the server and
+ * client markup identical, so there is no hydration mismatch, and the right
+ * one is already showing before any JavaScript runs.
+ */
+html:not([data-theme="dark"]) .only-dark {
+  display: none;
+}
+
+html[data-theme="dark"] .only-light {
+  display: none;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #374151 transparent;
+  scrollbar-color: var(--color-scrollbar-thumb) transparent;
 }
 
 @media (prefers-reduced-motion: no-preference) {

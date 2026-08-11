@@ -11,7 +11,27 @@ interface Stored<T> {
 export interface Fetched<T> {
   data: T | null;
   error: string | null;
+  /** Nothing to show yet, and a request is in flight. */
   loading: boolean;
+  /** Showing the previous result while the next one loads. */
+  refreshing: boolean;
+}
+
+export interface FetchedOptions {
+  /**
+   * Hold the previous result on screen while the next one loads, instead of
+   * clearing to null.
+   *
+   * Use this wherever a control derives its size from the data. A panel whose
+   * toolbar counts and dropdown options come from the response collapses to
+   * empty during a refetch, and a flex row reflows around it. Measured on the
+   * rivals panel: the season toggle moved 80px left and back within 240ms, so
+   * the button jumped out from under the pointer that had just clicked it.
+   *
+   * Leave it off when the new request means something different, such as a
+   * different game. Stale content would then read as current.
+   */
+  keepPreviousData?: boolean;
 }
 
 /**
@@ -30,7 +50,10 @@ export interface Fetched<T> {
  *
  * A superseded request aborts, so a slow answer cannot replace a newer one.
  */
-export function useFetchedData<T>(url: string | null): Fetched<T> {
+export function useFetchedData<T>(
+  url: string | null,
+  { keepPreviousData = false }: FetchedOptions = {}
+): Fetched<T> {
   const [stored, setStored] = useState<Stored<T> | null>(null);
 
   useEffect(() => {
@@ -52,8 +75,23 @@ export function useFetchedData<T>(url: string | null): Fetched<T> {
     return () => controller.abort();
   }, [url]);
 
-  if (url === null || stored?.url !== url) {
-    return { data: null, error: null, loading: true };
+  const isCurrent = url !== null && stored?.url === url;
+  if (isCurrent) {
+    return {
+      data: stored.data,
+      error: stored.error,
+      loading: false,
+      refreshing: false,
+    };
   }
-  return { data: stored.data, error: stored.error, loading: false };
+
+  // A previous result exists but belongs to an older url. Keeping it on screen
+  // holds the layout still while the next one loads.
+  const canKeep = keepPreviousData && stored?.data != null;
+  return {
+    data: canKeep ? stored.data : null,
+    error: null,
+    loading: !canKeep,
+    refreshing: canKeep,
+  };
 }

@@ -57,7 +57,7 @@ function PlayerIdentity({ player, align }: { player: BioPlayer; align: "left" | 
         />
       )}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-bold text-white">
+        <div className="truncate text-sm font-bold text-gray-100">
           {player.firstName} {player.lastName}
         </div>
         <div className={`mt-0.5 flex items-center gap-2 ${isRight ? "justify-end" : ""}`}>
@@ -146,7 +146,7 @@ function TeamStrip({
       </span>
       <span className={`flex flex-1 items-center justify-between ${isRight ? "flex-row-reverse" : ""}`}>
         <span className="text-gray-400">
-          <span className="font-bold text-white">{standings.points}</span> pts
+          <span className="font-bold text-gray-100">{standings.points}</span> pts
         </span>
         <span className="text-gray-400">
           {standings.wins}-{standings.losses}-{standings.otLosses}
@@ -217,7 +217,7 @@ export function PlayerBioCard({
           </div>
           <div className="text-[10px] text-gray-500">
             <span className="font-mono text-gray-300">{gamesShared}</span> GP
-            <span className="mx-1 text-gray-700">·</span>
+            <span className="mx-1 text-gray-600">·</span>
             <span className="font-mono text-gray-300">{formatSecondsToHMS(toiSharedSeconds)}</span>
           </div>
         </div>

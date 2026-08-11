@@ -54,7 +54,7 @@ function PlayerRow({
         <div className="h-12 w-12 rounded-full bg-gray-600 ring-2 ring-gray-500" />
       )}
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-white">
+        <div className="font-semibold text-gray-100">
           {player.firstName} {player.lastName}
         </div>
         <div className="text-sm text-gray-400">{player.position ?? "—"}</div>
@@ -267,7 +267,7 @@ function PlayerCombobox({
             <div className="h-14 w-14 rounded-full bg-gray-600" />
           )}
           <div className="flex-1">
-            <div className="text-lg font-bold text-white">
+            <div className="text-lg font-bold text-gray-100">
               {selected.firstName} {selected.lastName}
             </div>
             <div className="text-sm text-gray-400">
@@ -276,7 +276,7 @@ function PlayerCombobox({
           </div>
           <button
             onClick={() => onSelect(null)}
-            className="rounded-full p-2 text-gray-400 hover:text-white hover:bg-gray-700/50 active:scale-90 transition-all duration-150"
+            className="rounded-full p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700/50 active:scale-90 transition-all duration-150"
           >
             ✕
           </button>
@@ -287,7 +287,7 @@ function PlayerCombobox({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name..."
-          className="w-full rounded-xl border border-gray-700 bg-gray-800/80 px-5 py-4 text-white placeholder-gray-500 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:bg-gray-800"
+          className="w-full rounded-xl border border-gray-700 bg-gray-800/80 px-5 py-4 text-gray-100 placeholder-gray-500 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:bg-gray-800"
         />
       )}
 

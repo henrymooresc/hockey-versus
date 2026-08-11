@@ -43,37 +43,37 @@ export function MatchupRadarChart({
       <div style={{ width: "100%", height: 280 }}>
         <ResponsiveContainer>
           <RadarChart data={data} outerRadius="72%" margin={{ top: 8, right: 24, bottom: 8, left: 24 }}>
-            <PolarGrid stroke="#374151" />
-            <PolarAngleAxis dataKey="category" tick={{ fontSize: 10, fill: "#9CA3AF" }} />
+            <PolarGrid stroke="var(--color-gray-700)" />
+            <PolarAngleAxis dataKey="category" tick={{ fontSize: 10, fill: "var(--color-gray-500)" }} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
+                backgroundColor: "var(--color-gray-800)",
+                border: "1px solid var(--color-gray-700)",
                 borderRadius: 8,
                 fontSize: 11,
               }}
-              labelStyle={{ color: "#9CA3AF" }}
+              labelStyle={{ color: "var(--color-gray-500)" }}
               formatter={(_value, name, item) => {
                 const raw = name === playerName ? item.payload.mineRaw : item.payload.oppRaw;
                 return [raw, name];
               }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 10, color: "#9CA3AF", paddingTop: 4 }}
+              wrapperStyle={{ fontSize: 10, color: "var(--color-gray-500)", paddingTop: 4 }}
               iconSize={10}
             />
             <Radar
               name={playerName}
               dataKey="mine"
-              stroke="#60A5FA"
-              fill="#60A5FA"
+              stroke="var(--color-blue-400)"
+              fill="var(--color-blue-400)"
               fillOpacity={0.35}
             />
             <Radar
               name={opponentName}
               dataKey="opp"
-              stroke="#F87171"
-              fill="#F87171"
+              stroke="var(--color-red-400)"
+              fill="var(--color-red-400)"
               fillOpacity={0.3}
             />
           </RadarChart>
