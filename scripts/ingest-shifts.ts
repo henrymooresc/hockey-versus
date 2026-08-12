@@ -65,6 +65,7 @@ async function main() {
   const progress = new Progress(filtered.length, "Ingesting shifts");
   let totalShifts = 0;
   let htmlFallbackCount = 0;
+  let strayShiftCount = 0;
 
   for (let i = 0; i < filtered.length; i += CONCURRENCY) {
     const batch = filtered.slice(i, i + CONCURRENCY);
@@ -103,8 +104,46 @@ async function main() {
             return;
           }
 
-          const shiftRows = shiftData.data
-            .filter((s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId) && knownTeamIds.has(s.teamId))
+          const usable = shiftData.data.filter(
+            (s) => s.period > 0 && s.startTime && s.endTime && knownPlayerIds.has(s.playerId) && knownTeamIds.has(s.teamId)
+          );
+
+          /**
+           * Drop shifts belonging to a team that did not play in this game.
+           *
+           * The Stats API returned game 2024020565 — SJS at VGK, 2024-12-27 —
+           * folded into the response for game 2025020565, relabelled with the
+           * id we asked for. The two share the six-digit game number 020565 and
+           * differ only in the season prefix. It survived ingestion because
+           * every row looked individually valid: real players, real teams, real
+           * times. Only the pairing was nonsense, and `compute:versus` went on
+           * to build 330 rivalries between players who were never on the ice
+           * together.
+           *
+           * One game in 13,187 was affected and neighbouring ids are clean, so
+           * this is a single bad record upstream rather than a pattern. The
+           * guard is here because nothing else would notice a repeat.
+           */
+          const rosterTeamIds = [game.homeTeamId, game.awayTeamId].filter(
+            (id): id is number => id !== null
+          );
+          let inGame = usable;
+          if (rosterTeamIds.length === 2) {
+            const allowed = new Set(rosterTeamIds);
+            inGame = usable.filter((s) => allowed.has(s.teamId));
+            const dropped = usable.length - inGame.length;
+            if (dropped > 0) {
+              const strays = [
+                ...new Set(usable.filter((s) => !allowed.has(s.teamId)).map((s) => s.teamAbbrev)),
+              ].join(", ");
+              strayShiftCount += dropped;
+              console.warn(
+                `\n  Game ${game.id}: dropped ${dropped} shifts for ${strays}, which did not play in it`
+              );
+            }
+          }
+
+          const shiftRows = inGame
             .map((s) => ({
               gameId: game.id,
               playerId: s.playerId,
@@ -149,6 +188,11 @@ async function main() {
   console.log(
     `\nDone! Inserted ${totalShifts} shift records (${htmlFallbackCount} games used HTML fallback).`
   );
+  if (strayShiftCount > 0) {
+    console.log(
+      `Dropped ${strayShiftCount} shifts belonging to teams that did not play in the game they arrived under.`
+    );
+  }
   await client.end();
 }
 
