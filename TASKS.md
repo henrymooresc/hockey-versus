@@ -51,6 +51,49 @@ UPDATE games SET shifts_ingested=false, events_ingested=false WHERE id=202503041
 runs it should pass, and the game should be back to 846 shifts and 281 events.
 Verified locally on 2026-08-11.
 
+### A second game's shifts arrived under one game id
+
+Found 2026-08-12, while checking whether a mid-season trade could be reversed.
+`shiftcharts?cayenneExp=gameId=2025020565` returns game **2024020565** as well —
+SJS at VGK, 2024-12-27 — relabelled with the id that was asked for. The two
+share the six-digit game number `020565` and differ only in the season prefix.
+Confirmed by a 618-of-618 exact match on (player, period, start, end), and by
+the rosters being right for 2024-25: Granlund on SJS, Hague on VGK.
+
+It is upstream, it is still live, and nothing in this repo caused it. It is also
+a single bad record rather than a pattern: 16 other 2025-26 games sampled from
+the same endpoint, including the neighbouring ids `020564` and `020566`, all
+return exactly two teams. One game in 13,187 is affected, 618 shift rows in
+10.2M. `game_events` is clean — it comes from a different endpoint, and no game
+anywhere has an event for a team that did not play in it.
+
+Every row looked individually valid — real players, real teams, real times — so
+nothing rejected it. Only the pairing was nonsense. `compute:versus` went on to
+build 330 rivalries between players who were never on the ice together, and to
+inflate 924 real ones. The same response also carried the real game's own rows
+twice; `onConflictDoNothing` had been absorbing that silently all along.
+
+- [x] **Guard on the way in.** `ingest:shifts` drops shifts whose team did not
+  play in the game and reports the count. `check:ingestion` fails when such a
+  row is already in the table, so a repeat cannot pass silently.
+- [ ] **Delete the 618 stray rows, locally and on Neon:**
+
+    ```sql
+    DELETE FROM shifts s USING games g
+    WHERE g.id = s.game_id
+      AND s.team_id IS DISTINCT FROM g.home_team_id
+      AND s.team_id IS DISTINCT FROM g.away_team_id;
+    ```
+
+- [ ] **Recompute 2025-26 afterwards.** The orphan delete added the same week
+  clears the 330 fabricated rows without further help. Leaderboards need
+  rebuilding too: two `ALL`-scope entries, Toffoli vs Hughes at ranks 24 and 35,
+  carry a fabricated contribution.
+    - Visible impact before the repair is small but real: 15 of the 330 clear
+      the 900-second rivals threshold, topping out at 1,285 seconds. They
+      cluster on goalies, who accumulate the most shared ice — Luukkonen and
+      Allen against half of San Jose and Vegas.
+
 Related:
 
 - [x] **Stream the upserts in `scripts/compute-versus.ts`** — done 2026-08-11.
@@ -114,6 +157,26 @@ The site is public and has no operational safety net.
 - [ ] `robots.txt` and `sitemap.xml`.
 
 ---
+
+## Modelling
+
+- [ ] **A pair traded apart mid-season is one row describing two relationships.**
+  When a player changes team, they are a team-mate of someone in the early
+  games and an opponent later, but `versus_stats` keys on
+  (pair, season, game type) and folds both into a single row. The totals mix
+  team-mate games with opponent games, and `sameTeam` can only describe one of
+  them.
+    - Found 2026-08-12 while chasing a digest mismatch between the local and
+      hosted databases. 72 players changed team mid-season in 2023-24 and 111
+      in 2024-25, touching 44,871 and 71,223 rows respectively.
+    - A stopgap landed the same day: games are now processed oldest first and
+      the team ids and `sameTeam` take the most recent game. That makes the
+      result deterministic and stops pairs disappearing from the rivals list,
+      but the totals are still mixed.
+    - The modelling fix is to split the row, keying on the relationship as well
+      so team-mate games and opponent games are counted separately. That is a
+      schema change, a migration and a full recompute, so it is worth doing
+      only if the mixed totals start to matter.
 
 ## Scoring
 

@@ -349,6 +349,13 @@ async function main() {
 
   // Get games that have both shifts and events ingested, for target seasons.
   // Only regular season (gameType=2) and playoffs (gameType=3) — skip preseason.
+  //
+  // The order matters and is not cosmetic. A pair's stored team ids and
+  // `sameTeam` come from one game rather than being summed, so without an
+  // explicit order Postgres decides which game wins and the result changes with
+  // the physical row layout. Two databases holding identical data produced
+  // different rows because of this. Oldest first, so the last game processed
+  // for a pair is the most recent one.
   const filtered = await db
     .select({
       id: games.id,
@@ -367,7 +374,9 @@ async function main() {
         inArray(games.seasonId, targetSeasons),
         inArray(games.gameType, [2, 3])
       )
-    );
+    )
+    // `id` breaks ties, since several games share a date.
+    .orderBy(games.gameDate, games.id);
 
   console.log(
     `Computing versus stats for ${filtered.length} games (seasons: ${targetSeasons.join(", ")})`
@@ -510,6 +519,18 @@ async function main() {
               existing.gamesShared++;
               existing.winsA += pairWinsA;
               existing.winsB += pairWinsB;
+
+              // These three describe a state, not a total, so they take the
+              // most recent game rather than accumulating. Games arrive oldest
+              // first, so the last write wins.
+              //
+              // It matters for a player traded mid-season: they are a team-mate
+              // of someone in the early games and an opponent later. `sameTeam`
+              // is a filter in the rivals and matchup routes, so keeping the
+              // first game hid pairs that genuinely faced each other.
+              existing.playerATeamId = stats.playerATeamId;
+              existing.playerBTeamId = stats.playerBTeamId;
+              existing.sameTeam = stats.sameTeam;
 
               existing.toiSharedSeconds += stats.toiSharedSeconds;
               existing.goalsForA += stats.goalsForA;
