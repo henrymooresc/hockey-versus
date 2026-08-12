@@ -9,6 +9,11 @@ on:
   #   - cron: "0 15 * * *"  # 11:00 ET in summer, 10:00 in winter — cron is UTC
   workflow_dispatch:
     # Manual trigger — run from the GitHub Actions UI
+    inputs:
+      seasons:
+        description: "Season ids, comma separated (e.g. 20232024,20242025). Leave blank for the current season."
+        required: false
+        type: string
 
 # One run at a time. Two concurrent ingests would fight over the same progress
 # flags and duplicate NHL API traffic.
@@ -40,6 +45,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The scripts default to the current season, so a blank input passes no
+      # flag at all. A season list is for maintenance: recomputing an older
+      # season, or backfilling one.
+      #
+      # The input is read through the environment rather than interpolated into
+      # the script body, so it cannot inject shell. The pattern check then
+      # rejects anything that is not a list of 8-digit ids, which also catches
+      # an ordinary typo before it reaches the database.
+      - name: Resolve target seasons
+        id: target
+        env:
+          SEASONS_INPUT: ${{ inputs.seasons }}
+        run: |
+          if [ -z "$SEASONS_INPUT" ]; then
+            echo "No season given — the scripts will use the current season."
+            echo "args=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! printf '%s' "$SEASONS_INPUT" | grep -Eq '^[0-9]{8}(,[0-9]{8})*$'; then
+            echo "::error::Invalid seasons input '$SEASONS_INPUT'. Expected 8-digit ids, comma separated, such as 20232024,20242025."
+            exit 1
+          fi
+          echo "Targeting seasons: $SEASONS_INPUT"
+          echo "args=--seasons $SEASONS_INPUT" >> "$GITHUB_OUTPUT"
+
       # The order below is a dependency chain, not a preference.
       #
       # There is deliberately no "were there games yesterday?" gate. Every
@@ -53,22 +83,32 @@ jobs:
       # scores, so a game that was provisional on an earlier run corrects
       # itself, and it leaves the progress flags alone.
       - name: Discover games and refresh scores
-        run: npm run ingest:seasons
+        env:
+          SEASON_ARGS: ${{ steps.target.outputs.args }}
+        run: npm run ingest:seasons -- $SEASON_ARGS
 
       # Must precede shifts. ingest-shifts filters every row through the known
       # player set, so a player making their debut has their shifts silently
       # dropped if the roster is stale.
       - name: Refresh rosters
-        run: npm run ingest:players
+        env:
+          SEASON_ARGS: ${{ steps.target.outputs.args }}
+        run: npm run ingest:players -- $SEASON_ARGS
 
       - name: Ingest shifts
-        run: npm run ingest:shifts
+        env:
+          SEASON_ARGS: ${{ steps.target.outputs.args }}
+        run: npm run ingest:shifts -- $SEASON_ARGS
 
       - name: Ingest events
-        run: npm run ingest:events
+        env:
+          SEASON_ARGS: ${{ steps.target.outputs.args }}
+        run: npm run ingest:events -- $SEASON_ARGS
 
       - name: Compute versus stats
-        run: npm run compute:versus
+        env:
+          SEASON_ARGS: ${{ steps.target.outputs.args }}
+        run: npm run compute:versus -- $SEASON_ARGS
 
       # The step that makes a silent failure loud. Without it the job can skip
       # every ingest and still go green, which is exactly what the previous

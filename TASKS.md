@@ -75,10 +75,21 @@ Related:
     - The delete only runs after a partition has written rows. Without that
       guard a partition that produced nothing would erase the season instead of
       leaving it alone.
-    - Cleared 1,629 rows. Verified by digesting the expected survivors before
-      the run and matching them after: 287,234 rows in 2023-24 and 284,379 in
-      2024-25, both digests identical, nothing stale left, and 2025-26
-      untouched.
+    - Cleared 1,629 rows locally. Verified by digesting the expected survivors
+      before the run and matching them after: 287,234 rows in 2023-24 and
+      284,379 in 2024-25, both digests identical, nothing stale left, and
+      2025-26 untouched.
+- [ ] **Clear the same rows on Neon.** The dump was taken 2026-08-11, a day
+  before the fix, so production still carries all 1,629. The daily job only
+  recomputes the current season and will never reach them. Run the ingestion
+  workflow by hand with the seasons input set to `20232024,20242025`.
+    - Low impact rather than a visible bug: every one is a single-game pair
+      with 33 to 202 seconds of shared ice, so the default 900-second minimum
+      hides them in the rivals list and the 10-game prior keeps them far from
+      any leaderboard.
+    - Run it from the workflow rather than a laptop. `compute:versus` reads two
+      seasons of shifts and events, which is slow and costly to pull across the
+      network from outside the host's region.
 
 ---
 
