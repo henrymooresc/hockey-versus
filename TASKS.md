@@ -33,11 +33,23 @@ not a fault.
 
 ### Still to do
 
-- [ ] **Add `DIRECT_DATABASE_URL` as a repository secret.** The workflow reads
-  it; nothing supplies it yet.
-- [ ] **Run the workflow once by hand against Neon, then enable the cron.** The
-  `schedule:` block is still commented out. Do not uncomment it before a manual
-  run has ingested a real game and `check:ingestion` has passed.
+- [x] **`DIRECT_DATABASE_URL` and `DATABASE_URL` are repository secrets** — added
+  2026-08-12.
+- [x] **The workflow runs green by hand against Neon** — four runs on 2026-08-12,
+  including all ten seasons recomputed in three batches. `check:ingestion` passed
+  on each.
+- [ ] **Enable the cron.** The `schedule:` block is still commented out. The runs
+  above prove the pipeline against the hosted database, but they could not prove
+  the part that matters in October: **no game was actually ingested**, because
+  the season is over and all 13,187 games were already complete. Replay one game
+  by the procedure below before uncommenting.
+
+**Neon and local hold identical data as of 2026-08-12.** All ten season digests
+over `versus_stats` match, row counts included — the first time since the
+restore. That closes a mismatch that took three separate causes to explain: a
+`to_jsonb` digest that compared column order rather than values, orphan rows no
+recompute could reach, and a games query with no `ORDER BY` feeding an
+order-sensitive accumulation.
 
 **How to test without waiting for October.** The scripts are idempotent — shift
 and event inserts use `onConflictDoNothing` against natural unique keys — so a
@@ -76,7 +88,7 @@ twice; `onConflictDoNothing` had been absorbing that silently all along.
 - [x] **Guard on the way in.** `ingest:shifts` drops shifts whose team did not
   play in the game and reports the count. `check:ingestion` fails when such a
   row is already in the table, so a repeat cannot pass silently.
-- [ ] **Delete the 618 stray rows, locally and on Neon:**
+- [x] **Deleted the 618 stray rows, locally and on Neon** — 2026-08-12:
 
     ```sql
     DELETE FROM shifts s USING games g
@@ -85,14 +97,15 @@ twice; `onConflictDoNothing` had been absorbing that silently all along.
       AND s.team_id IS DISTINCT FROM g.away_team_id;
     ```
 
-- [ ] **Recompute 2025-26 afterwards.** The orphan delete added the same week
-  clears the 330 fabricated rows without further help. Leaderboards need
-  rebuilding too: two `ALL`-scope entries, Toffoli vs Hughes at ranks 24 and 35,
-  carry a fabricated contribution.
-    - Visible impact before the repair is small but real: 15 of the 330 clear
-      the 900-second rivals threshold, topping out at 1,285 seconds. They
-      cluster on goalies, who accumulate the most shared ice — Luukkonen and
-      Allen against half of San Jose and Vegas.
+  Game 2025020565 is back to two teams, 753 shifts and 38 players.
+- [x] **Recomputed 2025-26** — the orphan delete cleared the fabricated rows
+  without further help: 407 of them, against the 330 that had been measured. The
+  measurement counted pairs sharing no other game; the extra 77 shared a game
+  elsewhere but only ever shared *ice* in this one.
+    - Visible impact before the repair was small but real: 15 cleared the
+      900-second rivals threshold, topping out at 1,285 seconds, clustered on
+      goalies because they accumulate the most shared ice — Luukkonen and Allen
+      against half of San Jose and Vegas.
 
 Related:
 
@@ -122,14 +135,9 @@ Related:
       before the run and matching them after: 287,234 rows in 2023-24 and
       284,379 in 2024-25, both digests identical, nothing stale left, and
       2025-26 untouched.
-- [ ] **Clear the same rows on Neon.** The dump was taken 2026-08-11, a day
-  before the fix, so production still carries all 1,629. The daily job only
-  recomputes the current season and will never reach them. Run the ingestion
-  workflow by hand with the seasons input set to `20232024,20242025`.
-    - Low impact rather than a visible bug: every one is a single-game pair
-      with 33 to 202 seconds of shared ice, so the default 900-second minimum
-      hides them in the rivals list and the 10-game prior keeps them far from
-      any leaderboard.
+- [x] **Cleared the same rows on Neon** — done 2026-08-12 by recomputing all ten
+  seasons from the workflow, in three batches to stay inside the 60-minute job
+  timeout. The same run carried the ordering fix to every season.
     - Run it from the workflow rather than a laptop. `compute:versus` reads two
       seasons of shifts and events, which is slow and costly to pull across the
       network from outside the host's region.
@@ -173,6 +181,20 @@ The site is public and has no operational safety net.
       the team ids and `sameTeam` take the most recent game. That makes the
       result deterministic and stops pairs disappearing from the rivals list,
       but the totals are still mixed.
+    - **The stopgap is wrong for a player who leaves and comes back.** Team-mate,
+      then opponent, then team-mate again: the most recent game says team-mate,
+      so `sameTeam` is true and the rivals list drops a pair that genuinely
+      faced each other for the middle stretch. The same holds for a player
+      traded *onto* the other's team, which is the commoner direction. Taking
+      the first game instead only moves which half is wrong. No ordering rule
+      can be right, because one row cannot hold two relationships — which is the
+      argument for the real fix rather than a reason to tune the stopgap.
+    - Searching for this is what turned up the cross-game contamination above.
+      Ten of the fourteen apparent returns were not trades at all; they were one
+      game of last season's rosters filed under this season's game id. After the
+      repair, four remain across all ten seasons — one each in 2016-17, 2017-18,
+      2021-22 and 2023-24, and none in 2025-26. Rare enough to leave, which is
+      why this stays behind the mixed-totals problem rather than driving it.
     - The modelling fix is to split the row, keying on the relationship as well
       so team-mate games and opponent games are counted separately. That is a
       schema change, a migration and a full recompute, so it is worth doing
