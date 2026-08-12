@@ -25,6 +25,110 @@ import { createScriptDb } from "./lib/db";
 
 const targetSeasons = parseTargetSeasons();
 
+/** One pair's totals for a single season and game type. */
+type AccumulatedPair = PairStats & {
+  seasonId: string;
+  gameType: number;
+  gamesShared: number;
+  winsA: number;
+  winsB: number;
+};
+
+/**
+ * Writes one partition's pairs to `versus_stats` and reports how many.
+ *
+ * The upsert replaces every column rather than adding to it, so a partition can
+ * be recomputed and rewritten safely. That is what lets the caller flush at each
+ * partition boundary instead of holding the whole run in memory.
+ */
+async function flushPairs(
+  db: PostgresJsDatabase,
+  accumulator: Map<string, AccumulatedPair>
+): Promise<number> {
+  const entries = Array.from(accumulator.values());
+  const BATCH_SIZE = 100;
+
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE).map((row) => ({
+      playerAId: row.playerAId,
+      playerBId: row.playerBId,
+      seasonId: row.seasonId,
+      gameType: row.gameType,
+      sameTeam: row.sameTeam,
+      gamesShared: row.gamesShared,
+      toiSharedSeconds: row.toiSharedSeconds,
+      winsA: row.winsA,
+      winsB: row.winsB,
+      playerATeamId: row.playerATeamId,
+      playerBTeamId: row.playerBTeamId,
+      goalsForA: row.goalsForA,
+      goalsAgainstA: row.goalsAgainstA,
+      goalsForB: row.goalsForB,
+      goalsAgainstB: row.goalsAgainstB,
+      shotsForA: row.shotsForA,
+      shotsAgainstA: row.shotsAgainstA,
+      shotsForB: row.shotsForB,
+      shotsAgainstB: row.shotsAgainstB,
+      hitsByA: row.hitsByA,
+      hitsByB: row.hitsByB,
+      blocksByA: row.blocksByA,
+      blocksByB: row.blocksByB,
+      penaltyMinutesA: row.penaltyMinutesA,
+      penaltyMinutesB: row.penaltyMinutesB,
+      faceoffWinsA: row.faceoffWinsA,
+      faceoffWinsB: row.faceoffWinsB,
+      playerAGoals: row.playerAGoals,
+      playerAAssists: row.playerAAssists,
+      playerAShots: row.playerAShots,
+      playerBGoals: row.playerBGoals,
+      playerBAssists: row.playerBAssists,
+      playerBShots: row.playerBShots,
+    }));
+
+    // Single insert per batch using excluded pseudo-table for conflict resolution
+    await db
+      .insert(versusStats)
+      .values(batch)
+      .onConflictDoUpdate({
+        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId, versusStats.gameType],
+        set: {
+          sameTeam: sql`excluded.same_team`,
+          gamesShared: sql`excluded.games_shared`,
+          toiSharedSeconds: sql`excluded.toi_shared_seconds`,
+          winsA: sql`excluded.wins_a`,
+          winsB: sql`excluded.wins_b`,
+          playerATeamId: sql`excluded.player_a_team_id`,
+          playerBTeamId: sql`excluded.player_b_team_id`,
+          goalsForA: sql`excluded.goals_for_a`,
+          goalsAgainstA: sql`excluded.goals_against_a`,
+          goalsForB: sql`excluded.goals_for_b`,
+          goalsAgainstB: sql`excluded.goals_against_b`,
+          shotsForA: sql`excluded.shots_for_a`,
+          shotsAgainstA: sql`excluded.shots_against_a`,
+          shotsForB: sql`excluded.shots_for_b`,
+          shotsAgainstB: sql`excluded.shots_against_b`,
+          hitsByA: sql`excluded.hits_by_a`,
+          hitsByB: sql`excluded.hits_by_b`,
+          blocksByA: sql`excluded.blocks_by_a`,
+          blocksByB: sql`excluded.blocks_by_b`,
+          penaltyMinutesA: sql`excluded.penalty_minutes_a`,
+          penaltyMinutesB: sql`excluded.penalty_minutes_b`,
+          faceoffWinsA: sql`excluded.faceoff_wins_a`,
+          faceoffWinsB: sql`excluded.faceoff_wins_b`,
+          playerAGoals: sql`excluded.player_a_goals`,
+          playerAAssists: sql`excluded.player_a_assists`,
+          playerAShots: sql`excluded.player_a_shots`,
+          playerBGoals: sql`excluded.player_b_goals`,
+          playerBAssists: sql`excluded.player_b_assists`,
+          playerBShots: sql`excluded.player_b_shots`,
+          computedAt: new Date(),
+        },
+      });
+  }
+
+  return entries.length;
+}
+
 /**
  * Rebuilds `player_season_totals` from `shifts` + `games`.
  *
@@ -233,226 +337,179 @@ async function main() {
     return;
   }
 
-  const progress = new Progress(filtered.length, "Computing versus");
-
-  // Accumulate stats per (pair, season, gameType)
-  const accumulator = new Map<
-    string,
-    PairStats & { seasonId: string; gameType: number; gamesShared: number; winsA: number; winsB: number }
-  >();
+  /**
+   * Partition the games by season and game type, then compute and write one
+   * partition at a time.
+   *
+   * The accumulator key already carries the season and the game type, so a pair
+   * never merges across a partition boundary. Flushing at each boundary writes
+   * exactly the rows one big pass would, while holding only the largest single
+   * partition in memory instead of every season at once. A full 10-season run
+   * used to build about 2.6M objects before writing anything.
+   *
+   * A run that fails midway now leaves earlier partitions written. That is safe:
+   * the upsert replaces whole rows, so a re-run corrects them.
+   */
+  const partitions = new Map<string, typeof filtered>();
+  for (const game of filtered) {
+    const key = `${game.seasonId}-${game.gameType}`;
+    const bucket = partitions.get(key);
+    if (bucket) bucket.push(game);
+    else partitions.set(key, [game]);
+  }
 
   // Process in chunks to avoid loading all shifts+events into memory at once
   const GAME_CHUNK = 500;
 
-  for (let gi = 0; gi < filtered.length; gi += GAME_CHUNK) {
-    const chunk = filtered.slice(gi, gi + GAME_CHUNK);
-    const chunkIds = chunk.map((g) => g.id);
+  let totalUpserted = 0;
+  let largestPartition = 0;
 
-    const [chunkShifts, chunkEvents] = await Promise.all([
-      db
-        .select({
-          gameId: shifts.gameId,
-          playerId: shifts.playerId,
-          teamId: shifts.teamId,
-          period: shifts.period,
-          startSeconds: shifts.startSeconds,
-          endSeconds: shifts.endSeconds,
-        })
-        .from(shifts)
-        .where(inArray(shifts.gameId, chunkIds)),
-      db
-        .select({
-          gameId: gameEvents.gameId,
-          eventType: gameEvents.eventType,
-          period: gameEvents.period,
-          timeSeconds: gameEvents.timeSeconds,
-          teamId: gameEvents.teamId,
-          player1Id: gameEvents.player1Id,
-          player2Id: gameEvents.player2Id,
-          player3Id: gameEvents.player3Id,
-          penaltyMinutes: gameEvents.penaltyMinutes,
-        })
-        .from(gameEvents)
-        .where(inArray(gameEvents.gameId, chunkIds)),
-    ]);
+  for (const key of Array.from(partitions.keys()).sort()) {
+    const partitionGames = partitions.get(key)!;
+    const gameTypeLabel = partitionGames[0].gameType === 3 ? "playoffs" : "regular";
+    console.log(
+      `\nSeason ${partitionGames[0].seasonId} ${gameTypeLabel}: ${partitionGames.length} games`
+    );
 
-    const shiftsByGame = new Map<number, ShiftRecord[]>();
-    for (const s of chunkShifts) {
-      if (!shiftsByGame.has(s.gameId)) shiftsByGame.set(s.gameId, []);
-      shiftsByGame.get(s.gameId)!.push(s as ShiftRecord);
-    }
+    const accumulator = new Map<string, AccumulatedPair>();
+    const progress = new Progress(partitionGames.length, "  Computing");
 
-    const eventsByGame = new Map<number, EventRecord[]>();
-    for (const e of chunkEvents) {
-      if (!eventsByGame.has(e.gameId)) eventsByGame.set(e.gameId, []);
-      eventsByGame.get(e.gameId)!.push(e as EventRecord);
-    }
+    for (let gi = 0; gi < partitionGames.length; gi += GAME_CHUNK) {
+      const chunk = partitionGames.slice(gi, gi + GAME_CHUNK);
+      const chunkIds = chunk.map((g) => g.id);
 
-    for (const game of chunk) {
-      try {
-        const gameShifts = shiftsByGame.get(game.id) ?? [];
-        const gameEvts = eventsByGame.get(game.id) ?? [];
+      const [chunkShifts, chunkEvents] = await Promise.all([
+        db
+          .select({
+            gameId: shifts.gameId,
+            playerId: shifts.playerId,
+            teamId: shifts.teamId,
+            period: shifts.period,
+            startSeconds: shifts.startSeconds,
+            endSeconds: shifts.endSeconds,
+          })
+          .from(shifts)
+          .where(inArray(shifts.gameId, chunkIds)),
+        db
+          .select({
+            gameId: gameEvents.gameId,
+            eventType: gameEvents.eventType,
+            period: gameEvents.period,
+            timeSeconds: gameEvents.timeSeconds,
+            teamId: gameEvents.teamId,
+            player1Id: gameEvents.player1Id,
+            player2Id: gameEvents.player2Id,
+            player3Id: gameEvents.player3Id,
+            penaltyMinutes: gameEvents.penaltyMinutes,
+          })
+          .from(gameEvents)
+          .where(inArray(gameEvents.gameId, chunkIds)),
+      ]);
 
-        if (gameShifts.length === 0) {
-          progress.increment();
-          continue;
-        }
-
-        const pairStats = computeGameVersus(gameShifts, gameEvts);
-
-        // Determine game winner team ID
-        const winnerTeamId =
-          game.homeScore !== null && game.awayScore !== null && game.homeScore !== game.awayScore
-            ? game.homeScore > game.awayScore
-              ? game.homeTeamId
-              : game.awayTeamId
-            : null;
-
-        // Accumulate into (season, gameType)-level stats
-        for (const [pairKey, stats] of pairStats) {
-          const accKey = `${pairKey}-${game.seasonId}-${game.gameType}`;
-
-          const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
-          const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
-
-          if (!accumulator.has(accKey)) {
-            accumulator.set(accKey, {
-              ...stats,
-              seasonId: game.seasonId,
-              gameType: game.gameType,
-              gamesShared: 1,
-              winsA: pairWinsA,
-              winsB: pairWinsB,
-            });
-          } else {
-            const existing = accumulator.get(accKey)!;
-            existing.gamesShared++;
-            existing.winsA += pairWinsA;
-            existing.winsB += pairWinsB;
-
-            existing.toiSharedSeconds += stats.toiSharedSeconds;
-            existing.goalsForA += stats.goalsForA;
-            existing.goalsAgainstA += stats.goalsAgainstA;
-            existing.goalsForB += stats.goalsForB;
-            existing.goalsAgainstB += stats.goalsAgainstB;
-            existing.shotsForA += stats.shotsForA;
-            existing.shotsAgainstA += stats.shotsAgainstA;
-            existing.shotsForB += stats.shotsForB;
-            existing.shotsAgainstB += stats.shotsAgainstB;
-            existing.hitsByA += stats.hitsByA;
-            existing.hitsByB += stats.hitsByB;
-            existing.blocksByA += stats.blocksByA;
-            existing.blocksByB += stats.blocksByB;
-            existing.penaltyMinutesA += stats.penaltyMinutesA;
-            existing.penaltyMinutesB += stats.penaltyMinutesB;
-            existing.faceoffWinsA += stats.faceoffWinsA;
-            existing.faceoffWinsB += stats.faceoffWinsB;
-            existing.playerAGoals += stats.playerAGoals;
-            existing.playerAAssists += stats.playerAAssists;
-            existing.playerAShots += stats.playerAShots;
-            existing.playerBGoals += stats.playerBGoals;
-            existing.playerBAssists += stats.playerBAssists;
-            existing.playerBShots += stats.playerBShots;
-          }
-        }
-      } catch (err) {
-        console.warn(
-          `\nWarning: Failed to compute versus for game ${game.id}: ${err instanceof Error ? err.message : err}`
-        );
+      const shiftsByGame = new Map<number, ShiftRecord[]>();
+      for (const s of chunkShifts) {
+        if (!shiftsByGame.has(s.gameId)) shiftsByGame.set(s.gameId, []);
+        shiftsByGame.get(s.gameId)!.push(s as ShiftRecord);
       }
-      progress.increment();
+
+      const eventsByGame = new Map<number, EventRecord[]>();
+      for (const e of chunkEvents) {
+        if (!eventsByGame.has(e.gameId)) eventsByGame.set(e.gameId, []);
+        eventsByGame.get(e.gameId)!.push(e as EventRecord);
+      }
+
+      for (const game of chunk) {
+        try {
+          const gameShifts = shiftsByGame.get(game.id) ?? [];
+          const gameEvts = eventsByGame.get(game.id) ?? [];
+
+          if (gameShifts.length === 0) {
+            progress.increment();
+            continue;
+          }
+
+          const pairStats = computeGameVersus(gameShifts, gameEvts);
+
+          // Determine game winner team ID
+          const winnerTeamId =
+            game.homeScore !== null && game.awayScore !== null && game.homeScore !== game.awayScore
+              ? game.homeScore > game.awayScore
+                ? game.homeTeamId
+                : game.awayTeamId
+              : null;
+
+          // Accumulate into (season, gameType)-level stats
+          for (const [pairKey, stats] of pairStats) {
+            const accKey = `${pairKey}-${game.seasonId}-${game.gameType}`;
+
+            const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
+            const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
+
+            if (!accumulator.has(accKey)) {
+              accumulator.set(accKey, {
+                ...stats,
+                seasonId: game.seasonId,
+                gameType: game.gameType,
+                gamesShared: 1,
+                winsA: pairWinsA,
+                winsB: pairWinsB,
+              });
+            } else {
+              const existing = accumulator.get(accKey)!;
+              existing.gamesShared++;
+              existing.winsA += pairWinsA;
+              existing.winsB += pairWinsB;
+
+              existing.toiSharedSeconds += stats.toiSharedSeconds;
+              existing.goalsForA += stats.goalsForA;
+              existing.goalsAgainstA += stats.goalsAgainstA;
+              existing.goalsForB += stats.goalsForB;
+              existing.goalsAgainstB += stats.goalsAgainstB;
+              existing.shotsForA += stats.shotsForA;
+              existing.shotsAgainstA += stats.shotsAgainstA;
+              existing.shotsForB += stats.shotsForB;
+              existing.shotsAgainstB += stats.shotsAgainstB;
+              existing.hitsByA += stats.hitsByA;
+              existing.hitsByB += stats.hitsByB;
+              existing.blocksByA += stats.blocksByA;
+              existing.blocksByB += stats.blocksByB;
+              existing.penaltyMinutesA += stats.penaltyMinutesA;
+              existing.penaltyMinutesB += stats.penaltyMinutesB;
+              existing.faceoffWinsA += stats.faceoffWinsA;
+              existing.faceoffWinsB += stats.faceoffWinsB;
+              existing.playerAGoals += stats.playerAGoals;
+              existing.playerAAssists += stats.playerAAssists;
+              existing.playerAShots += stats.playerAShots;
+              existing.playerBGoals += stats.playerBGoals;
+              existing.playerBAssists += stats.playerBAssists;
+              existing.playerBShots += stats.playerBShots;
+            }
+          }
+        } catch (err) {
+          console.warn(
+            `\nWarning: Failed to compute versus for game ${game.id}: ${err instanceof Error ? err.message : err}`
+          );
+        }
+        progress.increment();
+      }
     }
+    progress.done();
+
+    // Write this partition and drop it before the next one is built. This is
+    // the whole point of the partitioning: peak memory is one season and game
+    // type, not the entire run.
+    largestPartition = Math.max(largestPartition, accumulator.size);
+    const written = await flushPairs(db, accumulator);
+    totalUpserted += written;
+    accumulator.clear();
+    console.log(`  Upserted ${written.toLocaleString()} pair records`);
   }
-  progress.done();
 
-  // Upsert accumulated stats into versus_stats
-  console.log(`\nUpserting ${accumulator.size} pair-season records...`);
-  const upsertProgress = new Progress(accumulator.size, "Upserting");
-  const entries = Array.from(accumulator.values());
-  const BATCH_SIZE = 100;
-
-  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE).map((row) => ({
-      playerAId: row.playerAId,
-      playerBId: row.playerBId,
-      seasonId: row.seasonId,
-      gameType: row.gameType,
-      sameTeam: row.sameTeam,
-      gamesShared: row.gamesShared,
-      toiSharedSeconds: row.toiSharedSeconds,
-      winsA: row.winsA,
-      winsB: row.winsB,
-      playerATeamId: row.playerATeamId,
-      playerBTeamId: row.playerBTeamId,
-      goalsForA: row.goalsForA,
-      goalsAgainstA: row.goalsAgainstA,
-      goalsForB: row.goalsForB,
-      goalsAgainstB: row.goalsAgainstB,
-      shotsForA: row.shotsForA,
-      shotsAgainstA: row.shotsAgainstA,
-      shotsForB: row.shotsForB,
-      shotsAgainstB: row.shotsAgainstB,
-      hitsByA: row.hitsByA,
-      hitsByB: row.hitsByB,
-      blocksByA: row.blocksByA,
-      blocksByB: row.blocksByB,
-      penaltyMinutesA: row.penaltyMinutesA,
-      penaltyMinutesB: row.penaltyMinutesB,
-      faceoffWinsA: row.faceoffWinsA,
-      faceoffWinsB: row.faceoffWinsB,
-      playerAGoals: row.playerAGoals,
-      playerAAssists: row.playerAAssists,
-      playerAShots: row.playerAShots,
-      playerBGoals: row.playerBGoals,
-      playerBAssists: row.playerBAssists,
-      playerBShots: row.playerBShots,
-    }));
-
-    // Single insert per batch using excluded pseudo-table for conflict resolution
-    await db
-      .insert(versusStats)
-      .values(batch)
-      .onConflictDoUpdate({
-        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId, versusStats.gameType],
-        set: {
-          sameTeam: sql`excluded.same_team`,
-          gamesShared: sql`excluded.games_shared`,
-          toiSharedSeconds: sql`excluded.toi_shared_seconds`,
-          winsA: sql`excluded.wins_a`,
-          winsB: sql`excluded.wins_b`,
-          playerATeamId: sql`excluded.player_a_team_id`,
-          playerBTeamId: sql`excluded.player_b_team_id`,
-          goalsForA: sql`excluded.goals_for_a`,
-          goalsAgainstA: sql`excluded.goals_against_a`,
-          goalsForB: sql`excluded.goals_for_b`,
-          goalsAgainstB: sql`excluded.goals_against_b`,
-          shotsForA: sql`excluded.shots_for_a`,
-          shotsAgainstA: sql`excluded.shots_against_a`,
-          shotsForB: sql`excluded.shots_for_b`,
-          shotsAgainstB: sql`excluded.shots_against_b`,
-          hitsByA: sql`excluded.hits_by_a`,
-          hitsByB: sql`excluded.hits_by_b`,
-          blocksByA: sql`excluded.blocks_by_a`,
-          blocksByB: sql`excluded.blocks_by_b`,
-          penaltyMinutesA: sql`excluded.penalty_minutes_a`,
-          penaltyMinutesB: sql`excluded.penalty_minutes_b`,
-          faceoffWinsA: sql`excluded.faceoff_wins_a`,
-          faceoffWinsB: sql`excluded.faceoff_wins_b`,
-          playerAGoals: sql`excluded.player_a_goals`,
-          playerAAssists: sql`excluded.player_a_assists`,
-          playerAShots: sql`excluded.player_a_shots`,
-          playerBGoals: sql`excluded.player_b_goals`,
-          playerBAssists: sql`excluded.player_b_assists`,
-          playerBShots: sql`excluded.player_b_shots`,
-          computedAt: new Date(),
-        },
-      });
-
-    upsertProgress.increment(batch.length);
-  }
-  upsertProgress.done();
-
-  console.log(`\nDone! Upserted ${accumulator.size} versus stat records.`);
+  console.log(
+    `\nDone! Upserted ${totalUpserted.toLocaleString()} versus stat records ` +
+      `across ${partitions.size} partition(s). ` +
+      `Peak accumulator held ${largestPartition.toLocaleString()} pairs.`
+  );
 
   await refreshPlayerSeasonTotals(db);
   await refreshLeaderboard(db);

@@ -53,13 +53,30 @@ Verified locally on 2026-08-11.
 
 Related:
 
-- [ ] **Stream the upserts in `scripts/compute-versus.ts`.** It holds every pair
-  in memory before writing, about 2.6M objects for a full 10-season recompute. A
-  daily run recomputes the current season only, roughly 290k records, which a
-  GitHub runner handles. Fix this before any full recompute has to run there.
+- [x] **Stream the upserts in `scripts/compute-versus.ts`** — done 2026-08-11.
+  It now partitions the games by season and game type, then computes and writes
+  one partition at a time. The accumulator key already carried both, so a pair
+  never merged across a boundary; flushing there writes exactly the rows one
+  big pass wrote, while peak memory drops from every season at once to the
+  largest single partition.
 - [ ] **Decide what happens to the CDN cache after an ingest.** Derived data is
   cached for an hour, so new results appear up to an hour late. Probably fine;
   the alternative is a purge step at the end of the workflow.
+- [ ] **`versus_stats` holds rows a recompute no longer produces.** Found
+  2026-08-12 while verifying the streaming change, and not caused by it. A
+  recompute upserts but never deletes, so a pair the current engine stops
+  producing keeps its old row forever. Measured by `computed_at` after a full
+  3-season recompute: 830 rows untouched in 2023-24, 799 in 2024-25, **0** in
+  2025-26. All have `games_shared = 1` and a few minutes of shared ice.
+    - The clean zero for 2025-26 suggests these predate an engine change and
+      the two older seasons were last fully computed under it. That is a
+      hypothesis, not established.
+    - Impact is small: a one-game pair is regressed hard by the 10-game prior
+      and cannot reach a leaderboard. It can still appear in a player's rivals
+      list if it clears the minimum shared ice filter.
+    - The fix is a delete, so it needs a deliberate decision: either clear a
+      partition before writing it, or delete rows in the target seasons whose
+      `computed_at` predates the run.
 
 ---
 
