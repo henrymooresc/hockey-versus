@@ -6,7 +6,7 @@
  */
 import "dotenv/config";
 import { type PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, or, lt, isNull, sql, inArray } from "drizzle-orm";
 import { games, shifts, gameEvents, versusStats, leaderboardEntries } from "../src/db/schema";
 import { unwrapRows } from "../src/lib/db-utils";
 import {
@@ -43,7 +43,8 @@ type AccumulatedPair = PairStats & {
  */
 async function flushPairs(
   db: PostgresJsDatabase,
-  accumulator: Map<string, AccumulatedPair>
+  accumulator: Map<string, AccumulatedPair>,
+  runStartedAt: Date
 ): Promise<number> {
   const entries = Array.from(accumulator.values());
   const BATCH_SIZE = 100;
@@ -83,6 +84,11 @@ async function flushPairs(
       playerBGoals: row.playerBGoals,
       playerBAssists: row.playerBAssists,
       playerBShots: row.playerBShots,
+      // Stamped from one clock for the whole run, on both the insert and the
+      // update path. `deleteOrphans` compares against this exact value, and the
+      // column's `defaultNow()` would otherwise stamp inserts from the database
+      // clock while updates came from this process.
+      computedAt: runStartedAt,
     }));
 
     // Single insert per batch using excluded pseudo-table for conflict resolution
@@ -121,12 +127,52 @@ async function flushPairs(
           playerBGoals: sql`excluded.player_b_goals`,
           playerBAssists: sql`excluded.player_b_assists`,
           playerBShots: sql`excluded.player_b_shots`,
-          computedAt: new Date(),
+          computedAt: runStartedAt,
         },
       });
   }
 
   return entries.length;
+}
+
+/**
+ * Removes rows in this partition that the run did not write.
+ *
+ * The upsert refreshes rows it produces but has no way to notice one it no
+ * longer produces, so a pair the engine stops emitting kept its row forever. A
+ * full recompute on 2026-08-12 found 830 such rows in 2023-24 and 799 in
+ * 2024-25, all single-game pairs, against none in the season that had been
+ * computed most recently.
+ *
+ * Every row the run wrote carries `runStartedAt`, so anything older belongs to
+ * an earlier computation of the same partition. `IS NULL` is included because
+ * the column is nullable and a null would fail the comparison and survive.
+ *
+ * The caller only invokes this after a partition has written rows. Without that
+ * guard a partition that produced nothing — a bug, or shifts that failed to
+ * load — would delete the season instead of leaving it alone.
+ */
+async function deleteOrphans(
+  db: PostgresJsDatabase,
+  seasonId: string,
+  gameType: number,
+  runStartedAt: Date
+): Promise<number> {
+  const removed = await db
+    .delete(versusStats)
+    .where(
+      and(
+        eq(versusStats.seasonId, seasonId),
+        eq(versusStats.gameType, gameType),
+        or(
+          isNull(versusStats.computedAt),
+          lt(versusStats.computedAt, runStartedAt)
+        )
+      )
+    )
+    .returning({ playerAId: versusStats.playerAId });
+
+  return removed.length;
 }
 
 /**
@@ -361,7 +407,12 @@ async function main() {
   // Process in chunks to avoid loading all shifts+events into memory at once
   const GAME_CHUNK = 500;
 
+  // One clock for the whole run. Every row written carries this, so anything
+  // older in a partition the run covered is a row it no longer produces.
+  const runStartedAt = new Date();
+
   let totalUpserted = 0;
+  let totalRemoved = 0;
   let largestPartition = 0;
 
   for (const key of Array.from(partitions.keys()).sort()) {
@@ -499,15 +550,29 @@ async function main() {
     // the whole point of the partitioning: peak memory is one season and game
     // type, not the entire run.
     largestPartition = Math.max(largestPartition, accumulator.size);
-    const written = await flushPairs(db, accumulator);
+    const written = await flushPairs(db, accumulator, runStartedAt);
     totalUpserted += written;
     accumulator.clear();
     console.log(`  Upserted ${written.toLocaleString()} pair records`);
+
+    // Only after the partition has written something. See `deleteOrphans`.
+    if (written > 0) {
+      const removed = await deleteOrphans(
+        db,
+        partitionGames[0].seasonId,
+        partitionGames[0].gameType,
+        runStartedAt
+      );
+      totalRemoved += removed;
+      if (removed > 0) {
+        console.log(`  Removed ${removed.toLocaleString()} rows this run no longer produces`);
+      }
+    }
   }
 
   console.log(
     `\nDone! Upserted ${totalUpserted.toLocaleString()} versus stat records ` +
-      `across ${partitions.size} partition(s). ` +
+      `across ${partitions.size} partition(s), removed ${totalRemoved.toLocaleString()}. ` +
       `Peak accumulator held ${largestPartition.toLocaleString()} pairs.`
   );
 

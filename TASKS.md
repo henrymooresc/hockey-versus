@@ -62,21 +62,23 @@ Related:
 - [ ] **Decide what happens to the CDN cache after an ingest.** Derived data is
   cached for an hour, so new results appear up to an hour late. Probably fine;
   the alternative is a purge step at the end of the workflow.
-- [ ] **`versus_stats` holds rows a recompute no longer produces.** Found
-  2026-08-12 while verifying the streaming change, and not caused by it. A
-  recompute upserts but never deletes, so a pair the current engine stops
-  producing keeps its old row forever. Measured by `computed_at` after a full
-  3-season recompute: 830 rows untouched in 2023-24, 799 in 2024-25, **0** in
-  2025-26. All have `games_shared = 1` and a few minutes of shared ice.
-    - The clean zero for 2025-26 suggests these predate an engine change and
-      the two older seasons were last fully computed under it. That is a
-      hypothesis, not established.
-    - Impact is small: a one-game pair is regressed hard by the 10-game prior
-      and cannot reach a leaderboard. It can still appear in a player's rivals
-      list if it clears the minimum shared ice filter.
-    - The fix is a delete, so it needs a deliberate decision: either clear a
-      partition before writing it, or delete rows in the target seasons whose
-      `computed_at` predates the run.
+- [x] **`versus_stats` held rows a recompute no longer produced** — fixed
+  2026-08-12. The upsert refreshed rows it produced but could not notice one it
+  had stopped producing, so those rows survived every recompute. A 3-season run
+  found 830 in 2023-24 and 799 in 2024-25, all single-game pairs, against none
+  in the season computed most recently.
+    - `compute:versus` now stamps every row it writes with one timestamp taken
+      at the start of the run, then deletes rows in that partition older than
+      it. The column previously took `defaultNow()` from the database clock on
+      insert and `new Date()` from the process clock on update, so a comparison
+      would have straddled two clocks.
+    - The delete only runs after a partition has written rows. Without that
+      guard a partition that produced nothing would erase the season instead of
+      leaving it alone.
+    - Cleared 1,629 rows. Verified by digesting the expected survivors before
+      the run and matching them after: 287,234 rows in 2023-24 and 284,379 in
+      2024-25, both digests identical, nothing stale left, and 2025-26
+      untouched.
 
 ---
 
