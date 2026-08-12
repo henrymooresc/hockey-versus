@@ -1,17 +1,33 @@
 name: Daily Ingestion
 
 on:
-  # Scheduled ingestion disabled while using local DB.
-  # Re-enable by uncommenting the schedule block below:
+  # Disabled until the pipeline has been proved end to end against the hosted
+  # database. See "Test it before enabling the cron" in TASKS.md. Uncomment
+  # only after a manual run has ingested a real game and check:ingestion has
+  # passed.
   # schedule:
-  #   - cron: "0 15 * * *"  # 10:00 AM ET daily
+  #   - cron: "0 15 * * *"  # 11:00 ET in summer, 10:00 in winter — cron is UTC
   workflow_dispatch:
-    # Manual trigger only — run from the GitHub Actions UI
+    # Manual trigger — run from the GitHub Actions UI
+
+# One run at a time. Two concurrent ingests would fight over the same progress
+# flags and duplicate NHL API traffic.
+concurrency:
+  group: daily-ingestion
+  cancel-in-progress: false
 
 jobs:
-  check-and-ingest:
-    name: Check for games and ingest
+  ingest:
+    name: Ingest yesterday's games
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    # The scripts prefer the direct endpoint. They do long bulk writes and gain
+    # from prepared statements, which the pooler cannot hold. DATABASE_URL is
+    # the fallback, so both are supplied.
+    env:
+      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -24,48 +40,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check if games were played yesterday
-        id: check-games
-        run: |
-          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
-          echo "Checking NHL schedule for $YESTERDAY"
-          RESPONSE=$(curl -sf "https://api-web.nhle.com/v1/schedule/$YESTERDAY" || echo '{}')
-          GAME_COUNT=$(echo "$RESPONSE" | node -e "
-            const data = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
-            const days = data.gameWeek ?? [];
-            const day = days.find(d => d.date === process.env.YESTERDAY);
-            console.log(day?.games?.length ?? 0);
-          " YESTERDAY="$YESTERDAY")
-          echo "Games found: $GAME_COUNT"
-          echo "game_count=$GAME_COUNT" >> $GITHUB_OUTPUT
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # The order below is a dependency chain, not a preference.
+      #
+      # There is deliberately no "were there games yesterday?" gate. Every
+      # script already resumes from the per-game progress flags and exits
+      # immediately when there is nothing to do, so an unconditional run is
+      # self-healing: a day that failed is picked up by the next one. A gate
+      # only adds a way for the whole job to skip while reporting success.
 
-      - name: Skip if no games yesterday
-        if: steps.check-games.outputs.game_count == '0'
-        run: |
-          echo "No games played yesterday — skipping ingestion."
+      # Discovers new games and creates the season row when the id rolls over.
+      # Without this nothing else has anything to work on. It also refreshes
+      # scores, so a game that was provisional on an earlier run corrects
+      # itself, and it leaves the progress flags alone.
+      - name: Discover games and refresh scores
+        run: npm run ingest:seasons
+
+      # Must precede shifts. ingest-shifts filters every row through the known
+      # player set, so a player making their debut has their shifts silently
+      # dropped if the roster is stale.
+      - name: Refresh rosters
+        run: npm run ingest:players
 
       - name: Ingest shifts
-        if: steps.check-games.outputs.game_count != '0'
         run: npm run ingest:shifts
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Ingest events
-        if: steps.check-games.outputs.game_count != '0'
         run: npm run ingest:events
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Compute versus stats
-        if: steps.check-games.outputs.game_count != '0'
         run: npm run compute:versus
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: Ingest players (refresh roster)
-        if: steps.check-games.outputs.game_count != '0'
-        run: npm run ingest:players
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # The step that makes a silent failure loud. Without it the job can skip
+      # every ingest and still go green, which is exactly what the previous
+      # version did.
+      - name: Verify no played game is missing data
+        run: npm run check:ingestion

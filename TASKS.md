@@ -14,23 +14,42 @@ already cost time once.
 Nothing new enters the database until then, so the site is correct today. The
 moment games resume, the daily ingestion has to work. **It does not yet.**
 
-`.github/workflows/ingest.yml` exists but has four defects. Each was read from
-the file on 2026-08-11, not inferred.
+`.github/workflows/ingest.yml` had four defects, all fixed on 2026-08-11:
 
-- [ ] **It never runs `ingest:seasons`, so no new game is ever discovered.**
-  `ingest-seasons.ts:151` is what inserts rows into `games`. `ingest-shifts.ts:40`
-  only looks at games already in that table with `shifts_ingested = false`. With
-  the discovery step missing, every run finds nothing to do and reports success.
-  This is the one that silently does nothing.
-- [ ] **It refreshes players last, so a new player's shifts are dropped.**
-  `ingest-shifts.ts:107` filters every shift through `knownPlayerIds`. A rookie's
-  first game is discarded, and nothing reports it. `ingest:players` has to run
-  before `ingest:shifts`, not after `compute:versus`.
-- [ ] **The schedule is commented out**, with the reason "while using local DB".
-  That reason no longer holds. Re-enable the cron once the two ordering defects
-  above are fixed — not before, or it will run daily and do nothing.
-- [ ] **It passes only `DATABASE_URL`**, so bulk writes go through the Neon
-  pooler. Add `DIRECT_DATABASE_URL` as a secret; the scripts already prefer it.
+- `ingest:seasons` was missing, so no new game was ever discovered and every
+  run reported success having done nothing.
+- `ingest:players` ran last, so `ingest-shifts.ts:107` would drop a debuting
+  player's shifts through its `knownPlayerIds` filter.
+- The "were there games yesterday?" gate could skip the whole job. It is gone.
+  Every script already resumes from the per-game progress flags, so an
+  unconditional run is self-healing.
+- Only `DATABASE_URL` was passed, so bulk writes went through the pooler.
+
+`npm run check:ingestion` now runs as the last step and fails the job when a
+game that has been played is still missing shifts or events. A game counts as
+played only when it has a score and its date has passed — `ingest:seasons`
+inserts the whole schedule, so future games sit with both flags false and are
+not a fault.
+
+### Still to do
+
+- [ ] **Add `DIRECT_DATABASE_URL` as a repository secret.** The workflow reads
+  it; nothing supplies it yet.
+- [ ] **Run the workflow once by hand against Neon, then enable the cron.** The
+  `schedule:` block is still commented out. Do not uncomment it before a manual
+  run has ingested a real game and `check:ingestion` has passed.
+
+**How to test without waiting for October.** The scripts are idempotent — shift
+and event inserts use `onConflictDoNothing` against natural unique keys — so a
+played game can be replayed. Pick one, clear its flags, and run the workflow:
+
+```
+UPDATE games SET shifts_ingested=false, events_ingested=false WHERE id=2025030416;
+```
+
+`check:ingestion` should fail immediately, naming that game. After the pipeline
+runs it should pass, and the game should be back to 846 shifts and 281 events.
+Verified locally on 2026-08-11.
 
 Related:
 
