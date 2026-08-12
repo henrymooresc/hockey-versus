@@ -115,6 +115,26 @@ The site is public and has no operational safety net.
 
 ---
 
+## Modelling
+
+- [ ] **A pair traded apart mid-season is one row describing two relationships.**
+  When a player changes team, they are a team-mate of someone in the early
+  games and an opponent later, but `versus_stats` keys on
+  (pair, season, game type) and folds both into a single row. The totals mix
+  team-mate games with opponent games, and `sameTeam` can only describe one of
+  them.
+    - Found 2026-08-12 while chasing a digest mismatch between the local and
+      hosted databases. 72 players changed team mid-season in 2023-24 and 111
+      in 2024-25, touching 44,871 and 71,223 rows respectively.
+    - A stopgap landed the same day: games are now processed oldest first and
+      the team ids and `sameTeam` take the most recent game. That makes the
+      result deterministic and stops pairs disappearing from the rivals list,
+      but the totals are still mixed.
+    - The modelling fix is to split the row, keying on the relationship as well
+      so team-mate games and opponent games are counted separately. That is a
+      schema change, a migration and a full recompute, so it is worth doing
+      only if the mixed totals start to matter.
+
 ## Scoring
 
 Both open questions are about the goalie board. Figures measured 2026-08-11 from
