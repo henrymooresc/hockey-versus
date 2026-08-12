@@ -38,11 +38,13 @@ not a fault.
 - [x] **The workflow runs green by hand against Neon** — four runs on 2026-08-12,
   including all ten seasons recomputed in three batches. `check:ingestion` passed
   on each.
-- [ ] **Enable the cron.** The `schedule:` block is still commented out. The runs
-  above prove the pipeline against the hosted database, but they could not prove
-  the part that matters in October: **no game was actually ingested**, because
-  the season is over and all 13,187 games were already complete. Replay one game
-  by the procedure below before uncommenting.
+- [x] **Cron enabled** — 2026-08-12, 15:00 UTC daily, after the replay below
+  proved the ingest path and not just the compute path.
+- [ ] **Watch for GitHub disabling the schedule.** Scheduled workflows are turned
+  off automatically after 60 days without repository activity. The season does
+  not restart until October, so a quiet September could silence the job exactly
+  when it starts to matter. Check the Actions tab in early October, or push
+  anything at all before then.
 
 **Neon and local hold identical data as of 2026-08-12.** All ten season digests
 over `versus_stats` match, row counts included — the first time since the
@@ -51,17 +53,27 @@ restore. That closes a mismatch that took three separate causes to explain: a
 recompute could reach, and a games query with no `ORDER BY` feeding an
 order-sensitive accumulation.
 
-**How to test without waiting for October.** The scripts are idempotent — shift
-and event inserts use `onConflictDoNothing` against natural unique keys — so a
-played game can be replayed. Pick one, clear its flags, and run the workflow:
+**How to test without waiting for October.** A played game can be replayed, so
+the pipeline can be exercised out of season. **Clearing the progress flags alone
+does not test anything useful** — the rows stay, every insert uses
+`onConflictDoNothing`, and the counts read the same afterwards whether the NHL
+fetch returned real data or nothing at all. Delete the data too:
 
-```
+```sql
+DELETE FROM game_events WHERE game_id = 2025030416;
+DELETE FROM shifts WHERE game_id = 2025030416;
 UPDATE games SET shifts_ingested=false, events_ingested=false WHERE id=2025030416;
 ```
 
-`check:ingestion` should fail immediately, naming that game. After the pipeline
-runs it should pass, and the game should be back to 846 shifts and 281 events.
-Verified locally on 2026-08-11.
+Then run the workflow **with the seasons box blank**, which is what the cron
+sends and what exercises `getCurrentSeasonId()`. The "Ingest shifts" step should
+report one game needing ingestion; if it reports none, the flags did not clear.
+
+Run against Neon on 2026-08-12 with game 2025030416, the Cup Final game 4. The
+846 shifts and 281 events came back, and the 2025-26 `versus_stats` digest was
+unchanged at `d9d22e7f…` over 288,795 rows — so the pipeline refetched, rewrote
+and recomputed to a byte-identical result. Ingest happens before compute inside
+a run, so a replay self-heals in a single pass.
 
 ### A second game's shifts arrived under one game id
 
