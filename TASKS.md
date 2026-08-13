@@ -207,10 +207,57 @@ The site is public and has no operational safety net.
       repair, four remain across all ten seasons — one each in 2016-17, 2017-18,
       2021-22 and 2023-24, and none in 2025-26. Rare enough to leave, which is
       why this stays behind the mixed-totals problem rather than driving it.
-    - The modelling fix is to split the row, keying on the relationship as well
-      so team-mate games and opponent games are counted separately. That is a
-      schema change, a migration and a full recompute, so it is worth doing
-      only if the mixed totals start to matter.
+    - **The mixed totals do matter — they produce the top of the leaderboard.**
+      Measured 2026-08-12. Crosby v Guentzel is rank 1 all-time with 1,051
+      seconds of shared ice per game, and MacKinnon v Rantanen rank 5 with
+      1,046. Genuine opponent pairs average **317**. Both rows are flagged
+      opponents and both carry most of a season of linemate ice, because each
+      player was traded away mid-season. Single-season boards are far worse than
+      the all-time one, which dilutes across ten seasons: by a 600-second proxy,
+      13.5% of the all-time top 200 but **72%** of 2024-25 regular season.
+    - `a013d32` made this systematic rather than intermittent. When `sameTeam`
+      was decided by whichever game Postgres happened to read first, traded
+      pairs landed on the opponent board at random. Taking the most recent game
+      is deterministic, and a trade almost always ends with the pair as
+      opponents, so now they land there reliably.
+
+### Scoping the row split — measured 2026-08-12
+
+The fix is to key on the relationship, so team-mate games and opponent games
+become two rows instead of one. It is small.
+
+- **Growth: 17,032 rows, 0.65%** on 2,625,358. Only a pair that was both
+  team-mates and opponents inside one season and game type splits, and that
+  needs one of them to have changed team mid-season — 812 player-seasons across
+  the ten, 66 to 111 a year.
+- **What it repairs: 7,109** rows currently flagged opponents while carrying
+  team-mate totals, which is what the leaderboard and rivals lists rank today,
+  and **9,922** flagged team-mates that hide a genuine opponent history.
+- It also settles the boomerang case above. With the relationship in the key,
+  no single flag has to describe two of them, so leaving and returning no longer
+  hides the pair.
+
+Touch points:
+
+- `schema.ts` — add `sameTeam` to `idx_versus_pair_season`. Generate the
+  migration; it is an index swap on 2.6M rows, not a rewrite.
+- `compute-versus.ts:503` — add `stats.sameTeam` to `accKey`, and add
+  `versusStats.sameTeam` to the `onConflictDoUpdate` target at line 99. Then
+  delete the most-recent-game assignment of `sameTeam` at line 533: it becomes
+  constant within a row. `playerATeamId`/`playerBTeamId` keep that rule.
+- The three readers need **no change**. `rivals/route.ts:73`,
+  `matchup/route.ts:80` and `breakdown/route.ts:357` already filter
+  `same_team = false`; that filter simply starts telling the truth.
+- `refreshLeaderboard` needs no change for the same reason.
+- **The digest query does need one.** It orders by
+  `(player_a_id, player_b_id, game_type)`, which stops being unique once a pair
+  has two rows. Add `same_team` to the `ORDER BY` or the digest goes
+  non-deterministic and the local-versus-Neon check becomes worthless.
+
+Sequence: migrate, then recompute every season. Old rows are overwritten in
+place — the upsert matches the surviving relationship and inserts the new one,
+and `deleteOrphans` clears anything left. Carry the faceoff fix in the same
+recompute rather than paying for two.
 
 ## Scoring
 
