@@ -286,13 +286,19 @@ describe("small-sample regression", () => {
     };
   }
 
-  // 2 shared games, very high raw intensity (19.5 weighted volume per game)
+  // Faceoff counts stay because the balance multiplier still reads them, but
+  // they no longer feed the volume sum. Both pairs were calibrated when they
+  // did, and the long pair took 10 draws a game against the short pair's 1, so
+  // it lost 11% of its volume to the short pair's 8%. The hit counts below are
+  // raised to put the intended per-game intensity back.
+
+  // 2 shared games, very high raw intensity (18.0 weighted volume per game)
   const shortHotPair = balancedPair(2, {
     points: 1, penalties: 0, hits: 3, blocks: 1, faceoffs: 1, shots: 2,
   });
   // 30 shared games, strong but lower raw intensity (9.5 per game)
   const longStrongPair = balancedPair(30, {
-    points: 5, penalties: 3, hits: 20, blocks: 8, faceoffs: 10, shots: 15,
+    points: 5, penalties: 3, hits: 27, blocks: 8, faceoffs: 10, shots: 15,
   });
 
   const asSkaters = (input: SkaterRivalryInput) =>

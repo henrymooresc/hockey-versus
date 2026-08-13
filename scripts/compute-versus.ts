@@ -96,9 +96,14 @@ async function flushPairs(
       .insert(versusStats)
       .values(batch)
       .onConflictDoUpdate({
-        target: [versusStats.playerAId, versusStats.playerBId, versusStats.seasonId, versusStats.gameType],
+        target: [
+          versusStats.playerAId,
+          versusStats.playerBId,
+          versusStats.seasonId,
+          versusStats.gameType,
+          versusStats.sameTeam,
+        ],
         set: {
-          sameTeam: sql`excluded.same_team`,
           gamesShared: sql`excluded.games_shared`,
           toiSharedSeconds: sql`excluded.toi_shared_seconds`,
           winsA: sql`excluded.wins_a`,
@@ -498,9 +503,14 @@ async function main() {
                 : game.awayTeamId
               : null;
 
-          // Accumulate into (season, gameType)-level stats
+          // Accumulate into (season, gameType, relationship)-level stats.
+          //
+          // `sameTeam` is in the key because a pair traded apart plays some
+          // games together and some against each other, and those are two
+          // different relationships. Folding them into one row mixed the totals
+          // and put linemates on the opponent leaderboard.
           for (const [pairKey, stats] of pairStats) {
-            const accKey = `${pairKey}-${game.seasonId}-${game.gameType}`;
+            const accKey = `${pairKey}-${game.seasonId}-${game.gameType}-${stats.sameTeam}`;
 
             const pairWinsA = winnerTeamId === stats.playerATeamId ? 1 : 0;
             const pairWinsB = winnerTeamId === stats.playerBTeamId ? 1 : 0;
@@ -520,17 +530,16 @@ async function main() {
               existing.winsA += pairWinsA;
               existing.winsB += pairWinsB;
 
-              // These three describe a state, not a total, so they take the
-              // most recent game rather than accumulating. Games arrive oldest
+              // These describe a state, not a total, so they take the most
+              // recent game rather than accumulating. Games arrive oldest
               // first, so the last write wins.
               //
-              // It matters for a player traded mid-season: they are a team-mate
-              // of someone in the early games and an opponent later. `sameTeam`
-              // is a filter in the rivals and matchup routes, so keeping the
-              // first game hid pairs that genuinely faced each other.
+              // `sameTeam` is no longer set here: it is part of the accumulator
+              // key, so it is already constant across every game in this row.
+              // The team ids still need the rule, for a player who moves twice
+              // and so has two clubs within one relationship.
               existing.playerATeamId = stats.playerATeamId;
               existing.playerBTeamId = stats.playerBTeamId;
-              existing.sameTeam = stats.sameTeam;
 
               existing.toiSharedSeconds += stats.toiSharedSeconds;
               existing.goalsForA += stats.goalsForA;

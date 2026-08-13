@@ -19,6 +19,7 @@
     "ingest:shifts": "tsx scripts/ingest-shifts.ts",
     "ingest:events": "tsx scripts/ingest-events.ts",
     "compute:versus": "tsx scripts/compute-versus.ts",
+    "derive:priors": "tsx scripts/derive-priors.ts",
     "check:ingestion": "tsx scripts/check-ingestion.ts",
     "test": "vitest run",
     "test:watch": "vitest",
