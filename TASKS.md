@@ -214,7 +214,51 @@ The site is public and has no operational safety net.
 
 ## Scoring
 
-Both open questions are about the goalie board. Figures measured 2026-08-11 from
+- [ ] **Centres own the skater board, because faceoffs are scored as volume.**
+  The all-time regular-season top 200 is **189** centre-against-centre pairs, 10
+  with one centre, and a single pair with neither — out of an eligible pool that
+  is 9.0% C-C. Measured 2026-08-12 over 188,194 opponent pairs.
+    - Faceoff wins are **34.9%** of the weighted volume of an opposing centre
+      pair, against 3.1% when only one player is a centre and 0.2% when neither
+      is. Wingers and defencemen take draws rarely, so the category is close to
+      a flat bonus for one position rather than a contest anyone can enter.
+    - The balance multiplier pushes the same way. `computeBalance` skips a
+      category where both sides are zero, so a defence pair is not punished for
+      taking no draws — but a centre pair gains a sixth active category, and it
+      is a well-matched one: mean balance 0.697 where active, for 92.3% of C-C
+      pairs. A centre-and-winger pair has it active only 23.5% of the time and
+      averages 0.374 when it is, because the draws are lopsided. Centres get a
+      bonus category, mixed pairs get a drag, and pairs with no centre are
+      simply left out of it.
+    - **Zeroing faceoffs drops C-C from 189 of the top 200 to 26**, and the mean
+      C-C score by 19.9%. That 13% still sits above the 9.0% pool share, which
+      is the right answer rather than a residual fault: opposing centres really
+      do match up against each other more than other pairings do.
+    - **The two channels are not equally at fault, and that points at the fix.**
+      `versus-engine.ts` only counts a faceoff when the pair *is* the draw —
+      `player1Id` beat `player2Id` — so `faceoffWinsA + faceoffWinsB` is the
+      number of draws between those two players, and nothing else. The balance
+      term is therefore already a rate: `1 - |a-b|/(a+b)` is just the win split
+      at the dot, and it says something real about two centres being evenly
+      matched. It is the *volume* term that counts opportunity, by adding 1.5
+      per draw taken.
+    - So try dropping faceoffs from `weightedVolume` while leaving the category
+      in `computeBalance` first. That keeps the signal and removes the subsidy,
+      needs no schema change and no re-ingest, and the win rate is already
+      available as `a / (a + b)` if a rate term is wanted explicitly. The 19.9%
+      figure above removes both channels at once, so re-measure this variant on
+      its own before choosing.
+    - Failing that: cut the weight from its current 1.5, or drop the category
+      and let points, penalty minutes, hits, blocks and shots carry the score.
+    - Any of them needs `PRIOR_VOLUME_PER_GAME` re-derived and every season
+      recomputed. The comment on that constant says so, and the "Traps" section
+      below records what happens when only the current season is run.
+    - Do not reach for a positional correction. The score describes an
+      interaction between two players, not a player, so a fix aimed at centres
+      would need a companion rule for every other pairing. The defect is that
+      one category measures opportunity instead of contest — fix it there.
+
+The two below are about the goalie board. Figures measured 2026-08-11 from
 `leaderboard_entries`, all-time regular season.
 
 - [ ] **Decide whether the two boards should share a scale.** Skater scores run
