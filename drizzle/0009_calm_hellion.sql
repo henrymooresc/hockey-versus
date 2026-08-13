@@ -1,0 +1,2 @@
+DROP INDEX "idx_versus_pair_season";--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_versus_pair_season" ON "versus_stats" USING btree ("player_a_id","player_b_id","season_id","game_type","same_team");

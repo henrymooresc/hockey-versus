@@ -1,12 +1,12 @@
 name: Daily Ingestion
 
 on:
-  # Disabled until the pipeline has been proved end to end against the hosted
-  # database. See "Test it before enabling the cron" in TASKS.md. Uncomment
-  # only after a manual run has ingested a real game and check:ingestion has
-  # passed.
-  # schedule:
-  #   - cron: "0 15 * * *"  # 11:00 ET in summer, 10:00 in winter — cron is UTC
+  # Enabled 2026-08-12, after the pipeline was proved end to end against Neon:
+  # game 2025030416 had its shifts and events deleted, this workflow refetched
+  # and rewrote them, and the season's versus_stats digest came back identical.
+  # See "A second game's shifts arrived under one game id" in TASKS.md.
+  schedule:
+    - cron: "0 15 * * *"  # 11:00 ET in summer, 10:00 in winter — cron is UTC
   workflow_dispatch:
     # Manual trigger — run from the GitHub Actions UI
     inputs:

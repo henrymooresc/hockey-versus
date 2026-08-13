@@ -229,11 +229,18 @@ export const versusStats = pgTable(
     computedAt: timestamp("computed_at").defaultNow(),
   },
   (table) => [
+    /**
+     * The relationship is part of the key. A pair traded apart mid-season is
+     * team-mates for some games and opponents for others, and one row cannot
+     * hold both: the totals mix, and `sameTeam` can only describe one of them.
+     * Splitting here keeps each relationship whole.
+     */
     uniqueIndex("idx_versus_pair_season").on(
       table.playerAId,
       table.playerBId,
       table.seasonId,
-      table.gameType
+      table.gameType,
+      table.sameTeam
     ),
     index("idx_versus_player_a").on(table.playerAId, table.seasonId, table.gameType),
     index("idx_versus_player_b").on(table.playerBId, table.seasonId, table.gameType),

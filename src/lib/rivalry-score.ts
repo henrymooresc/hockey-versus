@@ -60,9 +60,26 @@ const CATEGORY_WEIGHTS = {
   penaltyMinutes: 2,
   hits: 3,
   blocks: 2,
-  faceoffs: 1.5,
   shots: 1,
 };
+
+/**
+ * Faceoffs have no weight here on purpose, and it is not an oversight.
+ *
+ * Only a centre takes draws, so counting them as volume paid one position for
+ * turning up. They were 34.9% of the weighted volume of an opposing centre
+ * pair against 0.2% for a pair with no centre, and the all-time skater board
+ * came out 189 centre-against-centre pairs in its top 200, from a pool 9.0%
+ * C-C. Cutting the weight did not fix it — even at 0.25 the board was still
+ * 59 of 200 — because the term scales with opportunity rather than contest.
+ *
+ * They stay in the balance categories below. `versus-engine.ts` only counts a
+ * draw when the pair *is* the faceoff, so `faceoffWinsA + faceoffWinsB` is the
+ * number of draws between exactly these two players, and
+ * `1 - |a - b| / (a + b)` is their win split. That says something real about
+ * two centres being evenly matched, and it costs nothing: keeping it moved the
+ * board by two places out of 200.
+ */
 
 const GOALIE_CATEGORY_WEIGHTS = {
   goals: 8,
@@ -89,7 +106,6 @@ function skaterVolumeAndBalance(
     CATEGORY_WEIGHTS.penaltyMinutes * (input.penaltyMinutesA + input.penaltyMinutesB) +
     CATEGORY_WEIGHTS.hits * (input.hitsByA + input.hitsByB) +
     CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
-    CATEGORY_WEIGHTS.faceoffs * (input.faceoffWinsA + input.faceoffWinsB) +
     CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
 
   const categories: [number, number][] = [
@@ -123,23 +139,28 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
 /**
  * League mean weighted volume per game for skater pairs, measured over all 10
  * seasons of regular-season data above the 1800-second noise floor. The pooled
- * mean is 5.670 and the unweighted mean 5.647, across 187,000 pairs.
+ * mean is 5.362 and the unweighted mean 5.365, across 186,094 pairs.
  *
  * Re-derive this after a large data change, or after changing any category
- * weight. Sum the weighted categories per pair, divide by total shared games.
+ * weight — it must match the weights above or the regression pulls toward a
+ * mean the formula cannot produce, which quietly favours small samples. It fell
+ * from 5.67 on 2026-08-12 when faceoffs left the volume sum and `versus_stats`
+ * split team-mate rows from opponent rows.
+ *
  * Recompute *every* season first: `compute:versus` defaults to the current one,
  * so a partial run leaves the other nine at zero and skews the mean.
  */
-const PRIOR_VOLUME_PER_GAME = 5.67;
+const PRIOR_VOLUME_PER_GAME = 5.36;
 
 /**
- * The same figure for goalie pairs, measured the same way. The pooled mean was
- * 5.472 and the unweighted mean 5.345.
+ * The same figure for goalie pairs, measured the same way. The pooled mean is
+ * 5.492 and the unweighted mean 5.366, across 71,487 pairs. Faceoffs never
+ * entered this formula, so the move from 5.472 is the row split alone.
  *
  * That it lands so close to the skater figure is the point: both formulas
  * describe interactions per game, so their scores belong on one scale.
  */
-const GOALIE_PRIOR_VOLUME_PER_GAME = 5.47;
+const GOALIE_PRIOR_VOLUME_PER_GAME = 5.49;
 
 /**
  * Games of league-average play credited to every pair before its own record
