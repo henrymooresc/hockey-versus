@@ -160,16 +160,38 @@ Related:
 
 The site is public and has no operational safety net.
 
-- [ ] **Confirm Neon backups.** The database is the product. Re-ingesting 10
-  seasons costs hours of NHL API calls, and the local copy is the only other
-  copy. Check what point-in-time recovery the plan actually gives.
-- [ ] **Nothing reports errors.** A route returning 500 in production is
-  invisible. Routes log to `console.error`, which reaches Vercel logs and no
-  further.
-- [ ] **Confirm the Neon region matches `vercel.json`.** It pins functions to
-  `iad1`. If Neon sits outside AWS us-east-1, every query pays cross-region
-  latency and several routes make more than one.
-- [ ] Add an analytics tool to measure real page speed.
+- [x] **Neon region matches `vercel.json`** — confirmed 2026-08-13. Functions
+  are pinned to `iad1` and the database is alongside them, so no query pays
+  cross-region latency.
+- [x] **Backups: accepted as-is** — decided 2026-08-13. The verified local copy
+  plus the `pg_dump`/restore procedure in the README is the recovery plan. Worst
+  case is a few hours of restore, not data loss, so Neon's point-in-time window
+  does not need to be paid for.
+- [~] **Nothing reports errors.** A route returning 500 in production is
+  invisible; routes log to `console.error`, which reaches Vercel's log viewer
+  and no further. Sentry wired up 2026-08-13, **not yet active** — it needs an
+  account and a DSN, which only a human can create.
+    - Errors only. `tracesSampleRate: 0` and no session replay: performance is
+      Speed Insights' job, and traces are what exhaust a free quota fastest.
+      The quota belongs to the thing that was actually invisible.
+    - Inert without a DSN. `next.config.ts` exports the unwrapped config, the
+      SDK disables itself, and `enabled` further restricts sending to
+      `VERCEL_ENV=production`. Local development and CI need no secret, and a
+      missing variable in production costs reporting rather than the site.
+    - `onRequestError` in `src/instrumentation.ts` is the part that closes the
+      gap. `error.tsx` and `global-error.tsx` cover the client, the latter
+      catching failures in the root layout that `error.tsx` sits inside of and
+      cannot see.
+    - **Still to do:** create the Sentry project, set `NEXT_PUBLIC_SENTRY_DSN`
+      in Vercel, then trigger a deliberate error and confirm it arrives.
+      Optionally add `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` for
+      source-map upload, without which production stack traces stay minified.
+- [ ] **Add analytics.** Two packages, both zero-config on Vercel and
+  cookie-free, so no consent banner. `@vercel/speed-insights` is the one that
+  answers this task — real-user Core Web Vitals — and matters here because the
+  pages are client shells that fetch after render, a pattern that scores badly
+  on LCP in ways a warm-cache Lighthouse run will not show. `@vercel/analytics`
+  is pageviews and referrers; useful, but it measures who visited, not speed.
 
 ## Discovery
 

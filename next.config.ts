@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
  * Response headers the browser acts on. Each one is a short instruction that
@@ -46,4 +47,24 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Sentry wraps the build to instrument it and to upload source maps, so a
+ * minified stack trace turns back into real file names.
+ *
+ * Only when a DSN is set. Without one the export is the plain config this
+ * project had before, which is what should happen locally and in CI, where no
+ * Sentry secrets exist and a wrapped build would only add time and warnings.
+ *
+ * `org` and `project` come from the environment rather than being written here,
+ * so there is no placeholder to forget. Source map upload additionally needs
+ * `SENTRY_AUTH_TOKEN`; without it the build still succeeds and stack traces
+ * are simply minified.
+ */
+export default process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+    })
+  : nextConfig;
