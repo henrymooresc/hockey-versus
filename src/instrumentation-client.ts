@@ -10,11 +10,19 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
+/**
+ * `NEXT_PUBLIC_VERCEL_ENV`, not `VERCEL_ENV`. Next only inlines variables with
+ * the `NEXT_PUBLIC_` prefix into the browser bundle, so the bare name is
+ * `undefined` here — which silently left `enabled` false and reported nothing
+ * from the client. Vercel populates the prefixed one for exactly this.
+ */
+const vercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV;
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 0,
-  environment: process.env.VERCEL_ENV ?? "development",
-  enabled: process.env.VERCEL_ENV === "production",
+  environment: vercelEnv ?? "development",
+  enabled: vercelEnv === "production",
 });
 
 /** Reports navigation timing for App Router route changes. */
