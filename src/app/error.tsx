@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
-export default function GlobalError({
+/**
+ * Catches a render error anywhere below the root layout. Errors in the layout
+ * itself escape this one — `global-error.tsx` takes those.
+ */
+export default function RouteError({
   error,
   reset,
 }: {
@@ -10,7 +15,10 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // The console line stays. It is what shows up while running locally, where
+    // Sentry is deliberately disabled.
     console.error("[route error]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

@@ -160,16 +160,38 @@ Related:
 
 The site is public and has no operational safety net.
 
-- [ ] **Confirm Neon backups.** The database is the product. Re-ingesting 10
-  seasons costs hours of NHL API calls, and the local copy is the only other
-  copy. Check what point-in-time recovery the plan actually gives.
-- [ ] **Nothing reports errors.** A route returning 500 in production is
-  invisible. Routes log to `console.error`, which reaches Vercel logs and no
-  further.
-- [ ] **Confirm the Neon region matches `vercel.json`.** It pins functions to
-  `iad1`. If Neon sits outside AWS us-east-1, every query pays cross-region
-  latency and several routes make more than one.
-- [ ] Add an analytics tool to measure real page speed.
+- [x] **Neon region matches `vercel.json`** — confirmed 2026-08-13. Functions
+  are pinned to `iad1` and the database is alongside them, so no query pays
+  cross-region latency.
+- [x] **Backups: accepted as-is** — decided 2026-08-13. The verified local copy
+  plus the `pg_dump`/restore procedure in the README is the recovery plan. Worst
+  case is a few hours of restore, not data loss, so Neon's point-in-time window
+  does not need to be paid for.
+- [~] **Nothing reports errors.** A route returning 500 in production is
+  invisible; routes log to `console.error`, which reaches Vercel's log viewer
+  and no further. Sentry wired up 2026-08-13, **not yet active** — it needs an
+  account and a DSN, which only a human can create.
+    - Errors only. `tracesSampleRate: 0` and no session replay: performance is
+      Speed Insights' job, and traces are what exhaust a free quota fastest.
+      The quota belongs to the thing that was actually invisible.
+    - Inert without a DSN. `next.config.ts` exports the unwrapped config, the
+      SDK disables itself, and `enabled` further restricts sending to
+      `VERCEL_ENV=production`. Local development and CI need no secret, and a
+      missing variable in production costs reporting rather than the site.
+    - `onRequestError` in `src/instrumentation.ts` is the part that closes the
+      gap. `error.tsx` and `global-error.tsx` cover the client, the latter
+      catching failures in the root layout that `error.tsx` sits inside of and
+      cannot see.
+    - **Still to do:** create the Sentry project, set `NEXT_PUBLIC_SENTRY_DSN`
+      in Vercel, then trigger a deliberate error and confirm it arrives.
+      Optionally add `SENTRY_ORG`, `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN` for
+      source-map upload, without which production stack traces stay minified.
+- [ ] **Add analytics.** Two packages, both zero-config on Vercel and
+  cookie-free, so no consent banner. `@vercel/speed-insights` is the one that
+  answers this task — real-user Core Web Vitals — and matters here because the
+  pages are client shells that fetch after render, a pattern that scores badly
+  on LCP in ways a warm-cache Lighthouse run will not show. `@vercel/analytics`
+  is pageviews and referrers; useful, but it measures who visited, not speed.
 
 ## Discovery
 
@@ -178,132 +200,7 @@ The site is public and has no operational safety net.
 
 ---
 
-## Modelling
-
-- [ ] **A pair traded apart mid-season is one row describing two relationships.**
-  When a player changes team, they are a team-mate of someone in the early
-  games and an opponent later, but `versus_stats` keys on
-  (pair, season, game type) and folds both into a single row. The totals mix
-  team-mate games with opponent games, and `sameTeam` can only describe one of
-  them.
-    - Found 2026-08-12 while chasing a digest mismatch between the local and
-      hosted databases. 72 players changed team mid-season in 2023-24 and 111
-      in 2024-25, touching 44,871 and 71,223 rows respectively.
-    - A stopgap landed the same day: games are now processed oldest first and
-      the team ids and `sameTeam` take the most recent game. That makes the
-      result deterministic and stops pairs disappearing from the rivals list,
-      but the totals are still mixed.
-    - **The stopgap is wrong for a player who leaves and comes back.** Team-mate,
-      then opponent, then team-mate again: the most recent game says team-mate,
-      so `sameTeam` is true and the rivals list drops a pair that genuinely
-      faced each other for the middle stretch. The same holds for a player
-      traded *onto* the other's team, which is the commoner direction. Taking
-      the first game instead only moves which half is wrong. No ordering rule
-      can be right, because one row cannot hold two relationships — which is the
-      argument for the real fix rather than a reason to tune the stopgap.
-    - Searching for this is what turned up the cross-game contamination above.
-      Ten of the fourteen apparent returns were not trades at all; they were one
-      game of last season's rosters filed under this season's game id. After the
-      repair, four remain across all ten seasons — one each in 2016-17, 2017-18,
-      2021-22 and 2023-24, and none in 2025-26. Rare enough to leave, which is
-      why this stays behind the mixed-totals problem rather than driving it.
-    - **The mixed totals do matter — they produce the top of the leaderboard.**
-      Measured 2026-08-12. Crosby v Guentzel is rank 1 all-time with 1,051
-      seconds of shared ice per game, and MacKinnon v Rantanen rank 5 with
-      1,046. Genuine opponent pairs average **317**. Both rows are flagged
-      opponents and both carry most of a season of linemate ice, because each
-      player was traded away mid-season. Single-season boards are far worse than
-      the all-time one, which dilutes across ten seasons: by a 600-second proxy,
-      13.5% of the all-time top 200 but **72%** of 2024-25 regular season.
-    - `a013d32` made this systematic rather than intermittent. When `sameTeam`
-      was decided by whichever game Postgres happened to read first, traded
-      pairs landed on the opponent board at random. Taking the most recent game
-      is deterministic, and a trade almost always ends with the pair as
-      opponents, so now they land there reliably.
-
-### Scoping the row split — measured 2026-08-12
-
-The fix is to key on the relationship, so team-mate games and opponent games
-become two rows instead of one. It is small.
-
-- **Growth: 17,032 rows, 0.65%** on 2,625,358. Only a pair that was both
-  team-mates and opponents inside one season and game type splits, and that
-  needs one of them to have changed team mid-season — 812 player-seasons across
-  the ten, 66 to 111 a year.
-- **What it repairs: 7,109** rows currently flagged opponents while carrying
-  team-mate totals, which is what the leaderboard and rivals lists rank today,
-  and **9,922** flagged team-mates that hide a genuine opponent history.
-- It also settles the boomerang case above. With the relationship in the key,
-  no single flag has to describe two of them, so leaving and returning no longer
-  hides the pair.
-
-Touch points:
-
-- `schema.ts` — add `sameTeam` to `idx_versus_pair_season`. Generate the
-  migration; it is an index swap on 2.6M rows, not a rewrite.
-- `compute-versus.ts:503` — add `stats.sameTeam` to `accKey`, and add
-  `versusStats.sameTeam` to the `onConflictDoUpdate` target at line 99. Then
-  delete the most-recent-game assignment of `sameTeam` at line 533: it becomes
-  constant within a row. `playerATeamId`/`playerBTeamId` keep that rule.
-- The three readers need **no change**. `rivals/route.ts:73`,
-  `matchup/route.ts:80` and `breakdown/route.ts:357` already filter
-  `same_team = false`; that filter simply starts telling the truth.
-- `refreshLeaderboard` needs no change for the same reason.
-- **The digest query does need one.** It orders by
-  `(player_a_id, player_b_id, game_type)`, which stops being unique once a pair
-  has two rows. Add `same_team` to the `ORDER BY` or the digest goes
-  non-deterministic and the local-versus-Neon check becomes worthless.
-
-Sequence: migrate, then recompute every season. Old rows are overwritten in
-place — the upsert matches the surviving relationship and inserts the new one,
-and `deleteOrphans` clears anything left. Carry the faceoff fix in the same
-recompute rather than paying for two.
-
 ## Scoring
-
-- [ ] **Centres own the skater board, because faceoffs are scored as volume.**
-  The all-time regular-season top 200 is **189** centre-against-centre pairs, 10
-  with one centre, and a single pair with neither — out of an eligible pool that
-  is 9.0% C-C. Measured 2026-08-12 over 188,194 opponent pairs.
-    - Faceoff wins are **34.9%** of the weighted volume of an opposing centre
-      pair, against 3.1% when only one player is a centre and 0.2% when neither
-      is. Wingers and defencemen take draws rarely, so the category is close to
-      a flat bonus for one position rather than a contest anyone can enter.
-    - The balance multiplier pushes the same way. `computeBalance` skips a
-      category where both sides are zero, so a defence pair is not punished for
-      taking no draws — but a centre pair gains a sixth active category, and it
-      is a well-matched one: mean balance 0.697 where active, for 92.3% of C-C
-      pairs. A centre-and-winger pair has it active only 23.5% of the time and
-      averages 0.374 when it is, because the draws are lopsided. Centres get a
-      bonus category, mixed pairs get a drag, and pairs with no centre are
-      simply left out of it.
-    - **Zeroing faceoffs drops C-C from 189 of the top 200 to 26**, and the mean
-      C-C score by 19.9%. That 13% still sits above the 9.0% pool share, which
-      is the right answer rather than a residual fault: opposing centres really
-      do match up against each other more than other pairings do.
-    - **The two channels are not equally at fault, and that points at the fix.**
-      `versus-engine.ts` only counts a faceoff when the pair *is* the draw —
-      `player1Id` beat `player2Id` — so `faceoffWinsA + faceoffWinsB` is the
-      number of draws between those two players, and nothing else. The balance
-      term is therefore already a rate: `1 - |a-b|/(a+b)` is just the win split
-      at the dot, and it says something real about two centres being evenly
-      matched. It is the *volume* term that counts opportunity, by adding 1.5
-      per draw taken.
-    - So try dropping faceoffs from `weightedVolume` while leaving the category
-      in `computeBalance` first. That keeps the signal and removes the subsidy,
-      needs no schema change and no re-ingest, and the win rate is already
-      available as `a / (a + b)` if a rate term is wanted explicitly. The 19.9%
-      figure above removes both channels at once, so re-measure this variant on
-      its own before choosing.
-    - Failing that: cut the weight from its current 1.5, or drop the category
-      and let points, penalty minutes, hits, blocks and shots carry the score.
-    - Any of them needs `PRIOR_VOLUME_PER_GAME` re-derived and every season
-      recomputed. The comment on that constant says so, and the "Traps" section
-      below records what happens when only the current season is run.
-    - Do not reach for a positional correction. The score describes an
-      interaction between two players, not a player, so a fix aimed at centres
-      would need a companion rule for every other pairing. The defect is that
-      one category measures opportunity instead of contest — fix it there.
 
 The two below are about the goalie board. Figures measured 2026-08-11 from
 `leaderboard_entries`, all-time regular season.
@@ -368,6 +265,27 @@ as typed columns. Nothing scores on them yet.
 
 ## Decided — do not redo
 
+- **Faceoffs are deliberately not scored as volume.** Removed 2026-08-12. Only a
+  centre takes draws, so counting them paid one position for turning up: they
+  were 34.9% of the weighted volume of an opposing centre pair against 0.2% for
+  a pair with no centre, and the all-time board came out 189 centre-against-
+  centre pairs in its top 200 from a pool 9.0% C-C. Reducing the weight does not
+  work — at 0.25 it was still 59 of 200 — because the term scales with
+  opportunity rather than contest. They remain in the balance multiplier, which
+  reads the win split and is already a rate. Do not add them back to
+  `weightedVolume` without re-reading `rivalry-score.ts`.
+- **Do not fix a positional bias with a positional correction.** The score
+  describes an interaction between two players, not a player, so a rule aimed at
+  centres needs a companion rule for every other pairing. Fix the category that
+  measures opportunity instead of contest.
+- **`versus_stats` keys on the relationship, not just the pair.** A pair traded
+  apart mid-season plays some games together and some against each other, and
+  one row cannot hold both — the totals mix and `sameTeam` can only describe one
+  of them. Before the split, Crosby v Guentzel was rank 1 all-time claiming 51
+  opponent games when 50 of them were on the same line. Splitting cost 16,867
+  rows, 0.65%. It also settles the traded-away-and-back case, which no ordering
+  rule could: taking the most recent game hid the pair, taking the first only
+  moved which half was wrong.
 - **Do not query shifts and events from the NHL API instead of storing them.**
   Investigated and rejected. Latency is fine for one game, about 160ms for both
   endpoints in parallel, but only the post-game breakdown reads a single game.
@@ -398,3 +316,22 @@ as typed columns. Nothing scores on them yet.
 - **`ANALYZE` after any restore or bulk load.** Without fresh statistics the
   planner picks a bad plan for `team-history`, and which pairs are slow flips
   between runs.
+- **Re-derive the priors whenever a category weight changes.**
+  `npm run derive:priors`, then paste the pooled means into `rivalry-score.ts`.
+  A prior that no longer matches the weights pulls every pair toward a mean the
+  formula cannot produce, which favours small samples — the exact bias the
+  regression exists to remove, running backwards. Removing faceoffs moved it
+  from 5.67 to 5.36, and the one test that failed was the small-sample
+  regression test catching the mismatch.
+- **Any digest over `versus_stats` must sort by `same_team` too.** A pair can
+  hold two rows since the relationship split, so
+  `ORDER BY player_a_id, player_b_id, game_type` is no longer a total order and
+  the digest comes out non-deterministic — which reads exactly like a data
+  mismatch between local and Neon. Three separate causes have already been
+  chased down that road; do not add a fourth.
+- **Shared ice per game stopped being a contamination signal after the split.**
+  It was a good proxy while team-mate and opponent games shared a row: anything
+  over 600 seconds a game meant linemates mislabelled as opponents. Mixing is
+  now impossible by construction, so a high figure just means the two are
+  matched against each other often, which is what the board should select for.
+  The board averages 604 against a pool average of 318.
