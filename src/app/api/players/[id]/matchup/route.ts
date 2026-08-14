@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter, gameTypeClause } from "@/lib/db-utils";
@@ -150,7 +151,6 @@ export async function GET(
 
     return cachedJson({ matchups: [...matchups, ...noHistory] }, DERIVED);
   } catch (err: unknown) {
-    console.error("Matchup API error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Matchup API error", err);
   }
 }

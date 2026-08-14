@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows } from "@/lib/db-utils";
@@ -375,7 +376,6 @@ export async function GET(
 
     return cachedJson({ games: results }, DERIVED);
   } catch (err) {
-    console.error("Rival history API error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Rival history API error", err);
   }
 }

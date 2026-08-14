@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { unwrapRows, parseGameTypeFilter } from "@/lib/db-utils";
@@ -135,7 +136,6 @@ export async function GET(request: NextRequest) {
 
     return cachedJson({ leaderboard }, DERIVED);
   } catch (err: unknown) {
-    console.error("Leaderboard API error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Leaderboard API error", err);
   }
 }

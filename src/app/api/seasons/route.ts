@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { db } from "@/db";
 import { seasons } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -14,7 +14,6 @@ export async function GET() {
 
     return cachedJson({ seasons: rows }, DERIVED);
   } catch (err: unknown) {
-    console.error("Seasons API error:", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError("Seasons API error", err);
   }
 }
