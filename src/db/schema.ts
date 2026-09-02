@@ -213,6 +213,13 @@ export const versusStats = pgTable(
     // Penalties
     penaltyMinutesA: smallint("penalty_minutes_a").notNull().default(0),
     penaltyMinutesB: smallint("penalty_minutes_b").notNull().default(0),
+    /**
+     * Penalty shots conceded to the other player. Separate from the minutes
+     * because every one is recorded at zero minutes — the remedy is the free
+     * shot, not time in the box — so a per-minute term scores them nothing.
+     */
+    penaltyShotsA: smallint("penalty_shots_a").notNull().default(0),
+    penaltyShotsB: smallint("penalty_shots_b").notNull().default(0),
     // Faceoffs
     faceoffWinsA: smallint("faceoff_wins_a").notNull().default(0),
     faceoffWinsB: smallint("faceoff_wins_b").notNull().default(0),

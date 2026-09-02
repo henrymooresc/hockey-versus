@@ -76,6 +76,8 @@ async function flushPairs(
       blocksByB: row.blocksByB,
       penaltyMinutesA: row.penaltyMinutesA,
       penaltyMinutesB: row.penaltyMinutesB,
+      penaltyShotsA: row.penaltyShotsA,
+      penaltyShotsB: row.penaltyShotsB,
       faceoffWinsA: row.faceoffWinsA,
       faceoffWinsB: row.faceoffWinsB,
       playerAGoals: row.playerAGoals,
@@ -124,6 +126,8 @@ async function flushPairs(
           blocksByB: sql`excluded.blocks_by_b`,
           penaltyMinutesA: sql`excluded.penalty_minutes_a`,
           penaltyMinutesB: sql`excluded.penalty_minutes_b`,
+          penaltyShotsA: sql`excluded.penalty_shots_a`,
+          penaltyShotsB: sql`excluded.penalty_shots_b`,
           faceoffWinsA: sql`excluded.faceoff_wins_a`,
           faceoffWinsB: sql`excluded.faceoff_wins_b`,
           playerAGoals: sql`excluded.player_a_goals`,
@@ -437,6 +441,8 @@ async function refreshLeaderboard(db: PostgresJsDatabase) {
           SUM(v.blocks_by_b)::int AS "blocksByB",
           SUM(v.penalty_minutes_a)::int AS "penaltyMinutesA",
           SUM(v.penalty_minutes_b)::int AS "penaltyMinutesB",
+          SUM(v.penalty_shots_a)::int AS "penaltyShotsA",
+          SUM(v.penalty_shots_b)::int AS "penaltyShotsB",
           SUM(v.faceoff_wins_a)::int AS "faceoffWinsA",
           SUM(v.faceoff_wins_b)::int AS "faceoffWinsB",
           SUM(v.player_a_goals)::int AS "playerAGoals",
@@ -628,6 +634,7 @@ async function main() {
             player2Id: gameEvents.player2Id,
             player3Id: gameEvents.player3Id,
             penaltyMinutes: gameEvents.penaltyMinutes,
+            penaltyTypeCode: gameEvents.penaltyTypeCode,
           })
           .from(gameEvents)
           .where(inArray(gameEvents.gameId, chunkIds)),
@@ -717,6 +724,8 @@ async function main() {
               existing.blocksByA += stats.blocksByA;
               existing.blocksByB += stats.blocksByB;
               existing.penaltyMinutesA += stats.penaltyMinutesA;
+              existing.penaltyShotsA += stats.penaltyShotsA;
+              existing.penaltyShotsB += stats.penaltyShotsB;
               existing.penaltyMinutesB += stats.penaltyMinutesB;
               existing.faceoffWinsA += stats.faceoffWinsA;
               existing.faceoffWinsB += stats.faceoffWinsB;

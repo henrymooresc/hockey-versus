@@ -35,6 +35,7 @@ interface EventRow {
   player2_id: number | null;
   player3_id: number | null;
   penalty_minutes: number | null;
+  penalty_type_code: string | null;
 }
 
 interface GameInfo {
@@ -131,7 +132,7 @@ export async function GET(
     // 3. Bulk load relevant events across all shared games
     const eventsResult = await db.execute(sql`
       SELECT game_id, event_type, period, time_seconds,
-             team_id, player1_id, player2_id, player3_id, penalty_minutes
+             team_id, player1_id, player2_id, player3_id, penalty_minutes, penalty_type_code
       FROM game_events
       WHERE game_id IN (${gameIdList})
         AND event_type IN ('goal', 'shot', 'missed_shot', 'blocked_shot',
@@ -211,6 +212,8 @@ export async function GET(
         blocksByB = 0;
       let penaltyMinutesA = 0,
         penaltyMinutesB = 0;
+      let penaltyShotsA = 0,
+        penaltyShotsB = 0;
       let faceoffWinsA = 0,
         faceoffWinsB = 0;
       let playerAGoals = 0,
@@ -279,18 +282,20 @@ export async function GET(
           case "penalty": {
             // Minutes, matching versus-engine. A zero is accurate rather than
             // missing: every zero-minute penalty is a penalty shot, where the
-            // remedy is the shot and nobody serves time.
+            // remedy is the shot and nobody serves time. Those score through
+            // penaltyShots instead.
             const minutes = event.penalty_minutes ?? 0;
+            const isPenaltyShot = event.penalty_type_code === "PS";
             if (
               event.player1_id === playerAId &&
               event.player2_id === playerBId
             )
-              penaltyMinutesA += minutes;
+              { penaltyMinutesA += minutes; if (isPenaltyShot) penaltyShotsA++; }
             if (
               event.player1_id === playerBId &&
               event.player2_id === playerAId
             )
-              penaltyMinutesB += minutes;
+              { penaltyMinutesB += minutes; if (isPenaltyShot) penaltyShotsB++; }
             break;
           }
           case "faceoff": {
@@ -352,6 +357,8 @@ export async function GET(
             blocksByB: isRequestingA ? blocksByB : blocksByA,
             penaltyMinutesA: isRequestingA ? penaltyMinutesA : penaltyMinutesB,
             penaltyMinutesB: isRequestingA ? penaltyMinutesB : penaltyMinutesA,
+            penaltyShotsA: isRequestingA ? penaltyShotsA : penaltyShotsB,
+            penaltyShotsB: isRequestingA ? penaltyShotsB : penaltyShotsA,
             faceoffWinsA: isRequestingA ? faceoffWinsA : faceoffWinsB,
             faceoffWinsB: isRequestingA ? faceoffWinsB : faceoffWinsA,
             playerAGoals: pGoals,

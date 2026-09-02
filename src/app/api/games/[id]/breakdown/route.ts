@@ -49,6 +49,7 @@ interface EventRow {
   player2_id: number | null;
   player3_id: number | null;
   penalty_minutes: number | null;
+  penalty_type_code: string | null;
 }
 
 interface PlayerRow {
@@ -77,6 +78,8 @@ interface CareerRow {
   blocks_by_b: number;
   penalty_minutes_a: number;
   penalty_minutes_b: number;
+  penalty_shots_a: number;
+  penalty_shots_b: number;
   faceoff_wins_a: number;
   faceoff_wins_b: number;
   wins_a: number;
@@ -147,6 +150,8 @@ function rivalryFromPair(
     blocksByB: stats.blocksByB,
     penaltyMinutesA: stats.penaltyMinutesA,
     penaltyMinutesB: stats.penaltyMinutesB,
+    penaltyShotsA: stats.penaltyShotsA,
+    penaltyShotsB: stats.penaltyShotsB,
     faceoffWinsA: stats.faceoffWinsA,
     faceoffWinsB: stats.faceoffWinsB,
     playerAGoals: stats.playerAGoals,
@@ -205,7 +210,7 @@ export async function GET(
       `),
       db.execute(sql`
         SELECT event_type, period, time_seconds, team_id,
-               player1_id, player2_id, player3_id, penalty_minutes
+               player1_id, player2_id, player3_id, penalty_minutes, penalty_type_code
         FROM game_events
         WHERE game_id = ${gameId}
           AND event_type IN ('goal','shot','missed_shot','blocked_shot',
@@ -229,6 +234,7 @@ export async function GET(
       player2Id: e.player2_id,
       player3Id: e.player3_id,
       penaltyMinutes: e.penalty_minutes,
+      penaltyTypeCode: e.penalty_type_code,
     }));
 
     if (shifts.length === 0) {
@@ -351,6 +357,8 @@ export async function GET(
           SUM(blocks_by_b)::int AS blocks_by_b,
           SUM(penalty_minutes_a)::int AS penalty_minutes_a,
           SUM(penalty_minutes_b)::int AS penalty_minutes_b,
+          SUM(penalty_shots_a)::int AS penalty_shots_a,
+          SUM(penalty_shots_b)::int AS penalty_shots_b,
           SUM(faceoff_wins_a)::int AS faceoff_wins_a,
           SUM(faceoff_wins_b)::int AS faceoff_wins_b,
           SUM(wins_a)::int AS wins_a,
@@ -434,6 +442,8 @@ export async function GET(
                 blocksByB: career.blocks_by_b,
                 penaltyMinutesA: career.penalty_minutes_a,
                 penaltyMinutesB: career.penalty_minutes_b,
+                penaltyShotsA: career.penalty_shots_a,
+                penaltyShotsB: career.penalty_shots_b,
                 faceoffWinsA: career.faceoff_wins_a,
                 faceoffWinsB: career.faceoff_wins_b,
                 playerAGoals: career.player_a_goals,

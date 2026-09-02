@@ -191,8 +191,11 @@ describe("shootout handling", () => {
   });
 });
 
-describe("penalty minutes", () => {
-  const penalty = (minutes: number | null): EventRecord[] => [
+describe("penalty minutes and penalty shots", () => {
+  const penalty = (
+    minutes: number | null,
+    typeCode: string | null
+  ): EventRecord[] => [
     {
       eventType: "penalty",
       period: 1,
@@ -202,21 +205,29 @@ describe("penalty minutes", () => {
       player2Id: 2,
       player3Id: null,
       penaltyMinutes: minutes,
+      penaltyTypeCode: typeCode,
     },
   ];
 
-  it("records a zero-minute penalty as zero, not as a minor", () => {
-    const pair = computeGameVersus(shiftsBasic, penalty(0), 2).get("1-2")!;
+  it("records a zero-minute penalty shot as zero minutes, not a minor", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(0, "PS"), 2).get("1-2")!;
     expect(pair.penaltyMinutesA).toBe(0);
+  });
+
+  it("counts the penalty shot against the player who conceded it", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(0, "PS"), 2).get("1-2")!;
+    expect(pair.penaltyShotsA).toBe(1);
+    expect(pair.penaltyShotsB).toBe(0);
+  });
+
+  it("leaves penalty shots at zero for an ordinary minor", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(2, "MIN"), 2).get("1-2")!;
+    expect(pair.penaltyMinutesA).toBe(2);
+    expect(pair.penaltyShotsA).toBe(0);
   });
 
   it("treats a missing duration as zero rather than inventing a minor", () => {
-    const pair = computeGameVersus(shiftsBasic, penalty(null), 2).get("1-2")!;
+    const pair = computeGameVersus(shiftsBasic, penalty(null, "MIN"), 2).get("1-2")!;
     expect(pair.penaltyMinutesA).toBe(0);
-  });
-
-  it("still records a real minor at its served length", () => {
-    const pair = computeGameVersus(shiftsBasic, penalty(2), 2).get("1-2")!;
-    expect(pair.penaltyMinutesA).toBe(2);
   });
 });

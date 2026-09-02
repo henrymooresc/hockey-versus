@@ -7,6 +7,8 @@ export interface SkaterRivalryInput {
   blocksByB: number;
   penaltyMinutesA: number;
   penaltyMinutesB: number;
+  penaltyShotsA: number;
+  penaltyShotsB: number;
   faceoffWinsA: number;
   faceoffWinsB: number;
   playerAGoals: number;
@@ -58,6 +60,24 @@ const CATEGORY_WEIGHTS = {
    * 10, and a 10-minute misconduct 20.
    */
   penaltyMinutes: 2,
+  /**
+   * A penalty shot conceded, scored per event rather than per minute.
+   *
+   * These carry no minutes — all 426 in ten seasons are recorded at zero,
+   * because the remedy is the free shot rather than time in the box — so
+   * under a per-minute term the harshest individual foul in hockey scored
+   * exactly nothing. 6 places it above a 2-minute minor at 4 and below a
+   * fight at 10.
+   *
+   * Volume only. It is deliberately absent from the balance categories
+   * below: all 393 pairs that have a penalty shot between them have exactly
+   * one, so the category is always 1-0, the most imbalanced a category can
+   * be. In the balance average it would contribute 0 and pull the multiplier
+   * down, cancelling the volume it just earned. This is the faceoff rule
+   * inverted — faceoffs are balance-only because they measure opportunity;
+   * penalty shots are volume-only because they can never balance.
+   */
+  penaltyShots: 6,
   hits: 3,
   blocks: 2,
   shots: 1,
@@ -104,6 +124,7 @@ function skaterVolumeAndBalance(
   const weightedVolume =
     CATEGORY_WEIGHTS.points * (ptsA + ptsB) +
     CATEGORY_WEIGHTS.penaltyMinutes * (input.penaltyMinutesA + input.penaltyMinutesB) +
+    CATEGORY_WEIGHTS.penaltyShots * (input.penaltyShotsA + input.penaltyShotsB) +
     CATEGORY_WEIGHTS.hits * (input.hitsByA + input.hitsByB) +
     CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
     CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
@@ -149,6 +170,11 @@ export function computeSkaterRivalryScore(input: SkaterRivalryInput): number {
  *
  * Recompute *every* season first: `compute:versus` defaults to the current one,
  * so a partial run leaves the other nine at zero and skews the mean.
+ *
+ * Re-derived 2026-08-28 after the shootout exclusion, the zero-minute penalty
+ * fix and the new `penaltyShots` weight: pooled 5.362, unweighted 5.366, the
+ * same 186,094 pairs. Unchanged at this precision, and that is a result rather
+ * than an oversight — the three changes together touch about 0.2% of pairs.
  */
 const PRIOR_VOLUME_PER_GAME = 5.36;
 
@@ -159,6 +185,11 @@ const PRIOR_VOLUME_PER_GAME = 5.36;
  *
  * That it lands so close to the skater figure is the point: both formulas
  * describe interactions per game, so their scores belong on one scale.
+ *
+ * Re-derived 2026-08-28 alongside the skater prior: pooled 5.492, unweighted
+ * 5.366, the same 71,487 pairs. The shootout exclusion barely reaches this
+ * pool — only 5 shootout shots had an opposing goalie on the ice, because
+ * shift charts record the shooters and almost never the goalie.
  */
 const GOALIE_PRIOR_VOLUME_PER_GAME = 5.49;
 

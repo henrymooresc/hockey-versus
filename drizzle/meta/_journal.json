@@ -85,6 +85,13 @@
       "when": 1788208058871,
       "tag": "0011_add_player_season_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788374171650,
+      "tag": "0012_add_penalty_shots",
+      "breakpoints": true
     }
   ]
 }

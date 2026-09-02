@@ -72,6 +72,8 @@ export async function GET(
           SUM(blocks_by_b)::int AS blocks_by_b,
           SUM(penalty_minutes_a)::int AS penalty_minutes_a,
           SUM(penalty_minutes_b)::int AS penalty_minutes_b,
+          SUM(penalty_shots_a)::int AS penalty_shots_a,
+          SUM(penalty_shots_b)::int AS penalty_shots_b,
           SUM(faceoff_wins_a)::int AS faceoff_wins_a,
           SUM(faceoff_wins_b)::int AS faceoff_wins_b,
           SUM(wins_a)::int AS wins_a,

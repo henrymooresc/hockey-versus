@@ -23,6 +23,8 @@ export interface EventRecord {
   player3Id: number | null;
   /** Minutes served, on penalty events. 2, 4, 5, 10 or 15 — or 0. */
   penaltyMinutes?: number | null;
+  /** MIN, MAJ, MIS, GAM or PS. "PS" means a penalty shot was awarded. */
+  penaltyTypeCode?: string | null;
 }
 
 export interface PairStats {
@@ -46,6 +48,13 @@ export interface PairStats {
   blocksByB: number;
   penaltyMinutesA: number;
   penaltyMinutesB: number;
+  /**
+   * Penalty shots conceded to the other player: A fouled B on a breakaway
+   * badly enough that the referee awarded a free shot. Counted separately
+   * because these carry no minutes and would otherwise score nothing.
+   */
+  penaltyShotsA: number;
+  penaltyShotsB: number;
   faceoffWinsA: number;
   faceoffWinsB: number;
   playerAGoals: number;
@@ -155,6 +164,8 @@ export function computeGameVersus(
         blocksByB: 0,
         penaltyMinutesA: 0,
         penaltyMinutesB: 0,
+        penaltyShotsA: 0,
+        penaltyShotsB: 0,
         faceoffWinsA: 0,
         faceoffWinsB: 0,
         playerAGoals: 0,
@@ -255,12 +266,18 @@ export function computeGameVersus(
             // so the old `|| 2` fallback invented 858 minutes across 429 of
             // them. `??` rather than `||`, because 0 is a real value here and
             // only a missing one should fall back.
+            //
+            // Those events are not lost: they score through `penaltyShots`.
             const minutes = event.penaltyMinutes ?? 0;
+            const isPenaltyShot = event.penaltyTypeCode === "PS";
+
             if (event.player1Id === playerA && event.player2Id === playerB) {
               stats.penaltyMinutesA += minutes;
+              if (isPenaltyShot) stats.penaltyShotsA++;
             }
             if (event.player1Id === playerB && event.player2Id === playerA) {
               stats.penaltyMinutesB += minutes;
+              if (isPenaltyShot) stats.penaltyShotsB++;
             }
             break;
           }

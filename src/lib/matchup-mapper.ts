@@ -35,6 +35,8 @@ export interface AggRow {
   blocks_by_b: number;
   penalty_minutes_a: number;
   penalty_minutes_b: number;
+  penalty_shots_a: number;
+  penalty_shots_b: number;
   faceoff_wins_a: number;
   faceoff_wins_b: number;
   wins_a: number;
@@ -84,6 +86,8 @@ export function mapAggRowToMatchup(
     blocksByB: oppStats.blocks,
     penaltyMinutesA: stats.penaltyMinutes,
     penaltyMinutesB: oppStats.penaltyMinutes,
+    penaltyShotsA: pick(isA, row.penalty_shots_a, row.penalty_shots_b),
+    penaltyShotsB: pick(isA, row.penalty_shots_b, row.penalty_shots_a),
     faceoffWinsA: stats.faceoffWins,
     faceoffWinsB: oppStats.faceoffWins,
     playerAGoals: stats.goals,
