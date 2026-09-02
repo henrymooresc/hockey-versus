@@ -19,7 +19,7 @@ import { sql } from "drizzle-orm";
 import { unwrapRows } from "../src/lib/db-utils";
 import { createScriptDb } from "./lib/db";
 
-const W = { points: 5, pim: 2, hits: 3, blocks: 2, shots: 1 };
+const W = { points: 5, pim: 2, penaltyShots: 6, hits: 3, blocks: 2, shots: 1 };
 const GW = { goals: 8, assists: 4, shots: 1 };
 
 interface Row {
@@ -29,6 +29,7 @@ interface Row {
   hitsByA: number; hitsByB: number;
   blocksByA: number; blocksByB: number;
   penaltyMinutesA: number; penaltyMinutesB: number;
+  penaltyShotsA: number; penaltyShotsB: number;
   playerAGoals: number; playerAAssists: number; playerAShots: number;
   playerBGoals: number; playerBAssists: number; playerBShots: number;
   [key: string]: unknown;
@@ -45,6 +46,8 @@ async function main() {
              SUM(v.blocks_by_a)::int AS "blocksByA", SUM(v.blocks_by_b)::int AS "blocksByB",
              SUM(v.penalty_minutes_a)::int AS "penaltyMinutesA",
              SUM(v.penalty_minutes_b)::int AS "penaltyMinutesB",
+             SUM(v.penalty_shots_a)::int AS "penaltyShotsA",
+             SUM(v.penalty_shots_b)::int AS "penaltyShotsB",
              SUM(v.player_a_goals)::int AS "playerAGoals",
              SUM(v.player_a_assists)::int AS "playerAAssists",
              SUM(v.player_a_shots)::int AS "playerAShots",
@@ -81,6 +84,7 @@ async function main() {
       const vol =
         W.points * (r.playerAGoals + r.playerAAssists + r.playerBGoals + r.playerBAssists) +
         W.pim * (r.penaltyMinutesA + r.penaltyMinutesB) +
+        W.penaltyShots * (r.penaltyShotsA + r.penaltyShotsB) +
         W.hits * (r.hitsByA + r.hitsByB) +
         W.blocks * (r.blocksByA + r.blocksByB) +
         W.shots * (r.playerAShots + r.playerBShots);

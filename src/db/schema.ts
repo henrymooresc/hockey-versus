@@ -213,6 +213,13 @@ export const versusStats = pgTable(
     // Penalties
     penaltyMinutesA: smallint("penalty_minutes_a").notNull().default(0),
     penaltyMinutesB: smallint("penalty_minutes_b").notNull().default(0),
+    /**
+     * Penalty shots conceded to the other player. Separate from the minutes
+     * because every one is recorded at zero minutes — the remedy is the free
+     * shot, not time in the box — so a per-minute term scores them nothing.
+     */
+    penaltyShotsA: smallint("penalty_shots_a").notNull().default(0),
+    penaltyShotsB: smallint("penalty_shots_b").notNull().default(0),
     // Faceoffs
     faceoffWinsA: smallint("faceoff_wins_a").notNull().default(0),
     faceoffWinsB: smallint("faceoff_wins_b").notNull().default(0),
@@ -265,10 +272,73 @@ export const playerSeasonTotals = pgTable(
     /** NHL game_type: 2 = regular season, 3 = playoffs */
     gameType: smallint("game_type").notNull(),
     gamesPlayed: smallint("games_played").notNull(),
+    /**
+     * Ice time for the season, with each player's overlapping shifts merged
+     * before they are summed.
+     *
+     * A plain `SUM(end_seconds - start_seconds)` is wrong here. The unique
+     * index on `shifts` rejects identical rows but not overlapping ones, and
+     * the HTML shift report fallback can produce a second, slightly different
+     * interval for the same time on ice. `mergeIntervals` in `time-utils.ts`
+     * exists for the same reason on the read path.
+     *
+     * `integer`, not `smallint`: a full season runs past 80,000 seconds.
+     */
+    toiSeconds: integer("toi_seconds").notNull().default(0),
   },
   (table) => [
     primaryKey({ columns: [table.playerId, table.seasonId, table.gameType] }),
     index("idx_pst_season").on(table.seasonId, table.gameType),
+  ]
+);
+
+/**
+ * Season counting stats per player, derived from `game_events` by
+ * `npm run compute:versus`.
+ *
+ * Separate from `player_season_totals` on purpose. That table is read by the
+ * player search on every keystroke and stays narrow for it; this one is wider
+ * and only team pages and the intensity baseline read it. The two share a key,
+ * so a rate stat is a join away.
+ *
+ * No games-played column here, deliberately. Counting distinct games from
+ * events undercounts: 3,872 player-seasons record events in fewer games than
+ * they have shifts, by 1.6 games on average, because a quiet game produces no
+ * countable event. Divide by `player_season_totals.games_played` instead —
+ * every row here has a matching row there.
+ *
+ * Every definition matches `versus-engine.ts`. Phase 5 of the plan divides a
+ * `versus_stats` observation by a baseline from this table, so a category that
+ * counts differently in the two places yields a wrong ratio and no error.
+ */
+export const playerSeasonStats = pgTable(
+  "player_season_stats",
+  {
+    playerId: integer("player_id")
+      .references(() => players.id)
+      .notNull(),
+    seasonId: varchar("season_id", { length: 8 })
+      .references(() => seasons.id)
+      .notNull(),
+    /** NHL game_type: 2 = regular season, 3 = playoffs. Preseason is excluded. */
+    gameType: smallint("game_type").notNull(),
+    goals: smallint("goals").notNull().default(0),
+    assists: smallint("assists").notNull().default(0),
+    /**
+     * Shot *attempts*: goals, shots on goal, missed shots and blocked shots,
+     * every one credited to the shooter. This is what `versus-engine.ts`
+     * counts in `playerAShots`, and the two must not drift apart.
+     */
+    shots: smallint("shots").notNull().default(0),
+    hits: smallint("hits").notNull().default(0),
+    blocks: smallint("blocks").notNull().default(0),
+    penaltyMinutes: smallint("penalty_minutes").notNull().default(0),
+    faceoffWins: smallint("faceoff_wins").notNull().default(0),
+    faceoffLosses: smallint("faceoff_losses").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.playerId, table.seasonId, table.gameType] }),
+    index("idx_pss_season").on(table.seasonId, table.gameType),
   ]
 );
 

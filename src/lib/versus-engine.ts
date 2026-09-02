@@ -21,8 +21,10 @@ export interface EventRecord {
   player1Id: number | null;
   player2Id: number | null;
   player3Id: number | null;
-  /** Minutes served, on penalty events. 2, 4, 5, 10 or 15. */
+  /** Minutes served, on penalty events. 2, 4, 5, 10 or 15 — or 0. */
   penaltyMinutes?: number | null;
+  /** MIN, MAJ, MIS, GAM or PS. "PS" means a penalty shot was awarded. */
+  penaltyTypeCode?: string | null;
 }
 
 export interface PairStats {
@@ -46,6 +48,13 @@ export interface PairStats {
   blocksByB: number;
   penaltyMinutesA: number;
   penaltyMinutesB: number;
+  /**
+   * Penalty shots conceded to the other player: A fouled B on a breakaway
+   * badly enough that the referee awarded a free shot. Counted separately
+   * because these carry no minutes and would otherwise score nothing.
+   */
+  penaltyShotsA: number;
+  penaltyShotsB: number;
   faceoffWinsA: number;
   faceoffWinsB: number;
   playerAGoals: number;
@@ -65,7 +74,8 @@ export interface PairStats {
  */
 export function computeGameVersus(
   gameShifts: ShiftRecord[],
-  gameEvents: EventRecord[]
+  gameEvents: EventRecord[],
+  gameType: number
 ): Map<string, PairStats> {
   const results = new Map<string, PairStats>();
 
@@ -154,6 +164,8 @@ export function computeGameVersus(
         blocksByB: 0,
         penaltyMinutesA: 0,
         penaltyMinutesB: 0,
+        penaltyShotsA: 0,
+        penaltyShotsB: 0,
         faceoffWinsA: 0,
         faceoffWinsB: 0,
         playerAGoals: 0,
@@ -166,6 +178,14 @@ export function computeGameVersus(
 
       // Attribute events during overlap intervals
       for (const event of gameEvents) {
+        // Regular-season period 5 is the shootout, which is not hockey played
+        // between these two. Shift charts do record it — 1,954 period-5 rows
+        // across 867 games, almost all skaters — so overlap is found and the
+        // events would score as ordinary goals and shots. The playoffs have no
+        // shootout and their periods 5 and up are real overtime holding 44
+        // real goals, so the game type has to be part of the test.
+        if (gameType === 2 && event.period >= 5) continue;
+
         const periodIntervals = allOverlapIntervals.get(event.period);
         if (!periodIntervals) continue;
         if (!isTimeInIntervals(event.timeSeconds, periodIntervals)) continue;
@@ -238,15 +258,26 @@ export function computeGameVersus(
             break;
           }
           case "penalty": {
-            // Minutes, not a count, so a fight outweighs a hooking. A missing
-            // or zero duration falls back to a minor rather than scoring
-            // nothing: the infraction still happened between these two.
-            const minutes = event.penaltyMinutes || 2;
+            // Minutes, not a count, so a fight outweighs a hooking.
+            //
+            // A zero is taken at face value rather than rounded up to a minor.
+            // Every zero-minute penalty in ten seasons is a penalty shot
+            // awarded, where the remedy is the shot and nobody serves time,
+            // so the old `|| 2` fallback invented 858 minutes across 429 of
+            // them. `??` rather than `||`, because 0 is a real value here and
+            // only a missing one should fall back.
+            //
+            // Those events are not lost: they score through `penaltyShots`.
+            const minutes = event.penaltyMinutes ?? 0;
+            const isPenaltyShot = event.penaltyTypeCode === "PS";
+
             if (event.player1Id === playerA && event.player2Id === playerB) {
               stats.penaltyMinutesA += minutes;
+              if (isPenaltyShot) stats.penaltyShotsA++;
             }
             if (event.player1Id === playerB && event.player2Id === playerA) {
               stats.penaltyMinutesB += minutes;
+              if (isPenaltyShot) stats.penaltyShotsB++;
             }
             break;
           }

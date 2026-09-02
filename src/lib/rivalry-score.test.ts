@@ -17,6 +17,8 @@ const baseSkaterInput: SkaterRivalryInput = {
   blocksByA: 3,
   blocksByB: 2,
   penaltyMinutesA: 2,
+  penaltyShotsA: 0,
+  penaltyShotsB: 0,
   penaltyMinutesB: 2,
   faceoffWinsA: 10,
   faceoffWinsB: 10,
@@ -83,6 +85,7 @@ describe("computeSkaterRivalryScore", () => {
       hitsByA: 0, hitsByB: 0,
       blocksByA: 0, blocksByB: 0,
       penaltyMinutesA: 0, penaltyMinutesB: 0,
+      penaltyShotsA: 0, penaltyShotsB: 0,
       faceoffWinsA: 0, faceoffWinsB: 0,
       playerAGoals: 0, playerAAssists: 0, playerAShots: 0,
       playerBGoals: 0, playerBAssists: 0, playerBShots: 0,
@@ -279,6 +282,7 @@ describe("small-sample regression", () => {
       hitsByA: per.hits, hitsByB: per.hits,
       blocksByA: per.blocks, blocksByB: per.blocks,
       penaltyMinutesA: per.penalties, penaltyMinutesB: per.penalties,
+      penaltyShotsA: 0, penaltyShotsB: 0,
       faceoffWinsA: per.faceoffs, faceoffWinsB: per.faceoffs,
       playerAGoals: per.points, playerAAssists: 0, playerAShots: per.shots,
       playerBGoals: per.points, playerBAssists: 0, playerBShots: per.shots,
@@ -406,6 +410,8 @@ describe("penalty severity", () => {
   /** Same number of penalties, different severity. */
   const withPim = (minutesEach: number): SkaterRivalryInput => ({
     ...baseSkaterInput,
+    penaltyShotsA: 0,
+    penaltyShotsB: 0,
     penaltyMinutesA: minutesEach,
     penaltyMinutesB: minutesEach,
   });
@@ -441,5 +447,57 @@ describe("penalty severity", () => {
     expect(computeSkaterRivalryScore(even)).toBeGreaterThan(
       computeSkaterRivalryScore(lopsided)
     );
+  });
+});
+
+describe("penalty shots", () => {
+  it("adds to weighted volume at 6 per shot", () => {
+    const without = computeSkaterRivalryScore(baseSkaterInput);
+    const withOne = computeSkaterRivalryScore({
+      ...baseSkaterInput,
+      penaltyShotsA: 1,
+    });
+    expect(withOne).toBeGreaterThan(without);
+  });
+
+  it("does not enter the balance multiplier", () => {
+    // A one-sided count in a balance category would drag the multiplier down.
+    // Two pairs whose only difference is which side conceded the penalty shot
+    // must therefore score identically.
+    const aConceded = computeSkaterRivalryScore({
+      ...baseSkaterInput,
+      penaltyShotsA: 2,
+      penaltyShotsB: 0,
+    });
+    const split = computeSkaterRivalryScore({
+      ...baseSkaterInput,
+      penaltyShotsA: 1,
+      penaltyShotsB: 1,
+    });
+    expect(aConceded).toBeCloseTo(split, 10);
+  });
+
+  it("is worth more than a minor and less than a fight", () => {
+    // Each side gets the same increment, so the balance multiplier is
+    // unchanged and the deltas compare pure volume. Adding minutes to one
+    // side only would confound the two: penalty minutes are a balance
+    // category and penalty shots deliberately are not, so a one-sided minor
+    // loses more to the multiplier than it gains in volume.
+    const base = computeSkaterRivalryScore(baseSkaterInput);
+    const delta = (patch: Partial<SkaterRivalryInput>) =>
+      computeSkaterRivalryScore({ ...baseSkaterInput, ...patch }) - base;
+
+    const penaltyShotEach = delta({ penaltyShotsA: 1, penaltyShotsB: 1 });
+    const minorEach = delta({
+      penaltyMinutesA: baseSkaterInput.penaltyMinutesA + 2,
+      penaltyMinutesB: baseSkaterInput.penaltyMinutesB + 2,
+    });
+    const fightEach = delta({
+      penaltyMinutesA: baseSkaterInput.penaltyMinutesA + 5,
+      penaltyMinutesB: baseSkaterInput.penaltyMinutesB + 5,
+    });
+
+    expect(penaltyShotEach).toBeGreaterThan(minorEach);
+    expect(penaltyShotEach).toBeLessThan(fightEach);
   });
 });
