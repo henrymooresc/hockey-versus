@@ -40,6 +40,7 @@ interface EventRow {
 interface GameInfo {
   game_id: number;
   season_id: string;
+  game_type: number;
   game_date: string;
   home_team_id: number | null;
   away_team_id: number | null;
@@ -92,7 +93,7 @@ export async function GET(
       : sql`AND g.game_type IN (2, 3)`;
 
     const gameRows = await db.execute(sql`
-      SELECT DISTINCT g.id AS game_id, g.season_id, g.game_date,
+      SELECT DISTINCT g.id AS game_id, g.season_id, g.game_type, g.game_date,
              g.home_team_id, g.away_team_id,
              g.home_score, g.away_score
       FROM games g
@@ -220,6 +221,11 @@ export async function GET(
         playerBShots = 0;
 
       for (const event of gameEvents) {
+        // Regular-season period 5 is the shootout, not play between these
+        // two. Matches the skip in versus-engine.ts, so a per-game score here
+        // and the stored season totals describe the same events.
+        if (gameInfo.game_type === 2 && event.period >= 5) continue;
+
         const periodIntervals = allOverlapIntervals.get(event.period);
         if (!periodIntervals) continue;
         if (!isTimeInIntervals(event.time_seconds, periodIntervals)) continue;
@@ -271,9 +277,10 @@ export async function GET(
             break;
           }
           case "penalty": {
-            // Minutes, matching versus-engine. A missing duration counts as a
-            // minor rather than nothing.
-            const minutes = event.penalty_minutes || 2;
+            // Minutes, matching versus-engine. A zero is accurate rather than
+            // missing: every zero-minute penalty is a penalty shot, where the
+            // remedy is the shot and nobody serves time.
+            const minutes = event.penalty_minutes ?? 0;
             if (
               event.player1_id === playerAId &&
               event.player2_id === playerBId

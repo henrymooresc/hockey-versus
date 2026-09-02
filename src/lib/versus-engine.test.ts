@@ -9,7 +9,7 @@ const shiftsBasic: ShiftRecord[] = [
 
 describe("computeGameVersus", () => {
   it("returns empty map when no shifts", () => {
-    const result = computeGameVersus([], []);
+    const result = computeGameVersus([], [], 2);
     expect(result.size).toBe(0);
   });
 
@@ -18,24 +18,24 @@ describe("computeGameVersus", () => {
       { playerId: 1, teamId: 10, period: 1, startSeconds: 0, endSeconds: 30 },
       { playerId: 2, teamId: 20, period: 1, startSeconds: 60, endSeconds: 90 },
     ];
-    const result = computeGameVersus(shifts, []);
+    const result = computeGameVersus(shifts, [], 2);
     expect(result.size).toBe(0);
   });
 
   it("creates a pair for two players with overlapping shifts", () => {
-    const result = computeGameVersus(shiftsBasic, []);
+    const result = computeGameVersus(shiftsBasic, [], 2);
     expect(result.has("1-2")).toBe(true);
   });
 
   it("uses lower player ID as playerA", () => {
-    const result = computeGameVersus(shiftsBasic, []);
+    const result = computeGameVersus(shiftsBasic, [], 2);
     const pair = result.get("1-2")!;
     expect(pair.playerAId).toBe(1);
     expect(pair.playerBId).toBe(2);
   });
 
   it("computes correct shared TOI", () => {
-    const result = computeGameVersus(shiftsBasic, []);
+    const result = computeGameVersus(shiftsBasic, [], 2);
     expect(result.get("1-2")!.toiSharedSeconds).toBe(60);
   });
 
@@ -44,8 +44,8 @@ describe("computeGameVersus", () => {
       { playerId: 1, teamId: 10, period: 1, startSeconds: 0, endSeconds: 60 },
       { playerId: 2, teamId: 10, period: 1, startSeconds: 0, endSeconds: 60 },
     ];
-    const opposingResult = computeGameVersus(shiftsBasic, []);
-    const sameteamResult = computeGameVersus(sameteamShifts, []);
+    const opposingResult = computeGameVersus(shiftsBasic, [], 2);
+    const sameteamResult = computeGameVersus(sameteamShifts, [], 2);
 
     expect(opposingResult.get("1-2")!.sameTeam).toBe(false);
     expect(sameteamResult.get("1-2")!.sameTeam).toBe(true);
@@ -64,7 +64,7 @@ describe("computeGameVersus", () => {
         player3Id: null,
       },
     ];
-    const result = computeGameVersus(shiftsBasic, events);
+    const result = computeGameVersus(shiftsBasic, events, 2);
     const pair = result.get("1-2")!;
 
     expect(pair.goalsForA).toBe(1);   // team A scored
@@ -87,7 +87,7 @@ describe("computeGameVersus", () => {
         player3Id: null,
       },
     ];
-    const result = computeGameVersus(shiftsBasic, events);
+    const result = computeGameVersus(shiftsBasic, events, 2);
     const pair = result.get("1-2")!;
 
     expect(pair.hitsByA).toBe(1);
@@ -106,7 +106,7 @@ describe("computeGameVersus", () => {
         player3Id: null,
       },
     ];
-    const result = computeGameVersus(shiftsBasic, events);
+    const result = computeGameVersus(shiftsBasic, events, 2);
     const pair = result.get("1-2")!;
 
     expect(pair.faceoffWinsB).toBe(1);
@@ -129,7 +129,7 @@ describe("computeGameVersus", () => {
         player3Id: null,
       },
     ];
-    const result = computeGameVersus(shifts, events);
+    const result = computeGameVersus(shifts, events, 2);
     const pair = result.get("1-2")!;
     expect(pair.goalsForA).toBe(0);
   });
@@ -140,9 +140,83 @@ describe("computeGameVersus", () => {
       { playerId: 2, teamId: 20, period: 1, startSeconds: 0, endSeconds: 60 },
       { playerId: 3, teamId: 10, period: 1, startSeconds: 0, endSeconds: 60 },
     ];
-    const result = computeGameVersus(shifts, []);
+    const result = computeGameVersus(shifts, [], 2);
     expect(result.has("1-2")).toBe(true);
     expect(result.has("1-3")).toBe(true);
     expect(result.has("2-3")).toBe(true);
+  });
+});
+
+// Period 5 shifts exist in real data — 1,954 rows across 867 regular-season
+// games — so the shootout is only excluded by the game-type test, never by an
+// absence of overlap.
+const shiftsPeriod5: ShiftRecord[] = [
+  { playerId: 1, teamId: 10, period: 5, startSeconds: 0, endSeconds: 60 },
+  { playerId: 2, teamId: 20, period: 5, startSeconds: 0, endSeconds: 60 },
+];
+
+const period5Goal: EventRecord[] = [
+  {
+    eventType: "goal",
+    period: 5,
+    timeSeconds: 30,
+    teamId: 10,
+    player1Id: 1,
+    player2Id: null,
+    player3Id: null,
+  },
+];
+
+describe("shootout handling", () => {
+  it("ignores a regular-season period 5 goal, because that is the shootout", () => {
+    const pair = computeGameVersus(shiftsPeriod5, period5Goal, 2).get("1-2")!;
+    expect(pair.playerAGoals).toBe(0);
+    expect(pair.goalsForA).toBe(0);
+  });
+
+  it("counts a playoff period 5 goal, because that is real overtime", () => {
+    const pair = computeGameVersus(shiftsPeriod5, period5Goal, 3).get("1-2")!;
+    expect(pair.playerAGoals).toBe(1);
+    expect(pair.goalsForA).toBe(1);
+  });
+
+  it("still counts regulation events in a game that went to a shootout", () => {
+    const shifts = [...shiftsBasic, ...shiftsPeriod5];
+    const events: EventRecord[] = [
+      { ...period5Goal[0], period: 1 },
+      ...period5Goal,
+    ];
+    const pair = computeGameVersus(shifts, events, 2).get("1-2")!;
+    expect(pair.playerAGoals).toBe(1);
+  });
+});
+
+describe("penalty minutes", () => {
+  const penalty = (minutes: number | null): EventRecord[] => [
+    {
+      eventType: "penalty",
+      period: 1,
+      timeSeconds: 30,
+      teamId: 10,
+      player1Id: 1,
+      player2Id: 2,
+      player3Id: null,
+      penaltyMinutes: minutes,
+    },
+  ];
+
+  it("records a zero-minute penalty as zero, not as a minor", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(0), 2).get("1-2")!;
+    expect(pair.penaltyMinutesA).toBe(0);
+  });
+
+  it("treats a missing duration as zero rather than inventing a minor", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(null), 2).get("1-2")!;
+    expect(pair.penaltyMinutesA).toBe(0);
+  });
+
+  it("still records a real minor at its served length", () => {
+    const pair = computeGameVersus(shiftsBasic, penalty(2), 2).get("1-2")!;
+    expect(pair.penaltyMinutesA).toBe(2);
   });
 });

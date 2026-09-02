@@ -18,6 +18,7 @@ import {
 interface GameRow {
   id: number;
   season_id: string;
+  game_type: number;
   game_date: string;
   home_team_id: number | null;
   away_team_id: number | null;
@@ -174,7 +175,7 @@ export async function GET(
 
     // Game info
     const gameRows = await db.execute(sql`
-      SELECT g.id, g.season_id, g.game_date, g.home_team_id, g.away_team_id,
+      SELECT g.id, g.season_id, g.game_type, g.game_date, g.home_team_id, g.away_team_id,
              g.home_score, g.away_score,
              ht.abbrev AS home_abbrev, ht.name AS home_name, ht.logo_url AS home_logo_url,
              at.abbrev AS away_abbrev, at.name AS away_name, at.logo_url AS away_logo_url
@@ -294,7 +295,7 @@ export async function GET(
     };
 
     // Compute per-pair stats for the game
-    const pairMap = computeGameVersus(shifts, events);
+    const pairMap = computeGameVersus(shifts, events, game.game_type);
 
     // Filter to cross-team pairs with meaningful shared TOI
     const crossTeamPairs = Array.from(pairMap.values()).filter(

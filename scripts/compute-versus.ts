@@ -655,7 +655,7 @@ async function main() {
             continue;
           }
 
-          const pairStats = computeGameVersus(gameShifts, gameEvts);
+          const pairStats = computeGameVersus(gameShifts, gameEvts, game.gameType);
 
           // Determine game winner team ID
           const winnerTeamId =

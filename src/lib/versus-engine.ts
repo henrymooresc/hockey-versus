@@ -21,7 +21,7 @@ export interface EventRecord {
   player1Id: number | null;
   player2Id: number | null;
   player3Id: number | null;
-  /** Minutes served, on penalty events. 2, 4, 5, 10 or 15. */
+  /** Minutes served, on penalty events. 2, 4, 5, 10 or 15 — or 0. */
   penaltyMinutes?: number | null;
 }
 
@@ -65,7 +65,8 @@ export interface PairStats {
  */
 export function computeGameVersus(
   gameShifts: ShiftRecord[],
-  gameEvents: EventRecord[]
+  gameEvents: EventRecord[],
+  gameType: number
 ): Map<string, PairStats> {
   const results = new Map<string, PairStats>();
 
@@ -166,6 +167,14 @@ export function computeGameVersus(
 
       // Attribute events during overlap intervals
       for (const event of gameEvents) {
+        // Regular-season period 5 is the shootout, which is not hockey played
+        // between these two. Shift charts do record it — 1,954 period-5 rows
+        // across 867 games, almost all skaters — so overlap is found and the
+        // events would score as ordinary goals and shots. The playoffs have no
+        // shootout and their periods 5 and up are real overtime holding 44
+        // real goals, so the game type has to be part of the test.
+        if (gameType === 2 && event.period >= 5) continue;
+
         const periodIntervals = allOverlapIntervals.get(event.period);
         if (!periodIntervals) continue;
         if (!isTimeInIntervals(event.timeSeconds, periodIntervals)) continue;
@@ -238,10 +247,15 @@ export function computeGameVersus(
             break;
           }
           case "penalty": {
-            // Minutes, not a count, so a fight outweighs a hooking. A missing
-            // or zero duration falls back to a minor rather than scoring
-            // nothing: the infraction still happened between these two.
-            const minutes = event.penaltyMinutes || 2;
+            // Minutes, not a count, so a fight outweighs a hooking.
+            //
+            // A zero is taken at face value rather than rounded up to a minor.
+            // Every zero-minute penalty in ten seasons is a penalty shot
+            // awarded, where the remedy is the shot and nobody serves time,
+            // so the old `|| 2` fallback invented 858 minutes across 429 of
+            // them. `??` rather than `||`, because 0 is a real value here and
+            // only a missing one should fall back.
+            const minutes = event.penaltyMinutes ?? 0;
             if (event.player1Id === playerA && event.player2Id === playerB) {
               stats.penaltyMinutesA += minutes;
             }
