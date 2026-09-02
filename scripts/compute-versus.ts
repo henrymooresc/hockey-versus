@@ -183,9 +183,14 @@ async function deleteOrphans(
 /**
  * Rebuilds `player_season_totals` from `shifts` + `games`.
  *
- * The rebuild covers every season, not just the target ones, because the whole
- * scan costs about 5 seconds. A transaction keeps the table readable
- * throughout, so a live search never sees an empty table.
+ * The rebuild covers every season, not just the target ones. A transaction
+ * keeps the table readable throughout, so a live search never sees an empty
+ * table.
+ *
+ * Games played and ice time come out of one statement because they share the
+ * same scan. Ice time is the expensive half: overlapping shifts have to be
+ * merged before they are summed, which needs a sort the plain count did not,
+ * so expect this to run longer than the five seconds it used to.
  */
 async function refreshPlayerSeasonTotals(db: PostgresJsDatabase) {
   console.log("\nRebuilding player_season_totals...");
@@ -193,16 +198,172 @@ async function refreshPlayerSeasonTotals(db: PostgresJsDatabase) {
 
   await db.transaction(async (tx) => {
     await tx.execute(sql`DELETE FROM player_season_totals`);
+    /**
+     * Gaps and islands, per player per game per period.
+     *
+     * `prev_end` is the furthest any earlier shift in the partition reached. A
+     * row that starts beyond it opens a new island; a row that starts at or
+     * before it belongs to the current one. Summing that flag numbers the
+     * islands, and each island's real span is its last end minus its first
+     * start — which is exactly the merge, done in SQL.
+     *
+     * Without this a player with two overlapping rows for one shift is credited
+     * twice for the shared seconds. See the note on `toi_seconds` in schema.ts.
+     */
     await tx.execute(sql`
-      INSERT INTO player_season_totals (player_id, season_id, game_type, games_played)
-      SELECT s.player_id, g.season_id, g.game_type, COUNT(DISTINCT s.game_id)
-      FROM shifts s
-      JOIN games g ON g.id = s.game_id
-      GROUP BY s.player_id, g.season_id, g.game_type
+      INSERT INTO player_season_totals (player_id, season_id, game_type, games_played, toi_seconds)
+      WITH bounded AS (
+        SELECT
+          s.player_id, g.season_id, g.game_type, s.game_id, s.period,
+          s.start_seconds, s.end_seconds,
+          MAX(s.end_seconds) OVER (
+            PARTITION BY s.player_id, s.game_id, s.period
+            ORDER BY s.start_seconds, s.end_seconds
+            ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+          ) AS prev_end
+        FROM shifts s
+        JOIN games g ON g.id = s.game_id
+      ),
+      islands AS (
+        SELECT
+          player_id, season_id, game_type, game_id, period,
+          start_seconds, end_seconds,
+          SUM(CASE WHEN prev_end IS NULL OR start_seconds > prev_end THEN 1 ELSE 0 END)
+            OVER (
+              PARTITION BY player_id, game_id, period
+              ORDER BY start_seconds, end_seconds
+              ROWS UNBOUNDED PRECEDING
+            ) AS island
+        FROM bounded
+      ),
+      merged AS (
+        SELECT
+          player_id, season_id, game_type, game_id,
+          MAX(end_seconds) - MIN(start_seconds) AS seconds
+        FROM islands
+        GROUP BY player_id, season_id, game_type, game_id, period, island
+      )
+      SELECT
+        player_id, season_id, game_type,
+        COUNT(DISTINCT game_id)::smallint,
+        SUM(seconds)::int
+      FROM merged
+      GROUP BY player_id, season_id, game_type
     `);
   });
 
   const rows = await db.execute(sql`SELECT COUNT(*)::int AS n FROM player_season_totals`);
+  const count = unwrapRows<{ n: number }>(rows)[0]?.n ?? 0;
+  console.log(`Done! ${count} rows in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
+}
+
+/**
+ * Rebuilds `player_season_stats` from `game_events` + `games`.
+ *
+ * Each arm below contributes one stat and zero for the rest, so the outer
+ * GROUP BY sums them into one row per player, season and game type. A player
+ * appears in several arms — the scorer of a goal is also credited a shot — and
+ * that is why the arms are separate rather than one filtered scan.
+ *
+ * Every definition mirrors `versus-engine.ts`. Where the two could drift, they
+ * are commented; a silent mismatch here corrupts the Phase 5 intensity ratios
+ * without producing an error.
+ */
+async function refreshPlayerSeasonStats(db: PostgresJsDatabase) {
+  console.log("\nRebuilding player_season_stats...");
+  const started = Date.now();
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`DELETE FROM player_season_stats`);
+    await tx.execute(sql`
+      INSERT INTO player_season_stats (
+        player_id, season_id, game_type,
+        goals, assists, shots, hits, blocks, penalty_minutes,
+        faceoff_wins, faceoff_losses
+      )
+      WITH scored AS (
+        -- One scan and one join for every arm below, and the one place the
+        -- "does this event count" rules live.
+        --
+        -- Regular-season period 5 is the shootout, and a shootout goal is not
+        -- a goal: the NHL records it in the play-by-play but keeps it out of
+        -- the scoring totals. Counting it put McDavid at 34 goals in 2023-24
+        -- against an official 32, and Panarin at 53 against 49, while assists
+        -- stayed exact because a shootout goal has none.
+        --
+        -- The test is period AND game type together. Playoffs have no
+        -- shootout, so periods 5 through 8 there are real overtime and hold 44
+        -- real goals; a blanket period filter would throw them away.
+        SELECT e.event_type, e.player1_id, e.player2_id, e.player3_id,
+               e.penalty_minutes, g.season_id, g.game_type
+        FROM game_events e JOIN games g ON g.id = e.game_id
+        WHERE g.game_type IN (2, 3)
+          AND NOT (g.game_type = 2 AND e.period >= 5)
+      ),
+      contributions AS (
+        -- Goals. The scorer is player1.
+        SELECT player1_id AS player_id, season_id, game_type,
+               1 AS goals, 0 AS assists, 0 AS shots, 0 AS hits, 0 AS blocks,
+               0 AS pim, 0 AS fo_wins, 0 AS fo_losses
+        FROM scored WHERE event_type = 'goal' AND player1_id IS NOT NULL
+        UNION ALL
+        -- Primary assist.
+        SELECT player2_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0
+        FROM scored WHERE event_type = 'goal' AND player2_id IS NOT NULL
+        UNION ALL
+        -- Secondary assist.
+        SELECT player3_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0
+        FROM scored WHERE event_type = 'goal' AND player3_id IS NOT NULL
+        UNION ALL
+        -- Shot attempts. All four types, because the engine counts all four:
+        -- a goal increments playerAShots, and so does a miss or a block.
+        SELECT player1_id, season_id, game_type, 0, 0, 1, 0, 0, 0, 0, 0
+        FROM scored
+        WHERE event_type IN ('goal', 'shot', 'missed_shot', 'blocked_shot')
+          AND player1_id IS NOT NULL
+        UNION ALL
+        -- Hits thrown. player1 is the hitter, player2 the one hit.
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 1, 0, 0, 0, 0
+        FROM scored WHERE event_type = 'hit' AND player1_id IS NOT NULL
+        UNION ALL
+        -- Blocks. On a blocked shot player1 shot it and player2 blocked it.
+        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 1, 0, 0, 0
+        FROM scored WHERE event_type = 'blocked_shot' AND player2_id IS NOT NULL
+        UNION ALL
+        -- Penalty minutes served. 2,965 penalties have no committer at all
+        -- (bench and team penalties) and drop out on the NULL check.
+        --
+        -- A zero-minute penalty is recorded at zero, not rounded up to a
+        -- minor. 450 rows carry 0 minutes and 429 of them name a committer;
+        -- almost all are penalty shots awarded — hooking, slashing or
+        -- tripping on a breakaway — where the remedy is the shot rather than
+        -- time in the box. The player genuinely served nothing, so 0 is the
+        -- accurate figure and matches what the NHL reports.
+        --
+        -- This is a deliberate divergence from versus-engine.ts, which falls
+        -- back to 2 minutes on a zero. That fallback fabricates time nobody
+        -- served; see the note in PLAN-suggestions.md.
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, penalty_minutes, 0, 0
+        FROM scored WHERE event_type = 'penalty' AND player1_id IS NOT NULL
+        UNION ALL
+        -- Faceoffs. player1 won the draw, player2 lost it.
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 1, 0
+        FROM scored WHERE event_type = 'faceoff' AND player1_id IS NOT NULL
+        UNION ALL
+        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 0, 1
+        FROM scored WHERE event_type = 'faceoff' AND player2_id IS NOT NULL
+      )
+      SELECT
+        player_id, season_id, game_type,
+        SUM(goals)::smallint, SUM(assists)::smallint, SUM(shots)::smallint,
+        SUM(hits)::smallint, SUM(blocks)::smallint, SUM(pim)::smallint,
+        SUM(fo_wins)::smallint, SUM(fo_losses)::smallint
+      FROM contributions
+      GROUP BY player_id, season_id, game_type
+    `);
+  });
+
+  const rows = await db.execute(sql`SELECT COUNT(*)::int AS n FROM player_season_stats`);
   const count = unwrapRows<{ n: number }>(rows)[0]?.n ?? 0;
   console.log(`Done! ${count} rows in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 }
@@ -392,6 +553,7 @@ async function main() {
     // The derived tables still read `shifts` and `versus_stats`, which an
     // earlier run may have changed.
     await refreshPlayerSeasonTotals(db);
+    await refreshPlayerSeasonStats(db);
     await refreshLeaderboard(db);
     await client.end();
     return;
@@ -607,6 +769,7 @@ async function main() {
   );
 
   await refreshPlayerSeasonTotals(db);
+  await refreshPlayerSeasonStats(db);
   await refreshLeaderboard(db);
   await client.end();
 }

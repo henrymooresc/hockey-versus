@@ -64,6 +64,31 @@ export async function GET(request: NextRequest) {
       q && q.length >= 2 ? ilike(players.searchText, `%${q.toLowerCase().replace(/%/g, "\\%").replace(/_/g, "\\_")}%`) : undefined,
     );
 
+    /**
+     * Ice time per player, for ranking the list.
+     *
+     * Grouped to one row per player, so joining it cannot multiply the result
+     * set. Three figures, because they rank differently:
+     *
+     * - `totalToi`   — every season on record.
+     * - `latestToi`  — the most recent season only.
+     * - `totalGames` — divides either one into a per-game rate.
+     *
+     * The join is a LEFT JOIN, so a player with no rows here comes back null.
+     */
+    const toi = db
+      .select({
+        playerId: playerSeasonTotals.playerId,
+        totalToi: sql<number>`SUM(${playerSeasonTotals.toiSeconds})::int`.as("total_toi"),
+        totalGames: sql<number>`SUM(${playerSeasonTotals.gamesPlayed})::int`.as("total_games"),
+        latestToi: sql<number>`COALESCE(SUM(${playerSeasonTotals.toiSeconds}) FILTER (
+          WHERE ${playerSeasonTotals.seasonId} = (SELECT MAX(${seasons.id}) FROM ${seasons})
+        ), 0)::int`.as("latest_toi"),
+      })
+      .from(playerSeasonTotals)
+      .groupBy(playerSeasonTotals.playerId)
+      .as("toi");
+
     const results = await db
       .select({
         id: players.id,
@@ -79,8 +104,20 @@ export async function GET(request: NextRequest) {
       })
       .from(players)
       .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
+      .leftJoin(toi, eq(toi.playerId, players.id))
       .where(where)
-      .orderBy(asc(players.lastName))
+      /**
+       * Most recent season's ice time first, so the names a hockey fan knows
+       * sit at the top of each team. Goalies lead most groups, which is the
+       * honest answer to "who played the most" rather than a flaw.
+       *
+       * `NULLS LAST` is load-bearing. `latest_toi` is COALESCEd to 0 inside
+       * the subquery, but a player with no `player_season_totals` row at all
+       * misses the LEFT JOIN and comes back null — and Postgres sorts nulls
+       * *first* under DESC. Without this the never-played players lead the
+       * list on any call that does not pass `minGames`.
+       */
+      .orderBy(sql`${toi.latestToi} DESC NULLS LAST`, asc(players.lastName))
       .limit(q && q.length >= 2 ? 50 : 1000);
 
     return cachedJson({ players: results }, DERIVED);

@@ -1,0 +1,1 @@
+ALTER TABLE "player_season_totals" ADD COLUMN "toi_seconds" integer DEFAULT 0 NOT NULL;
