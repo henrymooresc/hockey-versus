@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TeamRoster } from "@/components/TeamRoster";
+import { TeamRivalryBoard } from "@/components/TeamRivalryBoard";
 
 export const metadata = {
   title: "Team Roster — Bar Down Data",
@@ -31,6 +32,13 @@ export default async function TeamPage({
         ← All teams
       </Link>
       <TeamRoster teamId={teamId} />
+      <hr className="border-gray-700/60" />
+      <TeamRivalryBoard
+        teamId={teamId}
+        limit={10}
+        title="Biggest Rivals"
+        subtitle="This club's most contested matchups, all seasons"
+      />
     </div>
   );
 }

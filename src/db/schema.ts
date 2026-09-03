@@ -343,6 +343,61 @@ export const playerSeasonStats = pgTable(
 );
 
 /**
+ * Team-against-team intensity, derived from `versus_stats` + `games` by
+ * `npm run compute:versus`.
+ *
+ * Precomputed for the same reason `leaderboard_entries` is: the rollup groups
+ * every opponent pair row by team pair, which is a full scan of `versus_stats`
+ * and measured 1.9s. No index avoids it, because the board needs all 496
+ * matchups at once rather than one.
+ *
+ * The score is weighted volume per game between the two clubs, regressed
+ * toward the league mean, so it reads on the same per-game scale as the player
+ * score. Volume is summed across both sides of every pair, which is what makes
+ * the A/B labels in `versus_stats` irrelevant here — they follow player id
+ * order, so each club's players sit on both sides.
+ *
+ * Only team ids live here. Names and logos join at read time, matching
+ * `leaderboard_entries`.
+ *
+ * **Trap.** A pair's `player_a_team_id` comes from their most recent shared
+ * game in the partition rather than being summed, so a player traded
+ * mid-season has every game in that season attributed to his newer club. The
+ * error is bounded by how often that happens and is invisible at the all-time
+ * scope, where it washes out.
+ */
+export const teamRivalryEntries = pgTable(
+  "team_rivalry_entries",
+  {
+    /** A season id, or "ALL" for every season combined. */
+    seasonScope: varchar("season_scope", { length: 8 }).notNull(),
+    /** "regular", "playoffs" or "both". */
+    gameTypeScope: varchar("game_type_scope", { length: 8 }).notNull(),
+    rank: smallint("rank").notNull(),
+    /** The lower team id, so a matchup has one row rather than two. */
+    teamXId: integer("team_x_id")
+      .references(() => teams.id)
+      .notNull(),
+    teamYId: integer("team_y_id")
+      .references(() => teams.id)
+      .notNull(),
+    rivalryScore: real("rivalry_score").notNull(),
+    /** Games the two clubs played each other in this scope. */
+    gamesPlayed: integer("games_played").notNull(),
+    /** Unweighted totals, so the UI can show what drove the score. */
+    goals: integer("goals").notNull().default(0),
+    hits: integer("hits").notNull().default(0),
+    penaltyMinutes: integer("penalty_minutes").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.seasonScope, table.gameTypeScope, table.rank],
+    }),
+    index("idx_tre_teams").on(table.teamXId, table.teamYId),
+  ]
+);
+
+/**
  * Derived from `versus_stats` by `npm run compute:versus`.
  *
  * Ranking on demand means summing 2.6M rows and scoring 260k+ pairs per

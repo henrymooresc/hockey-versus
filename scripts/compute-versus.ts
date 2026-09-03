@@ -7,7 +7,14 @@
 import "dotenv/config";
 import { type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { eq, and, or, lt, isNull, sql, inArray } from "drizzle-orm";
-import { games, shifts, gameEvents, versusStats, leaderboardEntries } from "../src/db/schema";
+import {
+  games,
+  shifts,
+  gameEvents,
+  versusStats,
+  leaderboardEntries,
+  teamRivalryEntries,
+} from "../src/db/schema";
 import { unwrapRows } from "../src/lib/db-utils";
 import {
   computeGameVersus,
@@ -17,6 +24,7 @@ import {
 } from "../src/lib/versus-engine";
 import {
   computePairRivalryScore,
+  computeWeightedVolume,
   type SkaterRivalryInput,
 } from "../src/lib/rivalry-score";
 import { Progress } from "./lib/progress";
@@ -399,6 +407,283 @@ interface LeaderboardPairRow extends SkaterRivalryInput {
 }
 
 /**
+ * Games of league-average intensity credited to a team matchup before its own
+ * record outweighs the prior.
+ *
+ * Chosen by measuring the board at 4, 10 and 20. Utah joined in 2024 and has
+ * two or three games against most clubs, against sixteen to forty-six for
+ * everyone else, so they are the test case: at 4 they took seven of the top
+ * twenty-five all-time places, at 10 one, at 20 none.
+ *
+ * 10 clears the noise without demanding a long history to rank — OTT against
+ * VGK holds first place on sixteen games either way. The top six never moved
+ * across the sweep, which is the sign the dial only touches the cases it
+ * should: a regression that reshuffles the leaders is measuring sample size
+ * rather than intensity.
+ *
+ * No minimum-games floor, deliberately. `LEADERBOARD_MIN_TOI` keeps noise off
+ * the player board by refusing to rank it, but this board exists to show every
+ * matchup, and a club missing entirely reads as a bug rather than as caution.
+ * Regression ranks them low instead, which says the same thing honestly.
+ *
+ * Note this is not the player score's 10 transplanted. That regresses pairs
+ * sharing ten to forty games; teams meet two to forty-six, so the same number
+ * bites considerably harder here.
+ */
+const TEAM_PRIOR_GAMES = 10;
+
+/**
+ * Rebuilds `team_rivalry_entries` for every season scope and game type.
+ *
+ * The score is weighted volume per game between the two clubs, regressed
+ * toward the league mean for the scope, so it sits on the same per-game scale
+ * as the player score.
+ *
+ * Volume is summed across both sides of every pair. The A and B labels in
+ * `versus_stats` follow player id order rather than team, so each club's
+ * players appear on both sides and a one-sided sum would be meaningless. The
+ * weights come from `computeWeightedVolume`, not from SQL, so this cannot
+ * drift from the player formula.
+ *
+ * The prior mean is computed from the scope itself rather than hardcoded. A
+ * team board is 496 matchups at most, so the mean is cheap and always matches
+ * the weights in force.
+ */
+async function refreshTeamRivalry(db: PostgresJsDatabase) {
+  console.log("\nRebuilding team_rivalry_entries...");
+  const started = Date.now();
+
+  const seasonRows = await db.execute(
+    sql`SELECT id FROM seasons WHERE ingested = true ORDER BY id DESC`
+  );
+  const seasonIds = unwrapRows<{ id: string }>(seasonRows).map((r) => r.id);
+  const seasonScopes: string[] = ["ALL", ...seasonIds];
+
+  /**
+   * Three scans, not three per scope.
+   *
+   * Each query groups by season and game type as well as team pair, so every
+   * scope is a roll-up of the same rows in memory. Running them per scope
+   * meant 33 full passes over `versus_stats`, at 1.9s each.
+   */
+  interface PairRow {
+    team_x: number; team_y: number; season_id: string; game_type: number;
+    goals: number; assists: number; penalty_minutes: number;
+    penalty_shots: number; hits: number; blocks: number; shots: number;
+    pair_games: number;
+    [key: string]: unknown;
+  }
+  const pairRows = unwrapRows<PairRow>(
+    await db.execute(sql`
+      SELECT
+        LEAST(v.player_a_team_id, v.player_b_team_id)    AS team_x,
+        GREATEST(v.player_a_team_id, v.player_b_team_id) AS team_y,
+        v.season_id, v.game_type,
+        SUM(v.player_a_goals + v.player_b_goals)::int       AS goals,
+        SUM(v.player_a_assists + v.player_b_assists)::int   AS assists,
+        SUM(v.penalty_minutes_a + v.penalty_minutes_b)::int AS penalty_minutes,
+        SUM(v.penalty_shots_a + v.penalty_shots_b)::int     AS penalty_shots,
+        SUM(v.hits_by_a + v.hits_by_b)::int                 AS hits,
+        SUM(v.blocks_by_a + v.blocks_by_b)::int             AS blocks,
+        SUM(v.player_a_shots + v.player_b_shots)::int       AS shots,
+        -- Pair-game observations, not rows. A versus_stats row covers a whole
+        -- season for one pair, so COUNT(*) counts seasons and would divide by
+        -- games a second time on top of the meeting count below.
+        SUM(v.games_shared)::int                            AS pair_games
+      FROM versus_stats v
+      WHERE v.same_team = false
+        AND v.player_a_team_id IS NOT NULL
+        AND v.player_b_team_id IS NOT NULL
+        AND v.player_a_team_id <> v.player_b_team_id
+        AND v.game_type IN (2, 3)
+      GROUP BY 1, 2, 3, 4
+    `)
+  );
+
+  interface MeetingRow {
+    team_x: number; team_y: number; season_id: string; game_type: number;
+    games_played: number;
+    [key: string]: unknown;
+  }
+  const meetingRows = unwrapRows<MeetingRow>(
+    await db.execute(sql`
+      SELECT
+        LEAST(g.home_team_id, g.away_team_id)    AS team_x,
+        GREATEST(g.home_team_id, g.away_team_id) AS team_y,
+        g.season_id, g.game_type,
+        COUNT(*)::int                            AS games_played
+      FROM games g
+      WHERE g.home_team_id IS NOT NULL
+        AND g.away_team_id IS NOT NULL
+        AND g.shifts_ingested = true
+        AND g.game_type IN (2, 3)
+      GROUP BY 1, 2, 3, 4
+    `)
+  );
+
+  /**
+   * Real event counts for the matchup, straight from `game_events`.
+   *
+   * The pair sums above cannot supply these: they count each event once per
+   * pair that was on the ice for it, so a goal lands about ten times. That is
+   * harmless for a ranking, where every matchup is inflated alike, but it
+   * would be a lie on screen — OTT against COL read 952 goals in 18 games.
+   *
+   * The shootout is excluded on the same terms as everywhere else.
+   */
+  interface EventRow {
+    team_x: number; team_y: number; season_id: string; game_type: number;
+    goals: number; hits: number; penalty_minutes: number;
+    [key: string]: unknown;
+  }
+  const eventRows = unwrapRows<EventRow>(
+    await db.execute(sql`
+      SELECT
+        LEAST(g.home_team_id, g.away_team_id)    AS team_x,
+        GREATEST(g.home_team_id, g.away_team_id) AS team_y,
+        g.season_id, g.game_type,
+        COUNT(*) FILTER (WHERE e.event_type = 'goal')::int AS goals,
+        COUNT(*) FILTER (WHERE e.event_type = 'hit')::int  AS hits,
+        COALESCE(SUM(e.penalty_minutes) FILTER (WHERE e.event_type = 'penalty'), 0)::int
+          AS penalty_minutes
+      FROM games g
+      JOIN game_events e ON e.game_id = g.id
+      WHERE g.home_team_id IS NOT NULL
+        AND g.away_team_id IS NOT NULL
+        AND g.game_type IN (2, 3)
+        AND NOT (g.game_type = 2 AND e.period >= 5)
+      GROUP BY 1, 2, 3, 4
+    `)
+  );
+
+  const key = (x: number, y: number) => `${x}-${y}`;
+  const inScope = (seasonId: string, gameType: number, scope: string, gt: string) =>
+    (scope === "ALL" || seasonId === scope) &&
+    (gt === "both" || (gt === "regular" ? gameType === 2 : gameType === 3));
+
+  const rows: (typeof teamRivalryEntries.$inferInsert)[] = [];
+
+  for (const seasonScope of seasonScopes) {
+    for (const gameTypeScope of GAME_TYPE_SCOPES) {
+      const acc = new Map<
+        string,
+        {
+          teamXId: number; teamYId: number; volume: number; pairGames: number;
+          gamesPlayed: number; goals: number; hits: number; penaltyMinutes: number;
+        }
+      >();
+
+      const get = (x: number, y: number) => {
+        const k = key(x, y);
+        if (!acc.has(k)) {
+          acc.set(k, {
+            teamXId: x, teamYId: y, volume: 0, pairGames: 0,
+            gamesPlayed: 0, goals: 0, hits: 0, penaltyMinutes: 0,
+          });
+        }
+        return acc.get(k)!;
+      };
+
+      for (const p of pairRows) {
+        if (!inScope(p.season_id, p.game_type, seasonScope, gameTypeScope)) continue;
+        const e = get(p.team_x, p.team_y);
+        e.volume += computeWeightedVolume({
+          points: p.goals + p.assists,
+          penaltyMinutes: p.penalty_minutes,
+          penaltyShots: p.penalty_shots,
+          hits: p.hits,
+          blocks: p.blocks,
+          shots: p.shots,
+        });
+        e.pairGames += p.pair_games;
+      }
+      for (const m of meetingRows) {
+        if (!inScope(m.season_id, m.game_type, seasonScope, gameTypeScope)) continue;
+        get(m.team_x, m.team_y).gamesPlayed += m.games_played;
+      }
+      for (const ev of eventRows) {
+        if (!inScope(ev.season_id, ev.game_type, seasonScope, gameTypeScope)) continue;
+        const e = get(ev.team_x, ev.team_y);
+        e.goals += ev.goals;
+        e.hits += ev.hits;
+        e.penaltyMinutes += ev.penalty_minutes;
+      }
+
+      /**
+       * Volume for one representative pair over the whole matchup.
+       *
+       * `volume` counts every event once per pair on the ice for it, so it is
+       * inflated about tenfold and lands near 1,900 per game — rankable, but
+       * meaningless to read. `pairGames` is the matching denominator: the sum
+       * of `games_shared` across those pair rows, so it counts pair-game
+       * observations rather than pairs or seasons.
+       *
+       * `volume / pairGames` is therefore volume per pair per game, on the
+       * same scale as the player score, where the league mean is about 5.4.
+       * Multiplying back by `gamesPlayed` gives the matchup total for one
+       * pair, which is exactly the shape `computeRegressedSkaterScore` feeds
+       * its own regression — total volume over games, not a rate over a rate.
+       *
+       * Dividing by pair *count* instead was wrong and measurably so: a row
+       * covers a season, not a game, so the games cancelled twice and the
+       * board's correlation with games played went to -0.73, putting every
+       * two-game matchup on top.
+       */
+      const matchups = Array.from(acc.values())
+        .filter((m) => m.gamesPlayed > 0 && m.pairGames > 0)
+        .map((m) => ({
+          ...m,
+          pairVolume: (m.volume / m.pairGames) * m.gamesPlayed,
+        }));
+
+      if (matchups.length === 0) continue;
+
+      // Pooled rather than unweighted, so one short meeting cannot drag the
+      // mean it is then measured against.
+      const totalVolume = matchups.reduce((s, m) => s + m.pairVolume, 0);
+      const totalGames = matchups.reduce((s, m) => s + m.gamesPlayed, 0);
+      const priorPerGame = totalGames > 0 ? totalVolume / totalGames : 0;
+
+      matchups
+        .map((m) => ({
+          ...m,
+          rivalryScore:
+            (m.pairVolume + TEAM_PRIOR_GAMES * priorPerGame) /
+            (m.gamesPlayed + TEAM_PRIOR_GAMES),
+        }))
+        .sort((a, b) => b.rivalryScore - a.rivalryScore)
+        .forEach((m, i) => {
+          rows.push({
+            seasonScope,
+            gameTypeScope,
+            rank: i + 1,
+            teamXId: m.teamXId,
+            teamYId: m.teamYId,
+            rivalryScore: m.rivalryScore,
+            gamesPlayed: m.gamesPlayed,
+            goals: m.goals,
+            hits: m.hits,
+            penaltyMinutes: m.penaltyMinutes,
+          });
+        });
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`DELETE FROM team_rivalry_entries`);
+    const BATCH = 500;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      await tx.insert(teamRivalryEntries).values(rows.slice(i, i + BATCH));
+    }
+  });
+
+  console.log(
+    `Done! ${rows.length} rows across ${seasonScopes.length} season scopes in ` +
+      `${((Date.now() - started) / 1000).toFixed(1)}s.`
+  );
+}
+
+/**
  * Rebuilds `leaderboard_entries` for every season scope and game type.
  *
  * One aggregate runs per combination, so the cost grows with the season count
@@ -561,6 +846,7 @@ async function main() {
     await refreshPlayerSeasonTotals(db);
     await refreshPlayerSeasonStats(db);
     await refreshLeaderboard(db);
+    await refreshTeamRivalry(db);
     await client.end();
     return;
   }
@@ -780,6 +1066,7 @@ async function main() {
   await refreshPlayerSeasonTotals(db);
   await refreshPlayerSeasonStats(db);
   await refreshLeaderboard(db);
+  await refreshTeamRivalry(db);
   await client.end();
 }
 

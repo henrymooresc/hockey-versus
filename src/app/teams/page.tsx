@@ -1,4 +1,5 @@
 import { TeamGrid } from "@/components/TeamGrid";
+import { TeamRivalryBoard } from "@/components/TeamRivalryBoard";
 
 export const metadata = {
   title: "Teams — Bar Down Data",
@@ -16,6 +17,8 @@ export default function TeamsPage() {
           Pick a club to see its roster, ice time and rate stats
         </p>
       </div>
+      <TeamRivalryBoard limit={15} />
+      <hr className="border-gray-700/60" />
       <TeamGrid />
     </div>
   );
