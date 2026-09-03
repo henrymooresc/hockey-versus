@@ -5,22 +5,7 @@ import type { PlayerSearchResult } from "@/types/versus";
 import { useFetchedData } from "@/hooks/useFetchedData";
 import { SoloAnalysis } from "./SoloAnalysis";
 import { RemoteImage } from "./RemoteImage";
-
-const DIVISIONS: Record<string, string[]> = {
-  Atlantic:     ["BOS", "BUF", "DET", "FLA", "MTL", "OTT", "TBL", "TOR"],
-  Metropolitan: ["CAR", "CBJ", "NJD", "NYI", "NYR", "PHI", "PIT", "WSH"],
-  Central:      ["CHI", "COL", "DAL", "MIN", "NSH", "STL", "UTA", "WPG"],
-  Pacific:      ["ANA", "CGY", "EDM", "LAK", "SJS", "SEA", "VAN", "VGK"],
-};
-
-const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific", "Other"];
-
-function abbrevToDivision(abbrev: string): string {
-  for (const [division, abbrevs] of Object.entries(DIVISIONS)) {
-    if (abbrevs.includes(abbrev)) return division;
-  }
-  return "Other";
-}
+import { DIVISION_ORDER, abbrevToDivision } from "@/lib/divisions";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
