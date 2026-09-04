@@ -1,4 +1,5 @@
 import { Leaderboard } from "@/components/Leaderboard";
+import { TargetingBoard } from "@/components/TargetingBoard";
 
 export const metadata = {
   title: "Rivalry Leaderboard — Bar Down Data",
@@ -17,6 +18,8 @@ export default function LeaderboardPage() {
         </p>
       </div>
       <Leaderboard />
+      <hr className="border-gray-700/60" />
+      <TargetingBoard limit={25} />
     </div>
   );
 }

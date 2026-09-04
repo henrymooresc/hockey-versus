@@ -343,6 +343,61 @@ export const playerSeasonStats = pgTable(
 );
 
 /**
+ * Which pairs of players seek each other out physically, derived from
+ * `versus_stats` by `npm run compute:versus`.
+ *
+ * A player's hits on one opponent, against his own hit rate across every
+ * opponent he shares ice with. Both sides must lift for the pair to rank, so
+ * the score is the *lower* of the two — one player running at another is not
+ * a rivalry, it is a hunt.
+ *
+ * The baseline has to be pair-directed, like the measurement. `versus-engine`
+ * only records `hits_by_a` when A hit B specifically, so comparing it to a
+ * season hit total — which covers every opponent at once — makes the ratio
+ * centre near 0.18 instead of 1.
+ *
+ * **This measures targeting, not effort, and the distinction was measured
+ * rather than assumed.** The original plan scored "does a player produce more
+ * against this opponent". Split-half reliability across ten seasons put that
+ * at r = 0.018 to 0.050 — statistically detectable, practically noise, so a
+ * board built on it would have ranked almost nothing. The same test on hits
+ * gives r = 0.231 at 48,674 pairs, 0.320 at 8,061 and 0.420 at 245, rising
+ * with sample size the way a real effect does. Scoring against a particular
+ * opponent is close to random; hitting one is a stable habit.
+ */
+export const targetingEntries = pgTable(
+  "targeting_entries",
+  {
+    /** A season id, or "ALL" for every season combined. */
+    seasonScope: varchar("season_scope", { length: 8 }).notNull(),
+    /** "regular", "playoffs" or "both". */
+    gameTypeScope: varchar("game_type_scope", { length: 8 }).notNull(),
+    rank: smallint("rank").notNull(),
+    playerAId: integer("player_a_id")
+      .references(() => players.id)
+      .notNull(),
+    playerBId: integer("player_b_id")
+      .references(() => players.id)
+      .notNull(),
+    /** The lower of the two lifts: both players must target the other. */
+    targetingScore: real("targeting_score").notNull(),
+    /** Each side's own lift, so a page can show who drives the pair. */
+    liftA: real("lift_a").notNull(),
+    liftB: real("lift_b").notNull(),
+    hitsAOnB: smallint("hits_a_on_b").notNull().default(0),
+    hitsBOnA: smallint("hits_b_on_a").notNull().default(0),
+    gamesShared: integer("games_shared").notNull(),
+    toiSharedSeconds: integer("toi_shared_seconds").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.seasonScope, table.gameTypeScope, table.rank],
+    }),
+    index("idx_targeting_players").on(table.playerAId, table.playerBId),
+  ]
+);
+
+/**
  * Team-against-team intensity, derived from `versus_stats` + `games` by
  * `npm run compute:versus`.
  *

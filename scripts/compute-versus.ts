@@ -14,6 +14,7 @@ import {
   versusStats,
   leaderboardEntries,
   teamRivalryEntries,
+  targetingEntries,
 } from "../src/db/schema";
 import { unwrapRows } from "../src/lib/db-utils";
 import {
@@ -404,6 +405,162 @@ interface LeaderboardPairRow extends SkaterRivalryInput {
   position_b: string | null;
   toiSharedSeconds: number;
   [key: string]: unknown;
+}
+
+/**
+ * Hits of ordinary behaviour credited to each side of a pair before its own
+ * record outweighs the prior.
+ *
+ * In hits rather than games, because that is the unit the noise lives in. A
+ * pair with four hits between them can read as double their normal rate on one
+ * extra shove; a pair with forty cannot. Six is roughly the median a pair
+ * accumulates over the shared time this board admits.
+ */
+const PRIOR_HITS = 6;
+
+/**
+ * Rebuilds `targeting_entries` for every season scope and game type.
+ *
+ * The metric is each player's hits on one opponent against his own hit rate
+ * across every opponent, and the pair scores the *lower* of the two lifts —
+ * both have to be seeking the other out.
+ *
+ * Baselines are computed per scope rather than once, because a player's
+ * physicality changes across a career and a 2016 baseline should not judge a
+ * 2025 season.
+ *
+ * One fetch, rolled up per scope in memory. Thirty-three scans of
+ * `versus_stats` would cost far more than holding its opponent rows once.
+ */
+async function refreshTargeting(db: PostgresJsDatabase) {
+  console.log("\nRebuilding targeting_entries...");
+  const started = Date.now();
+
+  const seasonRows = await db.execute(
+    sql`SELECT id FROM seasons WHERE ingested = true ORDER BY id DESC`
+  );
+  const seasonIds = unwrapRows<{ id: string }>(seasonRows).map((r) => r.id);
+  const seasonScopes: string[] = ["ALL", ...seasonIds];
+
+  interface PairRow {
+    a_id: number; b_id: number; season_id: string; game_type: number;
+    toi: number; games: number; hits_a: number; hits_b: number;
+    [key: string]: unknown;
+  }
+
+  // Goalies are excluded: they do not hit and are not hit, so every pair
+  // involving one sits at a zero baseline the ratio cannot use.
+  const rows = unwrapRows<PairRow>(
+    await db.execute(sql`
+      SELECT v.player_a_id AS a_id, v.player_b_id AS b_id,
+             v.season_id, v.game_type,
+             v.toi_shared_seconds AS toi, v.games_shared AS games,
+             v.hits_by_a AS hits_a, v.hits_by_b AS hits_b
+      FROM versus_stats v
+      JOIN players pa ON pa.id = v.player_a_id
+      JOIN players pb ON pb.id = v.player_b_id
+      WHERE v.same_team = false
+        AND v.game_type IN (2, 3)
+        AND v.toi_shared_seconds > 0
+        AND pa.position <> 'G' AND pb.position <> 'G'
+    `)
+  );
+
+  const entries: (typeof targetingEntries.$inferInsert)[] = [];
+
+  for (const seasonScope of seasonScopes) {
+    for (const gameTypeScope of GAME_TYPE_SCOPES) {
+      const wanted = (r: PairRow) =>
+        (seasonScope === "ALL" || r.season_id === seasonScope) &&
+        (gameTypeScope === "both" ||
+          (gameTypeScope === "regular" ? r.game_type === 2 : r.game_type === 3));
+
+      // Each player's own hits per hour of shared ice, across every opponent.
+      const base = new Map<number, { hits: number; hours: number }>();
+      const bump = (id: number, hits: number, hours: number) => {
+        const b = base.get(id) ?? { hits: 0, hours: 0 };
+        b.hits += hits;
+        b.hours += hours;
+        base.set(id, b);
+      };
+      for (const r of rows) {
+        if (!wanted(r)) continue;
+        const h = r.toi / 3600;
+        bump(r.a_id, r.hits_a, h);
+        bump(r.b_id, r.hits_b, h);
+      }
+
+      interface Acc {
+        aId: number; bId: number; toi: number; games: number;
+        hitsA: number; hitsB: number; expA: number; expB: number;
+      }
+      const pairs = new Map<string, Acc>();
+      for (const r of rows) {
+        if (!wanted(r)) continue;
+        const k = `${r.a_id}-${r.b_id}`;
+        let p = pairs.get(k);
+        if (!p) {
+          p = {
+            aId: r.a_id, bId: r.b_id, toi: 0, games: 0,
+            hitsA: 0, hitsB: 0, expA: 0, expB: 0,
+          };
+          pairs.set(k, p);
+        }
+        const h = r.toi / 3600;
+        const ra = base.get(r.a_id)!;
+        const rb = base.get(r.b_id)!;
+        p.toi += r.toi;
+        p.games += r.games;
+        p.hitsA += r.hits_a;
+        p.hitsB += r.hits_b;
+        p.expA += (ra.hours > 0 ? ra.hits / ra.hours : 0) * h;
+        p.expB += (rb.hours > 0 ? rb.hits / rb.hours : 0) * h;
+      }
+
+      const scored = [];
+      for (const p of pairs.values()) {
+        // The same noise floor the player leaderboard uses.
+        if (p.toi < LEADERBOARD_MIN_TOI) continue;
+        if (p.expA <= 0 || p.expB <= 0) continue;
+        const liftA = (p.hitsA + PRIOR_HITS) / (p.expA + PRIOR_HITS);
+        const liftB = (p.hitsB + PRIOR_HITS) / (p.expB + PRIOR_HITS);
+        scored.push({ p, liftA, liftB, score: Math.min(liftA, liftB) });
+      }
+
+      scored
+        .sort((x, y) => y.score - x.score)
+        .slice(0, LEADERBOARD_SIZE)
+        .forEach((s, i) => {
+          entries.push({
+            seasonScope,
+            gameTypeScope,
+            rank: i + 1,
+            playerAId: s.p.aId,
+            playerBId: s.p.bId,
+            targetingScore: s.score,
+            liftA: s.liftA,
+            liftB: s.liftB,
+            hitsAOnB: s.p.hitsA,
+            hitsBOnA: s.p.hitsB,
+            gamesShared: s.p.games,
+            toiSharedSeconds: s.p.toi,
+          });
+        });
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`DELETE FROM targeting_entries`);
+    const BATCH = 500;
+    for (let i = 0; i < entries.length; i += BATCH) {
+      await tx.insert(targetingEntries).values(entries.slice(i, i + BATCH));
+    }
+  });
+
+  console.log(
+    `Done! ${entries.length} rows across ${seasonScopes.length} season scopes ` +
+      `in ${((Date.now() - started) / 1000).toFixed(1)}s.`
+  );
 }
 
 /**
@@ -847,6 +1004,7 @@ async function main() {
     await refreshPlayerSeasonStats(db);
     await refreshLeaderboard(db);
     await refreshTeamRivalry(db);
+    await refreshTargeting(db);
     await client.end();
     return;
   }
@@ -1067,6 +1225,7 @@ async function main() {
   await refreshPlayerSeasonStats(db);
   await refreshLeaderboard(db);
   await refreshTeamRivalry(db);
+  await refreshTargeting(db);
   await client.end();
 }
 
