@@ -335,3 +335,39 @@ as typed columns. Nothing scores on them yet.
   now impossible by construction, so a high figure just means the two are
   matched against each other often, which is what the board should select for.
   The board averages 604 against a pool average of 318.
+- **Migrate Neon *before* the deploy, never after.** Nothing runs
+  `drizzle-kit migrate` for you: not CI, not the ingestion workflow, not the
+  Vercel build. `db:migrate` is manual, and Vercel promotes a build the moment
+  it is ready, so there is no window between "code exists" and "code serves
+  traffic" in which to catch up. Deploying first means every request to a route
+  that selects a new column returns 500 until someone notices.
+
+  This has already happened once, on 2026-08-28: `toi_seconds` shipped ahead of
+  its migration and `/api/players/search` — the home page's main panel — failed
+  for every visitor until the migration ran. Sentry caught it with
+  `column "toi_seconds" does not exist`.
+
+  The order that works, and leaves every intermediate state serviceable:
+
+  1. `npm run db:migrate` against `DIRECT_DATABASE_URL`. Additive migrations are
+     invisible to the running code, which cannot select a column it does not
+     know about.
+  2. Recompute, from a checkout of the new code. The old deployed code reads the
+     same columns whatever values they hold.
+  3. Merge and deploy.
+
+  Both steps 1 and 2 are abort points: stop after either and the site is fine.
+  A sequence that deploys first has none.
+- **A partial recompute is invisible, not loud.** `compute:versus` rebuilds
+  `player_season_totals`, `player_season_stats` and `leaderboard_entries` at the
+  end of *every* season's run, not once at the end of a loop. A loop that dies
+  at season six therefore leaves a fully rebuilt, internally consistent-looking
+  board ranking six new-scoring seasons against four old ones. Nothing errors.
+  Check per season rather than trusting the last run's output:
+
+  ```sql
+  SELECT season_id, SUM(penalty_shots_a + penalty_shots_b)::int AS ps
+  FROM versus_stats WHERE game_type = 2 GROUP BY season_id ORDER BY season_id;
+  ```
+
+  Every season must be non-zero. A zero is a season still carrying old scoring.

@@ -335,6 +335,20 @@ export const playerSeasonStats = pgTable(
     penaltyMinutes: smallint("penalty_minutes").notNull().default(0),
     faceoffWins: smallint("faceoff_wins").notNull().default(0),
     faceoffLosses: smallint("faceoff_losses").notNull().default(0),
+    /**
+     * Goalie workload, from `game_events.goalie_in_net_id`, which names the
+     * goalie facing each shot on 99.46% of them.
+     *
+     * `saves` counts shots on goal stopped and `goalsAgainst` those that went
+     * in, so save percentage is `saves / (saves + goalsAgainst)`. Missed and
+     * blocked shots are excluded: neither reaches the goalie, and counting
+     * them would inflate every save percentage.
+     *
+     * Zero for every skater. Kept on this table rather than a goalie-only one
+     * because the grain is identical and the search ranks both together.
+     */
+    saves: smallint("saves").notNull().default(0),
+    goalsAgainst: smallint("goals_against").notNull().default(0),
   },
   (table) => [
     primaryKey({ columns: [table.playerId, table.seasonId, table.gameType] }),
