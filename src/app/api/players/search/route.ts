@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api-error";
 import { db } from "@/db";
-import { players, teams, seasons, versusStats, playerSeasonTotals } from "@/db/schema";
+import {
+  players,
+  teams,
+  seasons,
+  versusStats,
+  playerSeasonTotals,
+  playerSeasonStats,
+} from "@/db/schema";
 import { ilike, asc, isNotNull, inArray, and, or, eq, gt, desc, sql } from "drizzle-orm";
 import { cachedJson, DERIVED } from "@/lib/api-cache";
 
@@ -65,28 +72,69 @@ export async function GET(request: NextRequest) {
     );
 
     /**
-     * Ice time per player, for ranking the list.
+     * Prominence: how likely a hockey fan is to recognise this player.
      *
-     * Grouped to one row per player, so joining it cannot multiply the result
-     * set. Three figures, because they rank differently:
+     * Ice time alone ranked defencemen above forwards, because a top-pair
+     * defenceman plays 25 minutes and a first-line centre 21. On Edmonton that
+     * put Bouchard and Nurse ahead of McDavid, which is the opposite of what a
+     * picker is for. The fix is to score minutes *and* output.
      *
-     * - `totalToi`   — every season on record.
-     * - `latestToi`  — the most recent season only.
-     * - `totalGames` — divides either one into a per-game rate.
+     * Both components are percentile ranks **within the player's own position
+     * group**, then averaged. Percentiles rather than raw values because the
+     * units do not compare: points run 0 to 140 and save percentage 0.87 to
+     * 0.93, so any linear blend would be dominated by whichever has the wider
+     * spread. Within position group because it is the only way a goalie and a
+     * skater can be placed on one scale at all — the best of each lands near
+     * 1.0, a fringe player near 0.
      *
-     * The join is a LEFT JOIN, so a player with no rows here comes back null.
+     * - Skaters pair ice time with points.
+     * - Goalies pair ice time with save percentage, which needs a minimum
+     *   workload or a backup with two clean periods outranks a starter.
+     *
+     * All ranks are league-wide, so the ordering inside one team reflects
+     * standing across the league rather than only among team-mates.
      */
-    const toi = db
+    const GOALIE_MIN_SHOTS = 200;
+
+    const prominence = db
       .select({
         playerId: playerSeasonTotals.playerId,
-        totalToi: sql<number>`SUM(${playerSeasonTotals.toiSeconds})::int`.as("total_toi"),
-        totalGames: sql<number>`SUM(${playerSeasonTotals.gamesPlayed})::int`.as("total_games"),
         latestToi: sql<number>`COALESCE(SUM(${playerSeasonTotals.toiSeconds}) FILTER (
           WHERE ${playerSeasonTotals.seasonId} = (SELECT MAX(${seasons.id}) FROM ${seasons})
         ), 0)::int`.as("latest_toi"),
+        score: sql<number>`
+          (
+            PERCENT_RANK() OVER (
+              PARTITION BY (${players.position} = 'G')
+              ORDER BY COALESCE(SUM(${playerSeasonTotals.toiSeconds}) FILTER (
+                WHERE ${playerSeasonTotals.seasonId} = (SELECT MAX(${seasons.id}) FROM ${seasons})
+              ), 0)
+            )
+            + PERCENT_RANK() OVER (
+              PARTITION BY (${players.position} = 'G')
+              ORDER BY CASE
+                WHEN ${players.position} = 'G' THEN
+                  CASE WHEN SUM(${playerSeasonStats.saves} + ${playerSeasonStats.goalsAgainst}) >= ${GOALIE_MIN_SHOTS}
+                    THEN SUM(${playerSeasonStats.saves})::numeric
+                         / NULLIF(SUM(${playerSeasonStats.saves} + ${playerSeasonStats.goalsAgainst}), 0)
+                    ELSE 0 END
+                ELSE SUM(${playerSeasonStats.goals} + ${playerSeasonStats.assists})
+              END
+            )
+          ) / 2
+        `.as("score"),
       })
       .from(playerSeasonTotals)
-      .groupBy(playerSeasonTotals.playerId)
+      .innerJoin(players, eq(players.id, playerSeasonTotals.playerId))
+      .leftJoin(
+        playerSeasonStats,
+        and(
+          eq(playerSeasonStats.playerId, playerSeasonTotals.playerId),
+          eq(playerSeasonStats.seasonId, playerSeasonTotals.seasonId),
+          eq(playerSeasonStats.gameType, playerSeasonTotals.gameType)
+        )
+      )
+      .groupBy(playerSeasonTotals.playerId, players.position)
       .as("toi");
 
     const results = await db
@@ -104,20 +152,18 @@ export async function GET(request: NextRequest) {
       })
       .from(players)
       .leftJoin(teams, sql`${players.currentTeamId} = ${teams.id}`)
-      .leftJoin(toi, eq(toi.playerId, players.id))
+      .leftJoin(prominence, eq(prominence.playerId, players.id))
       .where(where)
       /**
-       * Most recent season's ice time first, so the names a hockey fan knows
-       * sit at the top of each team. Goalies lead most groups, which is the
-       * honest answer to "who played the most" rather than a flaw.
+       * Most prominent first, so the names a hockey fan knows sit at the top
+       * of each team.
        *
-       * `NULLS LAST` is load-bearing. `latest_toi` is COALESCEd to 0 inside
-       * the subquery, but a player with no `player_season_totals` row at all
-       * misses the LEFT JOIN and comes back null — and Postgres sorts nulls
-       * *first* under DESC. Without this the never-played players lead the
-       * list on any call that does not pass `minGames`.
+       * `NULLS LAST` is load-bearing. A player with no `player_season_totals`
+       * row at all misses the LEFT JOIN and comes back null, and Postgres
+       * sorts nulls *first* under DESC. Without this the never-played players
+       * lead the list on any call that does not pass `minGames`.
        */
-      .orderBy(sql`${toi.latestToi} DESC NULLS LAST`, asc(players.lastName))
+      .orderBy(sql`${prominence.score} DESC NULLS LAST`, asc(players.lastName))
       .limit(q && q.length >= 2 ? 50 : 1000);
 
     return cachedJson({ players: results }, DERIVED);

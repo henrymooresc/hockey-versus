@@ -292,7 +292,7 @@ async function refreshPlayerSeasonStats(db: PostgresJsDatabase) {
       INSERT INTO player_season_stats (
         player_id, season_id, game_type,
         goals, assists, shots, hits, blocks, penalty_minutes,
-        faceoff_wins, faceoff_losses
+        faceoff_wins, faceoff_losses, saves, goals_against
       )
       WITH scored AS (
         -- One scan and one join for every arm below, and the one place the
@@ -308,7 +308,7 @@ async function refreshPlayerSeasonStats(db: PostgresJsDatabase) {
         -- shootout, so periods 5 through 8 there are real overtime and hold 44
         -- real goals; a blanket period filter would throw them away.
         SELECT e.event_type, e.player1_id, e.player2_id, e.player3_id,
-               e.penalty_minutes, g.season_id, g.game_type
+               e.penalty_minutes, e.goalie_in_net_id, g.season_id, g.game_type
         FROM game_events e JOIN games g ON g.id = e.game_id
         WHERE g.game_type IN (2, 3)
           AND NOT (g.game_type = 2 AND e.period >= 5)
@@ -317,30 +317,30 @@ async function refreshPlayerSeasonStats(db: PostgresJsDatabase) {
         -- Goals. The scorer is player1.
         SELECT player1_id AS player_id, season_id, game_type,
                1 AS goals, 0 AS assists, 0 AS shots, 0 AS hits, 0 AS blocks,
-               0 AS pim, 0 AS fo_wins, 0 AS fo_losses
+               0 AS pim, 0 AS fo_wins, 0 AS fo_losses, 0 AS saves, 0 AS ga
         FROM scored WHERE event_type = 'goal' AND player1_id IS NOT NULL
         UNION ALL
         -- Primary assist.
-        SELECT player2_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0
+        SELECT player2_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
         FROM scored WHERE event_type = 'goal' AND player2_id IS NOT NULL
         UNION ALL
         -- Secondary assist.
-        SELECT player3_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0
+        SELECT player3_id, season_id, game_type, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
         FROM scored WHERE event_type = 'goal' AND player3_id IS NOT NULL
         UNION ALL
         -- Shot attempts. All four types, because the engine counts all four:
         -- a goal increments playerAShots, and so does a miss or a block.
-        SELECT player1_id, season_id, game_type, 0, 0, 1, 0, 0, 0, 0, 0
+        SELECT player1_id, season_id, game_type, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0
         FROM scored
         WHERE event_type IN ('goal', 'shot', 'missed_shot', 'blocked_shot')
           AND player1_id IS NOT NULL
         UNION ALL
         -- Hits thrown. player1 is the hitter, player2 the one hit.
-        SELECT player1_id, season_id, game_type, 0, 0, 0, 1, 0, 0, 0, 0
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0
         FROM scored WHERE event_type = 'hit' AND player1_id IS NOT NULL
         UNION ALL
         -- Blocks. On a blocked shot player1 shot it and player2 blocked it.
-        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 1, 0, 0, 0
+        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0
         FROM scored WHERE event_type = 'blocked_shot' AND player2_id IS NOT NULL
         UNION ALL
         -- Penalty minutes served. 2,965 penalties have no committer at all
@@ -356,21 +356,36 @@ async function refreshPlayerSeasonStats(db: PostgresJsDatabase) {
         -- This is a deliberate divergence from versus-engine.ts, which falls
         -- back to 2 minutes on a zero. That fallback fabricates time nobody
         -- served; see the note in PLAN-suggestions.md.
-        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, penalty_minutes, 0, 0
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, penalty_minutes, 0, 0, 0, 0
         FROM scored WHERE event_type = 'penalty' AND player1_id IS NOT NULL
         UNION ALL
         -- Faceoffs. player1 won the draw, player2 lost it.
-        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 1, 0
+        SELECT player1_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
         FROM scored WHERE event_type = 'faceoff' AND player1_id IS NOT NULL
         UNION ALL
-        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 0, 1
+        SELECT player2_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
         FROM scored WHERE event_type = 'faceoff' AND player2_id IS NOT NULL
+        UNION ALL
+        -- Saves and goals against, credited to the goalie who faced the shot.
+        --
+        -- Shots on goal only: a 'shot' event reached the net and was stopped,
+        -- a 'goal' reached it and went in. Missed and blocked shots never got
+        -- there, so counting them would inflate every save percentage.
+        --
+        -- goalie_in_net_id is present on 99.46% of shots and goals. The rest
+        -- are mostly empty-net situations, where there is no goalie to credit.
+        SELECT goalie_in_net_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0
+        FROM scored WHERE event_type = 'shot' AND goalie_in_net_id IS NOT NULL
+        UNION ALL
+        SELECT goalie_in_net_id, season_id, game_type, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        FROM scored WHERE event_type = 'goal' AND goalie_in_net_id IS NOT NULL
       )
       SELECT
         player_id, season_id, game_type,
         SUM(goals)::smallint, SUM(assists)::smallint, SUM(shots)::smallint,
         SUM(hits)::smallint, SUM(blocks)::smallint, SUM(pim)::smallint,
-        SUM(fo_wins)::smallint, SUM(fo_losses)::smallint
+        SUM(fo_wins)::smallint, SUM(fo_losses)::smallint,
+        SUM(saves)::smallint, SUM(ga)::smallint
       FROM contributions
       GROUP BY player_id, season_id, game_type
     `);
