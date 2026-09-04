@@ -101,6 +101,45 @@ const CATEGORY_WEIGHTS = {
  * board by two places out of 200.
  */
 
+/**
+ * The category totals a weighted volume is built from, each already summed
+ * across both sides of the contest.
+ *
+ * Volume is direction-agnostic on purpose: it asks how much happened between
+ * the two, not who did it. That is what lets a team matchup reuse this, where
+ * the A and B labels in `versus_stats` mean nothing — they follow player id
+ * order, so one team's players sit on both sides of the pair rows.
+ */
+export interface VolumeCategories {
+  /** Goals plus assists, both sides. */
+  points: number;
+  penaltyMinutes: number;
+  penaltyShots: number;
+  hits: number;
+  blocks: number;
+  shots: number;
+}
+
+/**
+ * The one definition of weighted volume.
+ *
+ * Every caller that scores interaction volume goes through here — the skater
+ * formula below, and the team rollup in `compute-versus.ts`. TASKS.md records
+ * that the formula was already explained in three places; a fourth copy in SQL
+ * would be the one that silently drifts, because nothing typechecks it against
+ * these weights.
+ */
+export function computeWeightedVolume(c: VolumeCategories): number {
+  return (
+    CATEGORY_WEIGHTS.points * c.points +
+    CATEGORY_WEIGHTS.penaltyMinutes * c.penaltyMinutes +
+    CATEGORY_WEIGHTS.penaltyShots * c.penaltyShots +
+    CATEGORY_WEIGHTS.hits * c.hits +
+    CATEGORY_WEIGHTS.blocks * c.blocks +
+    CATEGORY_WEIGHTS.shots * c.shots
+  );
+}
+
 const GOALIE_CATEGORY_WEIGHTS = {
   goals: 8,
   assists: 4,
@@ -121,13 +160,14 @@ function skaterVolumeAndBalance(
   const ptsA = input.playerAGoals + input.playerAAssists;
   const ptsB = input.playerBGoals + input.playerBAssists;
 
-  const weightedVolume =
-    CATEGORY_WEIGHTS.points * (ptsA + ptsB) +
-    CATEGORY_WEIGHTS.penaltyMinutes * (input.penaltyMinutesA + input.penaltyMinutesB) +
-    CATEGORY_WEIGHTS.penaltyShots * (input.penaltyShotsA + input.penaltyShotsB) +
-    CATEGORY_WEIGHTS.hits * (input.hitsByA + input.hitsByB) +
-    CATEGORY_WEIGHTS.blocks * (input.blocksByA + input.blocksByB) +
-    CATEGORY_WEIGHTS.shots * (input.playerAShots + input.playerBShots);
+  const weightedVolume = computeWeightedVolume({
+    points: ptsA + ptsB,
+    penaltyMinutes: input.penaltyMinutesA + input.penaltyMinutesB,
+    penaltyShots: input.penaltyShotsA + input.penaltyShotsB,
+    hits: input.hitsByA + input.hitsByB,
+    blocks: input.blocksByA + input.blocksByB,
+    shots: input.playerAShots + input.playerBShots,
+  });
 
   const categories: [number, number][] = [
     [ptsA, ptsB],

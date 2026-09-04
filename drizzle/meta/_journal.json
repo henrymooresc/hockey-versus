@@ -92,6 +92,20 @@
       "when": 1788374171650,
       "tag": "0012_add_penalty_shots",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788452161579,
+      "tag": "0013_add_team_rivalry",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788534638542,
+      "tag": "0014_add_targeting",
+      "breakpoints": true
     }
   ]
 }
